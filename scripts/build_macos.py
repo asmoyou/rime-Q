@@ -10,7 +10,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 IDENTIFIER = "com.asmoyou.inputmethod.RimeQ"
-VERSION = "0.1.4"
+VERSION = "0.1.5"
 
 
 def run(*args):
@@ -123,32 +123,53 @@ def build(universal=False, resources=True, keep_app=False, smoke=False):
         app = payload / "RimeQ.app"
         build_app(app, universal, resources)
         if smoke:
+            run(sys.executable, ROOT / "scripts/test_macos_install_plan.py")
             run(app / "Contents/MacOS/RimeQ", "--smoke")
             run(app / "Contents/MacOS/RimeQ", "--installation-smoke")
             run(app / "Contents/MacOS/RimeQ", "--maintenance-smoke")
+            run(app / "Contents/MacOS/RimeQ", "--candidate-smoke")
+            run(app / "Contents/MacOS/RimeQ", "--controller-smoke")
         component = staging / "RimeQ-component.pkg"
+        package_scripts = staging / "Scripts"
+        shutil.copytree(ROOT / "scripts/macos/package-scripts", package_scripts)
+        build_number = plistlib.loads((app / "Contents/Info.plist").read_bytes())["CFBundleVersion"]
+        (package_scripts / "package-version.plist").write_bytes(plistlib.dumps({"Version": VERSION, "Build": build_number}))
+        resources = staging / "Resources"
+        shutil.copytree(ROOT / "scripts/macos/package-resources", resources)
+        for resource in resources.glob("*.html"):
+            resource.write_text(resource.read_text().replace("@PACKAGE_VERSION@", VERSION))
         run("pkgbuild", "--root", payload,
             "--component-plist", ROOT / "scripts/macos/component.plist",
-            "--scripts", ROOT / "scripts/macos/package-scripts",
+            "--scripts", package_scripts,
             "--identifier", IDENTIFIER, "--version", VERSION,
             "--install-location", "/Library/Input Methods", component)
         distribution = staging / "Distribution.xml"
+        checks = (ROOT / "scripts/macos/installation-check.js").read_text().replace("@PACKAGE_VERSION@", VERSION).replace("@PACKAGE_BUILD@", build_number)
+        choices = []
+        for action, title, description in [
+            ("install", "安装", "首次安装。内置引擎和词库将安装到系统输入法目录。"),
+            ("upgrade", "升级至", "检测到较旧版本。更新应用，保留个人词库、学习记录和设置。"),
+            ("repair", "重新安装", "检测到相同版本。重新安装以修复应用，保留个人词库和设置。")
+        ]:
+            choices.append(f'<choice id="{action}" title="{title} Rime Q {VERSION}" description="{description}" enabled="false" selected="rimeqActionIs(\'{action}\')" visible="rimeqActionIs(\'{action}\')"><pkg-ref id="{IDENTIFIER}"/></choice>')
         distribution.write_text(f'''<?xml version="1.0" encoding="utf-8"?>
 <installer-gui-script minSpecVersion="2">
-  <title>Rime Q</title>
-  <options customize="never" require-scripts="false" hostArchitectures="x86_64,arm64"/>
+  <title>Rime Q {VERSION}</title>
+  <options customize="always" require-scripts="true" hostArchitectures="x86_64,arm64"/>
   <domains enable_anywhere="false" enable_currentUserHome="false" enable_localSystem="true"/>
   <allowed-os-versions><os-version min="13.0"/></allowed-os-versions>
   <welcome file="welcome.html" mime-type="text/html"/>
   <conclusion file="conclusion.html" mime-type="text/html"/>
-  <choices-outline><line choice="rimeq"/></choices-outline>
-  <choice id="rimeq" title="Rime Q" visible="false"><pkg-ref id="{IDENTIFIER}"/></choice>
+  <installation-check script="rimeqCheckInstallation()"/>
+  <choices-outline><line choice="install"/><line choice="upgrade"/><line choice="repair"/></choices-outline>
+  {''.join(choices)}
   <pkg-ref id="{IDENTIFIER}" version="{VERSION}" onConclusion="None">RimeQ-component.pkg</pkg-ref>
+  <script><![CDATA[{checks}]]></script>
 </installer-gui-script>
 ''')
         package = ROOT / f"dist/RimeQ-{VERSION}-preview.pkg"
         run("productbuild", "--distribution", distribution, "--package-path", staging,
-            "--resources", ROOT / "scripts/macos/package-resources", package)
+            "--resources", resources, package)
         run(sys.executable, ROOT / "scripts/verify_macos_package.py", package)
         if keep_app:
             shutil.move(str(app), str(retained))

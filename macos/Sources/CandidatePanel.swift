@@ -2,62 +2,105 @@ import AppKit
 
 final class CandidateCanvas: NSView {
     override var isFlipped: Bool { true }
+    override var isOpaque: Bool { false }
     var composition = Composition()
     var select: ((Int) -> Void)?
     var fontSize: CGFloat = 18
-    let padding: CGFloat = 12
+    let padding: CGFloat = 8
+    private let horizontalPadding: CGFloat = 10
+    private let labelGap: CGFloat = 8
+    private let commentGap: CGFloat = 8
     var rowHeight: CGFloat { fontSize + 16 }
+    private var textFont: NSFont { .systemFont(ofSize: fontSize) }
+    private var smallFont: NSFont { .systemFont(ofSize: 12) }
+    private var numberFont: NSFont { .monospacedDigitSystemFont(ofSize: 12, weight: .regular) }
+    private var secondaryTextColor: NSColor { .labelColor.withAlphaComponent(0.68) }
+    private func width(_ string: String, font: NSFont) -> CGFloat {
+        ceil((string as NSString).size(withAttributes: [.font: font]).width)
+    }
+    private var numberWidth: CGFloat {
+        width(String(max(1, composition.candidates.count)), font: numberFont)
+    }
+    private var textX: CGFloat { horizontalPadding + numberWidth + labelGap }
 
     func measuredSize() -> NSSize {
-        let font = NSFont.systemFont(ofSize: fontSize)
+        guard !composition.candidates.isEmpty else { return .zero }
         let widest = composition.candidates.map {
-            ($0.text as NSString).size(withAttributes: [.font: font]).width +
-            ($0.comment as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 12)]).width
-        }.max() ?? 120
-        return NSSize(width: min(580, max(190, widest + 76)),
+            width($0.text, font: textFont) + ($0.comment.isEmpty ? 0 : commentGap + width($0.comment, font: smallFont))
+        }.max() ?? 0
+        return NSSize(width: min(580, ceil(textX + widest + horizontalPadding)),
                       height: CGFloat(composition.candidates.count) * rowHeight + padding * 2)
     }
 
+    func textWidths(for item: CandidateItem) -> (text: CGFloat, comment: CGFloat) {
+        let available = max(0, bounds.width - textX - horizontalPadding)
+        let naturalText = width(item.text, font: textFont)
+        guard !item.comment.isEmpty else { return (available, 0) }
+        let minimumText = min(naturalText, max(fontSize * 2, available * 0.65))
+        let comment = min(width(item.comment, font: smallFont), max(0, available - minimumText - commentGap))
+        return (max(0, available - (comment > 0 ? comment + commentGap : 0)), comment)
+    }
+
     override func draw(_ dirtyRect: NSRect) {
-        NSColor.windowBackgroundColor.setFill()
-        NSBezierPath(roundedRect: bounds, xRadius: 10, yRadius: 10).fill()
         for (index, item) in composition.candidates.enumerated() {
-            let row = NSRect(x: 6, y: padding + CGFloat(index) * rowHeight, width: bounds.width - 12, height: rowHeight)
+            let row = NSRect(x: 4, y: padding + CGFloat(index) * rowHeight, width: bounds.width - 8, height: rowHeight)
             if index == composition.highlighted {
                 NSColor.controlAccentColor.withAlphaComponent(0.15).setFill()
                 NSBezierPath(roundedRect: row, xRadius: 6, yRadius: 6).fill()
             }
             let y = row.minY + (rowHeight - fontSize - 4) / 2
-            ("\(index + 1)" as NSString).draw(at: NSPoint(x: 16, y: y + 3),
-                withAttributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .regular),
-                                 .foregroundColor: NSColor.secondaryLabelColor])
-            let font = NSFont.systemFont(ofSize: fontSize)
+            ("\(index + 1)" as NSString).draw(at: NSPoint(x: horizontalPadding, y: y + 3),
+                withAttributes: [.font: numberFont,
+                                 .foregroundColor: secondaryTextColor])
             let paragraph = NSMutableParagraphStyle()
             paragraph.lineBreakMode = .byTruncatingTail
-            (item.text as NSString).draw(in: NSRect(x: 38, y: y, width: bounds.width - 54, height: rowHeight),
-                withAttributes: [.font: font, .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph])
-            let commentX = 48 + (item.text as NSString).size(withAttributes: [.font: font]).width
-            if commentX + 30 < bounds.width {
+            let widths = textWidths(for: item)
+            (item.text as NSString).draw(in: NSRect(x: textX, y: y, width: widths.text, height: rowHeight),
+                withAttributes: [.font: textFont, .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph])
+            let commentX = textX + min(width(item.text, font: textFont), widths.text) + commentGap
+            if widths.comment > 0 {
                 (item.comment as NSString).draw(in: NSRect(x: commentX, y: y + 4,
-                    width: bounds.width - commentX - 12, height: rowHeight),
-                    withAttributes: [.font: NSFont.systemFont(ofSize: 12),
-                                     .foregroundColor: NSColor.secondaryLabelColor, .paragraphStyle: paragraph])
+                    width: widths.comment, height: rowHeight),
+                    withAttributes: [.font: smallFont,
+                                     .foregroundColor: secondaryTextColor, .paragraphStyle: paragraph])
             }
         }
     }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    func candidateIndex(at point: NSPoint) -> Int? {
+        guard bounds.contains(point), point.y >= padding else { return nil }
+        let index = Int((point.y - padding) / rowHeight)
+        return composition.candidates.indices.contains(index) ? index : nil
+    }
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
-        guard point.y >= padding else { return }
-        let index = Int((point.y - padding) / rowHeight)
-        if composition.candidates.indices.contains(index) { select?(index) }
+        if let index = candidateIndex(at: point) { select?(index) }
     }
+}
+
+final class CandidateSurface: NSVisualEffectView {
+    let canvas = CandidateCanvas(frame: .zero)
+
+    init() {
+        super.init(frame: .zero)
+        material = .popover
+        blendingMode = .behindWindow
+        state = .active
+        wantsLayer = true
+        layer?.cornerRadius = 10
+        layer?.masksToBounds = true
+        canvas.autoresizingMask = [.width, .height]
+        addSubview(canvas)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 }
 
 final class CandidatePanel: NSPanel {
     static let shared = CandidatePanel()
-    let canvas = CandidateCanvas(frame: .zero)
+    let surface = CandidateSurface()
+    var canvas: CandidateCanvas { surface.canvas }
     private var owner: ObjectIdentifier?
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
@@ -70,7 +113,7 @@ final class CandidatePanel: NSPanel {
         level = .popUpMenu
         hidesOnDeactivate = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        contentView = canvas
+        contentView = surface
     }
 
     func show(_ composition: Composition, anchor: NSRect, owner: ObjectIdentifier, select: @escaping (Int) -> Void) {

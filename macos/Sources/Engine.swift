@@ -20,6 +20,9 @@ struct Composition {
 enum Product {
     static let identifier = "com.asmoyou.inputmethod.RimeQ"
     static let connection = "RimeQ_Connection"
+    static let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "开发构建"
+    static let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "本地"
+    static var versionDescription: String { "版本 \(version) · 构建 \(build)" }
     static let userRoot = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Application Support/RimeQ", isDirectory: true)
     static var schema: String {

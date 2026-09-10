@@ -45,7 +45,7 @@ jobs:
           key: mac-resources-${{ hashFiles('dependencies.lock.json') }}
       - run: python3 scripts/build_macos.py --universal --smoke
       - name: Install the actual PKG at its fixed system path
-        run: sudo installer -pkg dist/RimeQ-0.1.4-preview.pkg -target /
+        run: sudo installer -pkg dist/RimeQ-0.1.5-preview.pkg -target /
       - name: Verify activation result or explicit pending fallback
         run: |
           rimeq_status="$HOME/Library/Application Support/RimeQ/installation-status.plist"
@@ -73,7 +73,47 @@ jobs:
           '/Library/Input Methods/RimeQ.app/Contents/MacOS/RimeQ' --smoke
           '/Library/Input Methods/RimeQ.app/Contents/MacOS/RimeQ' --installation-smoke
           '/Library/Input Methods/RimeQ.app/Contents/MacOS/RimeQ' --maintenance-smoke
+          '/Library/Input Methods/RimeQ.app/Contents/MacOS/RimeQ' --candidate-smoke
+          '/Library/Input Methods/RimeQ.app/Contents/MacOS/RimeQ' --version
           test ! -e dist/RimeQ.app
+      - name: Verify same-version repair replaces the application
+        # The disposable runner is also used to exercise repair and downgrade rejection.
+        # These mutations must not be run against a user's live installation.
+        run: |
+          rimeq_app='/Library/Input Methods/RimeQ.app'
+          rimeq_status="$HOME/Library/Application Support/RimeQ/installation-status.plist"
+          rimeq_data="$HOME/Library/Application Support/RimeQ/rime"
+          mkdir -p "$rimeq_data"
+          touch "$rimeq_data/repair-retention-check"
+          pkill -u "$(id -u)" -f '^/Library/Input Methods/RimeQ[.]app/Contents/MacOS/RimeQ --complete-install$' || true
+          rm -f "$rimeq_status"
+          sudo touch "$rimeq_app/Contents/Resources/rimeq-repair-probe"
+          sudo installer -pkg dist/RimeQ-0.1.5-preview.pkg -target /
+          test ! -e "$rimeq_app/Contents/Resources/rimeq-repair-probe"
+          test -f "$rimeq_data/repair-retention-check"
+          codesign --verify --deep --strict "$rimeq_app"
+          for attempt in {1..45}; do
+            test ! -f "$rimeq_status" || break
+            sleep 1
+          done
+          test -f "$rimeq_status"
+          pkill -u "$(id -u)" -f '^/Library/Input Methods/RimeQ[.]app/Contents/MacOS/RimeQ --complete-install$' || true
+      - name: Reject a package older than the installed release
+        run: |
+          rimeq_info='/Library/Input Methods/RimeQ.app/Contents/Info.plist'
+          rimeq_info_backup="$(mktemp)"
+          cp "$rimeq_info" "$rimeq_info_backup"
+          restore_rimeq_info() {
+            sudo cp "$rimeq_info_backup" "$rimeq_info"
+            rm -f "$rimeq_info_backup"
+          }
+          trap restore_rimeq_info EXIT
+          sudo /usr/libexec/PlistBuddy -c 'Set :CFBundleShortVersionString 9.9.9' "$rimeq_info"
+          if sudo installer -pkg dist/RimeQ-0.1.5-preview.pkg -target /; then
+            echo '::error::An older package was accepted over a newer installed release.'
+            exit 1
+          fi
+          test "$(plutil -extract CFBundleShortVersionString raw -o - "$rimeq_info")" = 9.9.9
       - name: Verify uninstall retains personal data
         run: |
           rimeq_data="$HOME/Library/Application Support/RimeQ/rime"

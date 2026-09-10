@@ -4,7 +4,7 @@
 
 ## 安装
 
-构建得到 `dist/RimeQ-0.1.4-preview.pkg`，双击即可安装应用与其内置的引擎、词库和模型。系统安装位置固定为 `/Library/Input Methods/RimeQ.app`，禁用 Installer 的应用重定位。安装后由 LaunchServices 启动当前登录用户的应用来注册输入法，再通过独立进程核验启用状态；不从包脚本直接执行注册入口。更新时会正常退出旧版本进程。
+构建得到 `dist/RimeQ-0.1.5-preview.pkg`，双击即可安装应用与其内置的引擎、词库和模型。系统安装位置固定为 `/Library/Input Methods/RimeQ.app`，禁用 Installer 的应用重定位。安装后由 LaunchServices 启动当前登录用户的应用来注册输入法，再通过独立进程核验启用状态；不从包脚本直接执行注册入口。更新时会正常退出旧版本进程。
 
 默认构建只保留 PKG，临时应用目录在打包后删除，避免重复应用影响系统识别。本地开发可用 `python3 scripts/build_macos.py --keep-app` 保留应用，再运行 `python3 scripts/install_macos.py`，将其移动到当前用户的 `~/Library/Input Methods/RimeQ.app`。两个安装位置只保留一份 Rime Q；PKG 遇到另一个安装目录内的同标识应用会在写入前中止，不自动删除个人文件。
 
@@ -16,6 +16,9 @@
 
 ## 使用
 
+- “关于 Rime Q…”及设置窗口底部显示版本与构建号，也可用应用的 `--version` 参数查询。
+- 安装类型根据实际已有版本自动选择首次安装、升级或同版修复；版本或构建降级会在安装前阻止，个人词库与设置保留。
+- 候选栏使用原生半透明材质，按文字和注释测量宽度，保留长句宽度上限并遵循系统的减少透明度设置。
 - 输入全拼，按空格确认当前候选；数字键或鼠标选择对应候选。
 - `−` / `=` 或 Page Up / Page Down 翻页，Esc 取消当前组合。
 - 单独按下并松开 Shift 切换中英文。

@@ -171,6 +171,8 @@ final class InputSession: NSObject {
         data.target = target ?? self
         let help = menu.addItem(withTitle: "使用说明", action: #selector(openHelp), keyEquivalent: "")
         help.target = target ?? self
+        let about = menu.addItem(withTitle: "关于 Rime Q…", action: #selector(openAbout), keyEquivalent: "")
+        about.target = target ?? self
         let update = menu.addItem(withTitle: "检查更新…", action: #selector(checkForUpdates), keyEquivalent: "")
         update.target = target ?? self
         menu.addItem(.separator())
@@ -186,6 +188,7 @@ final class InputSession: NSObject {
     @objc fileprivate func openSettings(_ sender: Any? = nil) { if let owner { commitCurrent(owner) }; SettingsWindow.shared.show() }
     @objc fileprivate func openData(_ sender: Any? = nil) { NSWorkspace.shared.open(Product.userRoot) }
     @objc fileprivate func openHelp(_ sender: Any? = nil) { if let owner { commitCurrent(owner) }; AppMaintenance.openHelp() }
+    @objc fileprivate func openAbout(_ sender: Any? = nil) { if let owner { commitCurrent(owner) }; AppMaintenance.openAbout() }
     @objc fileprivate func checkForUpdates(_ sender: Any? = nil) { if let owner { commitCurrent(owner) }; AppMaintenance.checkForUpdates() }
     @objc fileprivate func uninstall(_ sender: Any? = nil) { if let owner { commitCurrent(owner) }; AppMaintenance.uninstall() }
 }
@@ -204,6 +207,7 @@ final class RimeQController: IMKInputController {
     @objc private func openSettings(_ sender: Any?) { input.openSettings(sender) }
     @objc private func openData(_ sender: Any?) { input.openData(sender) }
     @objc private func openHelp(_ sender: Any?) { input.openHelp(sender) }
+    @objc private func openAbout(_ sender: Any?) { input.openAbout(sender) }
     @objc private func checkForUpdates(_ sender: Any?) { input.checkForUpdates(sender) }
     @objc private func uninstall(_ sender: Any?) { input.uninstall(sender) }
 }

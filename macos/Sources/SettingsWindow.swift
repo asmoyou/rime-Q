@@ -16,7 +16,7 @@ final class SettingsWindow: NSObject {
     }
 
     private func build() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 430, height: 260),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 430, height: 290),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "Rime Q"
         window.isReleasedWhenClosed = false
@@ -36,7 +36,10 @@ final class SettingsWindow: NSObject {
         let note = NSTextField(wrappingLabelWithString: "Shift 切换中英文；数字或鼠标选词；− / = 翻页。\n模式切换在下一次开始输入时生效。")
         note.textColor = .secondaryLabelColor
         note.font = .systemFont(ofSize: 12)
-        let stack = NSStackView(views: [title, subtitle, grid, note])
+        let version = NSTextField(labelWithString: Product.versionDescription)
+        version.font = .systemFont(ofSize: 11)
+        version.textColor = .secondaryLabelColor
+        let stack = NSStackView(views: [title, subtitle, grid, note, version])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 16

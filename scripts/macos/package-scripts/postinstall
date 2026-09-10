@@ -4,8 +4,16 @@ set -eu
 APP="/Library/Input Methods/RimeQ.app"
 EXE="$APP/Contents/MacOS/RimeQ"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+RIMEQ_SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)"
+package_version=$(/usr/libexec/PlistBuddy -c 'Print :Version' "$RIMEQ_SCRIPT_DIR/package-version.plist")
+package_build=$(/usr/libexec/PlistBuddy -c 'Print :Build' "$RIMEQ_SCRIPT_DIR/package-version.plist")
 [ -x "$EXE" ]
 [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" = "com.asmoyou.inputmethod.RimeQ" ]
+if [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")" != "$package_version" ] \
+    || [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Contents/Info.plist")" != "$package_build" ]; then
+    echo "Rime Q: installed version does not match package $package_version ($package_build)."
+    exit 1
+fi
 /usr/bin/codesign --verify --deep --strict "$APP"
 echo "Rime Q: verified installed application at $APP."
 

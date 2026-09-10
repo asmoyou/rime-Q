@@ -8,6 +8,9 @@ if let status = inputSourceInstallPhaseExitStatus(arguments: arguments) { exit(s
 if arguments.count > 1 {
     do {
         switch arguments[1] {
+        case "--version": print("Rime Q \(Product.version) (\(Product.build))")
+        case "--candidate-smoke": try CandidateAppearanceSmoke.run()
+        case "--candidate-preview": CandidateAppearanceSmoke.preview(dark: arguments.contains("dark"))
         case "--smoke": try EngineSmoke.run()
         case "--benchmark": try EngineSmoke.benchmark()
         case "--controller-smoke": try ControllerSmoke.run()

@@ -38,6 +38,14 @@ enum AppMaintenance {
     static let releases = URL(string: "https://github.com/asmoyou/rime-Q/releases")!
     private static var checkingUpdates = false
 
+    static func openAbout() {
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.orderFrontStandardAboutPanel(options: [
+            .applicationName: "Rime Q", .applicationVersion: Product.version, .version: Product.build,
+            .credits: NSAttributedString(string: "简洁、流畅、离线的中文输入法。")
+        ])
+    }
+
     static func openHelp() {
         if let url = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "Help") {
             NSWorkspace.shared.open(url)
@@ -47,7 +55,7 @@ enum AppMaintenance {
     static func checkForUpdates() {
         guard !checkingUpdates else { return }
         checkingUpdates = true
-        let installed = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
+        let installed = Product.version
         var request = URLRequest(url: URL(string: "https://api.github.com/repos/asmoyou/rime-Q/releases/latest")!)
         request.timeoutInterval = 12
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")

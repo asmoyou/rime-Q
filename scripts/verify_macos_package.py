@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import plistlib
 import xml.etree.ElementTree as ET
 
 
@@ -21,6 +22,10 @@ def verify(package):
         assert len(bundles) == 1 and bundles[0].get("path", "").removeprefix("./") == "RimeQ.app"
         assert info.find("./scripts/preinstall") is not None, "Missing duplicate-installation guard"
         assert info.find("./scripts/postinstall") is not None, "Missing input-source registration"
+        metadata = plistlib.loads((infos[0].parent / "Scripts/package-version.plist").read_bytes())
+        assert metadata["Version"] == info.get("version"), "Version guard differs from the packaged release"
+        assert metadata["Build"] == bundles[0].get("CFBundleVersion"), "Version guard differs from the packaged build"
+        assert (infos[0].parent / "Scripts/version-check.sh").exists(), "Missing preinstall downgrade protection"
         postinstall = infos[0].parent / "Scripts/postinstall"
         script = postinstall.read_text()
         assert '/usr/bin/open -n -g "$APP" --args --complete-install' in script, "Activation must use LaunchServices"
@@ -32,6 +37,9 @@ def verify(package):
         assert distribution.find("conclusion") is not None, "Missing activation instructions"
         assert distribution.find("welcome") is not None, "Explain permissions before the system asks"
         assert list(expanded.rglob("welcome.html")), "Missing installer introduction resource"
+        installation_check = distribution.find("installation-check")
+        assert installation_check is not None and installation_check.get("script") == "rimeqCheckInstallation()"
+        assert {choice.get("id") for choice in distribution.findall("choice")} == {"install", "upgrade", "repair"}
         assert all(reference.get("onConclusion") not in {"RequireLogout", "RequireRestart", "RequireShutdown"}
                    for reference in distribution.findall("pkg-ref")), "Do not require session changes after successful activation"
     print("PKG verified: fixed system path, relocation disabled, install scripts and activation instructions present")
