@@ -178,7 +178,7 @@ LaunchServices 只读审计发现正式标识下有 30 条路径记录，其中 
 
 目视复查发现更新页操作按钮被拉长，修正控件宽度和水平优先级后，针对更新检查、原生设置操作及全部设置渲染重新验证通过，并重打最终包。验证还覆盖重启恢复最近检查结果、安装新版后移除旧提示、网络失败保留已知新版入口。日志在本机忽略目录 `artifacts/build-0.3.0.log` 与 `artifacts/final-validation-0.3.0.log`；产品配图在 `docs/images`。
 
-发布前通过应用的 `--update-live-smoke 0.2.4 unpublished` 访问真实 GitHub API，确认仓库尚无公开 Release 时正确返回未发布；日志为 `artifacts/update-live-before-0.3.0.log`。发布后旧版/当前版本的真实查询与远端 CI 结果将在完成后追加。
+发布前通过应用的 `--update-live-smoke 0.2.4 unpublished` 访问真实 GitHub API，确认仓库尚无公开 Release 时正确返回未发布；日志为 `artifacts/update-live-before-0.3.0.log`。发布后旧版/当前版本的真实查询及远端 CI 结果见下文。
 
 最终附件 `RimeQ-0.3.0-macos-universal.pkg`，构建 `1789059153`，大小 `441267124` 字节，SHA-256 `233e8d7ae5613988f12907ab857f90ab4b0a2b71b6ad19dc1b5967b198e173b3`。该包尚未完成 Developer ID 签名与公证。当前机器安装仍为 0.2.4；本轮未用新包替换现用输入法，也未将隔离引擎/UI 回归当成所有真实宿主已通过。真实 PKG 安装、同版修复与卸载保留数据由独立 CI 运行环境验证；Apple Silicon 实机和更多宿主兼容性仍需补充。
 
@@ -192,3 +192,17 @@ LaunchServices 只读审计发现正式标识下有 30 条路径记录，其中 
 第二轮远端 CI（34503558032）通过全部核心构建、完整 macOS 包回归、首次安装的明确待启用/登录重试路径及已装引擎检查；同版修复替换应用并保留数据后，等待新的状态文件超时。初次安装停留在待启用提示；代码检查发现此时 AppDelegate 尚未注册退出通知，退出旧进程失败分支也未记录安装结果。将退出监听提前到安装窗口出现前，并为校验失败和旧进程未退出保存明确状态。新增独立子进程测试实际进入原生模态提示，验证只凭指定路径/PID 的更新通知即可正常退出；安装、进程应答、维护与更新回归通过，见 `artifacts/build-0.3.0-repair.log`。远端修复检查新增应用日志及明确 ready/pending 分支校验。最终 [CI 34504930270](https://github.com/asmoyou/rime-Q/actions/runs/34504930270) 全部通过：三平台核心构建、macOS 完整构建回归、实际 PKG 安装、同版修复、降级拒绝和卸载保留数据。无交互运行环境的启用结果为明确 pending，已验证登录重试，不等同于真实宿主立即可输入。成功包日志在 `artifacts/ci-0.3.0-passed-package.log`。
 
 另用生产 UpdateChecker 源码驱动实际计时器与网络：启动 30.01 秒后查询 GitHub，正确得到未发布结果，下次检查时间为本次尝试之后 86400 秒，立即重复调度没有发起请求。证据为 `artifacts/update-scheduler-live-0.3.0.log`，未修改用户自动检查偏好。
+
+
+### 发布后验收
+
+2026-09-11 01:01（Asia/Shanghai）公开 [v0.3.0](https://github.com/asmoyou/rime-Q/releases/tag/v0.3.0)，设为 Latest，标签指向 `51a4bf7962b011f657701c72a4e4bc3537082c67`。其应用与构建脚本代码与通过 [CI 34504930270](https://github.com/asmoyou/rime-Q/actions/runs/34504930270) 的 `045f27294947e36a64faf66564ac5d00999f61a2` 相同，差异仅为已完成的验证记录和发布说明。
+
+四个附件（通用 PKG、PKG 的 SHA256SUMS、固定万象模型及其许可）均已上传；GitHub 返回的文件大小和 SHA-256 与本地逐一一致。Latest API 与下载页面均指向 v0.3.0，草稿和预发布标志均为 false。
+
+通过本版应用中的实际 UpdateChecker/URLSession 访问公开 GitHub API：
+
+- `--update-live-smoke 0.2.4 available:v0.3.0` 通过，旧版能够发现首个公开版本。
+- `--update-live-smoke 0.3.0 current` 通过，同版没有被误报为需要更新。
+
+日志为 `artifacts/update-live-older-0.3.0.log`、`artifacts/update-live-current-0.3.0.log` 和 `artifacts/release-assets-0.3.0.log`。所有更新测试使用独立偏好域，未改变现用 0.2.4 的设置或安装。本轮发布包的版本与每日自动检查在安装 0.3.0 后生效。
