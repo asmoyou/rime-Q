@@ -65,5 +65,5 @@ for directory in ["Frameworks", "SharedSupport"]:
     shutil.copytree(source / "Contents" / directory, cache / directory, dirs_exist_ok=True)
 shutil.move(str(source), str(target))
 subprocess.run([LSREGISTER, "-f", str(target)], check=True)
-subprocess.run(["open", "-n", "-g", str(target), "--args", "--complete-install"], check=True)
+subprocess.run(["/usr/bin/open", "-n", "-g", str(target), "--args", "--complete-install"], env={}, check=True)
 print("Application installed; activation continues in the user session. A prompt appears only if action is needed.")
