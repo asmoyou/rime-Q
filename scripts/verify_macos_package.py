@@ -1,0 +1,33 @@
+#!/usr/bin/env python3
+"""Check the emitted PKG, including the relocation rule that caused a misplaced install."""
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import xml.etree.ElementTree as ET
+
+
+def verify(package):
+    with tempfile.TemporaryDirectory(prefix="rimeq-pkg-check-") as temporary:
+        expanded = Path(temporary) / "package"
+        subprocess.run(["pkgutil", "--expand", str(package), str(expanded)], check=True)
+        infos = list(expanded.rglob("PackageInfo"))
+        assert len(infos) == 1, "Expected exactly one Rime Q payload"
+        info = ET.parse(infos[0]).getroot()
+        assert info.get("identifier") == "com.asmoyou.inputmethod.RimeQ"
+        assert info.get("install-location") == "/Library/Input Methods"
+        assert not info.findall("./relocate/bundle"), "Installer can still relocate the app to a stray copy"
+        bundles = info.findall("./bundle")
+        assert len(bundles) == 1 and bundles[0].get("path", "").removeprefix("./") == "RimeQ.app"
+        assert info.find("./scripts/preinstall") is not None, "Missing duplicate-installation guard"
+        assert info.find("./scripts/postinstall") is not None, "Missing input-source registration"
+        distribution = ET.parse(expanded / "Distribution").getroot()
+        domains = distribution.find("domains")
+        assert domains is not None and domains.get("enable_anywhere") == "false"
+        assert domains.get("enable_currentUserHome") == "false"
+        assert distribution.find("conclusion") is not None, "Missing activation instructions"
+    print("PKG verified: fixed system path, relocation disabled, install scripts and activation instructions present")
+
+
+if __name__ == "__main__":
+    verify(Path(sys.argv[1]).resolve())

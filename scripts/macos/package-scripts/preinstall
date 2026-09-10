@@ -1,0 +1,43 @@
+#!/bin/bash
+set -eu
+
+APP="/Library/Input Methods/RimeQ.app"
+IDENTIFIER="com.asmoyou.inputmethod.RimeQ"
+if [ "${3:-/}" != "/" ]; then
+    echo "Rime Q: install on the current startup volume."
+    exit 1
+fi
+if [ -L "$APP" ]; then
+    echo "Rime Q: the installation path must not be a symbolic link."
+    exit 1
+fi
+if [ -e "$APP" ]; then
+    installed_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist" 2>/dev/null || true)
+    if [ "$installed_id" != "$IDENTIFIER" ]; then
+        echo "Rime Q: another application occupies $APP."
+        exit 1
+    fi
+fi
+
+check_duplicates() {
+    local directory="$1" candidate candidate_id
+    for candidate in "$directory"/*.app; do
+        [ "$candidate" != "$APP" ] || continue
+        [ -e "$candidate/Contents/Info.plist" ] || continue
+        candidate_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$candidate/Contents/Info.plist" 2>/dev/null || true)
+        if [ "$candidate_id" = "$IDENTIFIER" ]; then
+            echo "Rime Q: remove the other application copy before installing: $candidate. Keep personal dictionaries."
+            exit 1
+        fi
+    done
+}
+check_duplicates "/Library/Input Methods"
+console_user=$(/usr/bin/stat -f '%Su' /dev/console)
+case "$console_user" in
+    root|loginwindow|_mbsetupuser) ;;
+    *)
+        user_directory=$(/usr/bin/dscl . -read "/Users/$console_user" NFSHomeDirectory | /usr/bin/sed 's/^NFSHomeDirectory: //')
+        [ -n "$user_directory" ] || exit 1
+        check_duplicates "$user_directory/Library/Input Methods"
+        ;;
+esac

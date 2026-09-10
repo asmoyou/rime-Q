@@ -43,8 +43,14 @@ jobs:
         with:
           path: .cache
           key: mac-resources-${{ hashFiles('dependencies.lock.json') }}
-      - run: python3 scripts/build_macos.py --universal
-      - run: dist/RimeQ.app/Contents/MacOS/RimeQ --smoke
+      - run: python3 scripts/build_macos.py --universal --smoke
+      - name: Install the actual PKG at its fixed system path
+        run: sudo installer -pkg dist/RimeQ-0.1.1-preview.pkg -target /
+      - name: Verify the installed application and bundled engine
+        run: |
+          codesign --verify --deep --strict '/Library/Input Methods/RimeQ.app'
+          '/Library/Input Methods/RimeQ.app/Contents/MacOS/RimeQ' --smoke
+          test ! -e dist/RimeQ.app
       - uses: actions/upload-artifact@v4
         with:
           name: RimeQ-macOS-preview

@@ -1,0 +1,34 @@
+#!/bin/bash
+set -eu
+
+APP="/Library/Input Methods/RimeQ.app"
+EXE="$APP/Contents/MacOS/RimeQ"
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+[ -x "$EXE" ]
+[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" = "com.asmoyou.inputmethod.RimeQ" ]
+/usr/bin/codesign --verify --deep --strict "$APP"
+echo "Rime Q: verified installed application at $APP."
+
+console_user=$(/usr/bin/stat -f '%Su' /dev/console)
+case "$console_user" in
+    root|loginwindow|_mbsetupuser)
+        echo "Rime Q: no active login user; add Rime Q in Keyboard settings after login."
+        exit 0
+        ;;
+esac
+console_uid=$(/usr/bin/id -u "$console_user")
+# asuser sets the GUI bootstrap session; sudo also drops root to the login UID.
+as_login_user() {
+    /bin/launchctl asuser "$console_uid" /usr/bin/sudo -H -u "$console_user" -- "$@"
+}
+as_login_user "$LSREGISTER" -f "$APP"
+if as_login_user "$EXE" --register; then
+    echo "Rime Q: registered and enabled for $console_user. Select Rime Q from the input menu."
+else
+    status=$?
+    if [ "$status" -ne 75 ]; then
+        echo "Rime Q: input-source registration failed (status $status)."
+        exit "$status"
+    fi
+    echo "Rime Q: application installed, activation pending. Log out and back in, then add Rime Q in Keyboard settings."
+fi

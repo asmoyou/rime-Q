@@ -5,10 +5,12 @@ import plistlib
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
 IDENTIFIER = "com.asmoyou.inputmethod.RimeQ"
+VERSION = "0.1.1"
 
 
 def run(*args):
@@ -34,12 +36,11 @@ def icon(path):
     path.write_bytes(result)
 
 
-def build(universal=False, resources=True):
+def build_app(app, universal=False, resources=True):
     flags = ["--arch", "arm64", "--arch", "x86_64"] if universal else []
     run("swift", "build", "-c", "release", *flags)
     binary_directory = subprocess.check_output(["swift", "build", "-c", "release", *flags, "--show-bin-path"],
                                                 cwd=ROOT, text=True).strip()
-    app = ROOT / "dist/RimeQ.app"
     contents = app / "Contents"
     for directory in ["MacOS", "Resources"]:
         (contents / directory).mkdir(parents=True, exist_ok=True)
@@ -47,7 +48,7 @@ def build(universal=False, resources=True):
     mode = IDENTIFIER + ".Hans"
     metadata = {
         "CFBundleName": "Rime Q", "CFBundleDisplayName": "Rime Q", "CFBundleExecutable": "RimeQ",
-        "CFBundleIdentifier": IDENTIFIER, "CFBundleVersion": str(int(time.time())), "CFBundleShortVersionString": "0.1.0",
+        "CFBundleIdentifier": IDENTIFIER, "CFBundleVersion": str(int(time.time())), "CFBundleShortVersionString": VERSION,
         "CFBundlePackageType": "APPL", "CFBundleDevelopmentRegion": "en",
         "CFBundleIconFile": "AppIcon", "CFBundleIconName": "AppIcon",
         "CFBundleInfoDictionaryVersion": "6.0", "CFBundleSignature": "????",
@@ -99,16 +100,57 @@ def build(universal=False, resources=True):
         run("codesign", "--force", "--sign", "-", library)
     run("codesign", "--force", "--sign", "-", app)
     run("codesign", "--verify", "--deep", "--strict", app)
-    # Developer preview package. Signing/notarization is a later release task.
-    package = ROOT / "dist/RimeQ-0.1.0-preview.pkg"
-    run("pkgbuild", "--component", app, "--identifier", IDENTIFIER,
-        "--version", "0.1.0", "--install-location", "/Library/Input Methods", package)
-    print(f"Built {package}")
+
+
+def build(universal=False, resources=True, keep_app=False, smoke=False):
+    cache = ROOT / ".cache"
+    cache.mkdir(exist_ok=True)
+    (ROOT / "dist").mkdir(exist_ok=True)
+    retained = ROOT / "dist/RimeQ.app"
+    if retained.exists():
+        raise RuntimeError("Move the previous dist/RimeQ.app with install_macos.py before building again")
+    # Never leave a second discoverable app behind after producing an installer.
+    with tempfile.TemporaryDirectory(prefix="macos-package-", dir=cache) as temporary:
+        staging = Path(temporary)
+        payload = staging / "payload"
+        app = payload / "RimeQ.app"
+        build_app(app, universal, resources)
+        if smoke:
+            run(app / "Contents/MacOS/RimeQ", "--smoke")
+        component = staging / "RimeQ-component.pkg"
+        run("pkgbuild", "--root", payload,
+            "--component-plist", ROOT / "scripts/macos/component.plist",
+            "--scripts", ROOT / "scripts/macos/package-scripts",
+            "--identifier", IDENTIFIER, "--version", VERSION,
+            "--install-location", "/Library/Input Methods", component)
+        distribution = staging / "Distribution.xml"
+        distribution.write_text(f'''<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+  <title>Rime Q</title>
+  <options customize="never" require-scripts="false" hostArchitectures="x86_64,arm64"/>
+  <domains enable_anywhere="false" enable_currentUserHome="false" enable_localSystem="true"/>
+  <allowed-os-versions><os-version min="13.0"/></allowed-os-versions>
+  <conclusion file="conclusion.html" mime-type="text/html"/>
+  <choices-outline><line choice="rimeq"/></choices-outline>
+  <choice id="rimeq" title="Rime Q" visible="false"><pkg-ref id="{IDENTIFIER}"/></choice>
+  <pkg-ref id="{IDENTIFIER}" version="{VERSION}" onConclusion="none">RimeQ-component.pkg</pkg-ref>
+</installer-gui-script>
+''')
+        package = ROOT / f"dist/RimeQ-{VERSION}-preview.pkg"
+        run("productbuild", "--distribution", distribution, "--package-path", staging,
+            "--resources", ROOT / "scripts/macos/package-resources", package)
+        run(sys.executable, ROOT / "scripts/verify_macos_package.py", package)
+        if keep_app:
+            shutil.move(str(app), str(retained))
+            print(f"Development bundle retained at {retained}; move it with install_macos.py before using the PKG")
+    print(f"Built {package}; temporary app bundle removed")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--universal", action="store_true", help="Build both Apple Silicon and Intel")
     parser.add_argument("--reuse-resources", action="store_true", help="Rebuild code using previously prepared data")
+    parser.add_argument("--keep-app", action="store_true", help="Keep dist/RimeQ.app for the development installer only")
+    parser.add_argument("--smoke", action="store_true", help="Verify the bundled engine before packaging")
     options = parser.parse_args()
-    build(options.universal, not options.reuse_resources)
+    build(options.universal, not options.reuse_resources, options.keep_app, options.smoke)

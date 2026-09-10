@@ -11,11 +11,10 @@
 需要 macOS 13+、Xcode 和 Python 3.9+。
 
 ```sh
-python3 scripts/build_macos.py --universal
-python3 scripts/install_macos.py
+python3 scripts/build_macos.py --universal --smoke
 ```
 
-产物为 `dist/RimeQ-0.1.0-preview.pkg`，包含 Intel 与 Apple Silicon 程序。安装后在“系统设置 → 键盘 → 文本输入”添加 **Rime Q**。首次安装若系统尚未刷新输入源，需要注销并重新登录。
+双击产物 `dist/RimeQ-0.1.1-preview.pkg` 安装，包含 Intel 与 Apple Silicon 程序。安装器固定写入系统 Input Methods 目录，并为当前登录用户注册输入法。安装后从输入法菜单选择 **Rime Q**；如未显示，在“系统设置 → 键盘 → 文本输入”添加。首次安装若系统尚未刷新输入源，需要注销并重新登录。
 
 构建会获取固定版本依赖；安装后的日常输入完全离线。当前预览未做 Developer ID 签名与公证。[测试与安装说明](docs/MACOS.md)
 
@@ -23,8 +22,8 @@ python3 scripts/install_macos.py
 
 ```sh
 # 真实引擎：组词、选词、重启学习、模式切换和会话隔离
-./dist/RimeQ.app/Contents/MacOS/RimeQ --smoke
-./dist/RimeQ.app/Contents/MacOS/RimeQ --benchmark
+'/Library/Input Methods/RimeQ.app/Contents/MacOS/RimeQ' --smoke
+'/Library/Input Methods/RimeQ.app/Contents/MacOS/RimeQ' --benchmark
 
 # 尚未接入客户端的实验性排序库
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
