@@ -1,6 +1,17 @@
 import AppKit
 import Carbon
 
+enum UpdateQuitRequest {
+    static let name = Notification.Name("com.asmoyou.rimeq.requestUpdateQuit")
+
+    static func accepts(_ notification: Notification, appPath: String, processID: Int32) -> Bool {
+        guard notification.name == name, notification.object as? String == appPath,
+              let target = notification.userInfo?["targetPID"] as? NSNumber,
+              let sender = notification.userInfo?["senderPID"] as? NSNumber else { return false }
+        return target.int32Value == processID && sender.int32Value > 0 && sender.int32Value != processID
+    }
+}
+
 enum ReleaseLookup {
     case unpublished, current, available(String), invalid
 
@@ -102,7 +113,19 @@ enum AppMaintenance {
                 throw error("请先切换到其他输入法，再完成 Rime Q 的安装。")
             }
         }
-        for application in others { _ = application.terminate() }
+        // Current versions cooperate without asking to automate another app.
+        // Only older versions lacking this listener need the Apple-events fallback.
+        for application in others {
+            DistributedNotificationCenter.default().postNotificationName(
+                UpdateQuitRequest.name, object: Bundle.main.bundleURL.path,
+                userInfo: ["targetPID": application.processIdentifier,
+                           "senderPID": ProcessInfo.processInfo.processIdentifier], deliverImmediately: true)
+        }
+        let cooperativeDeadline = Date().addingTimeInterval(0.8)
+        while others.contains(where: { !$0.isTerminated }) && Date() < cooperativeDeadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        }
+        for application in others where !application.isTerminated { _ = application.terminate() }
         let deadline = Date().addingTimeInterval(3)
         while others.contains(where: { !$0.isTerminated }) && Date() < deadline {
             RunLoop.current.run(until: Date().addingTimeInterval(0.05))
@@ -203,6 +226,17 @@ enum AppMaintenance {
     }
 
     static func smoke() throws {
+        let appPath = "/Library/Input Methods/RimeQ.app"
+        let quit = Notification(name: UpdateQuitRequest.name, object: appPath,
+                                userInfo: ["targetPID": 101, "senderPID": 202])
+        let selfQuit = Notification(name: UpdateQuitRequest.name, object: appPath,
+                                    userInfo: ["targetPID": 101, "senderPID": 101])
+        guard UpdateQuitRequest.accepts(quit, appPath: appPath, processID: 101),
+              !UpdateQuitRequest.accepts(quit, appPath: appPath, processID: 303),
+              !UpdateQuitRequest.accepts(quit, appPath: "/another/app", processID: 101),
+              !UpdateQuitRequest.accepts(selfQuit, appPath: appPath, processID: 101) else {
+            throw error("更新退出请求的进程与路径限制测试失败。")
+        }
         guard case .available("v0.1.10") = ReleaseLookup.parse(data: Data(#"{"tag_name":"v0.1.10"}"#.utf8), status: 200, installed: "0.1.2"),
               case .current = ReleaseLookup.parse(data: Data(#"{"tag_name":"0.1.2"}"#.utf8), status: 200, installed: "0.1.10"),
               case .unpublished = ReleaseLookup.parse(data: Data(), status: 404, installed: "0.1.2"),
@@ -218,6 +252,6 @@ enum AppMaintenance {
                 throw error("InputMethodKit 菜单动作必须接收 sender，并由控制器响应。")
             }
         }
-        print("PASS maintenance: numeric versions, release errors, and IMK menu action signatures")
+        print("PASS maintenance: update-quit scope, numeric versions, release errors, and IMK menu action signatures")
     }
 }

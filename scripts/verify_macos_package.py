@@ -30,6 +30,8 @@ def verify(package):
         assert domains is not None and domains.get("enable_anywhere") == "false"
         assert domains.get("enable_currentUserHome") == "false"
         assert distribution.find("conclusion") is not None, "Missing activation instructions"
+        assert distribution.find("welcome") is not None, "Explain permissions before the system asks"
+        assert list(expanded.rglob("welcome.html")), "Missing installer introduction resource"
         assert all(reference.get("onConclusion") not in {"RequireLogout", "RequireRestart", "RequireShutdown"}
                    for reference in distribution.findall("pkg-ref")), "Do not require session changes after successful activation"
     print("PKG verified: fixed system path, relocation disabled, install scripts and activation instructions present")

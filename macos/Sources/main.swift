@@ -52,6 +52,8 @@ if arguments.count > 1 {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var server: IMKServer?
     func applicationDidFinishLaunching(_ notification: Notification) {
+        DistributedNotificationCenter.default().addObserver(self, selector: #selector(prepareUpdateQuit(_:)),
+            name: UpdateQuitRequest.name, object: Bundle.main.bundleURL.path)
         // Do not expose an input controller while ensureSession() still fails.
         // IMK can finish connecting after launch instead of losing initial keys.
         do {
@@ -67,7 +69,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             alert.runModal()
         }
     }
-    func applicationWillTerminate(_ notification: Notification) { if Engine.ready { QRimeStop() } }
+    @objc private func prepareUpdateQuit(_ notification: Notification) {
+        guard UpdateQuitRequest.accepts(notification, appPath: Bundle.main.bundleURL.path,
+                                       processID: ProcessInfo.processInfo.processIdentifier) else { return }
+        NSApp.terminate(nil)
+    }
+    func applicationWillTerminate(_ notification: Notification) {
+        DistributedNotificationCenter.default().removeObserver(self)
+        if Engine.ready { QRimeStop() }
+    }
 }
 
 let app = NSApplication.shared

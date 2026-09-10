@@ -10,7 +10,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 IDENTIFIER = "com.asmoyou.inputmethod.RimeQ"
-VERSION = "0.1.3"
+VERSION = "0.1.4"
 
 
 def run(*args):
@@ -53,6 +53,7 @@ def build_app(app, universal=False, resources=True):
         "CFBundleIconFile": "AppIcon", "CFBundleIconName": "AppIcon",
         "CFBundleInfoDictionaryVersion": "6.0", "CFBundleSignature": "????",
         "CFBundleSupportedPlatforms": ["MacOSX"], "LSBackgroundOnly": False,
+        "NSAppleEventsUsageDescription": "Rime Q asks its previous version to quit during an update. When you choose Log Out, it asks macOS to show the logout confirmation.",
         "LSMinimumSystemVersion": "13.0", "LSUIElement": True, "NSPrincipalClass": "NSApplication",
         "InputMethodConnectionName": "RimeQ_Connection", "InputMethodServerControllerClass": "RimeQController",
         "InputMethodServerDelegateClass": "RimeQController", "TISInputSourceID": IDENTIFIER,
@@ -72,9 +73,11 @@ def build_app(app, universal=False, resources=True):
     for language in ["en", "zh-Hans", "zh-Hant"]:
         localized = contents / "Resources" / (language + ".lproj")
         localized.mkdir(exist_ok=True)
+        strings = {key: "Rime Q" for key in ["CFBundleName", "CFBundleDisplayName", IDENTIFIER, mode]}
+        strings["NSAppleEventsUsageDescription"] = metadata["NSAppleEventsUsageDescription"] if language == "en" else (
+            "更新时用于退出仍在运行的旧版 Rime Q；仅当你选择注销账户时，才请求 macOS 显示注销确认。")
         (localized / "InfoPlist.strings").write_text(
-            '\n'.join(f'"{key}" = "Rime Q";' for key in ["CFBundleName", "CFBundleDisplayName", IDENTIFIER, mode]) + '\n',
-            encoding="utf-16")
+            '\n'.join(f'"{key}" = "{value}";' for key, value in strings.items()) + '\n', encoding="utf-16")
     run("swift", ROOT / "scripts/create_icons.swift", contents / "Resources")
     run("iconutil", "-c", "icns", contents / "Resources/AppIcon.iconset", "-o", contents / "Resources/AppIcon.icns")
     shutil.rmtree(contents / "Resources/AppIcon.iconset")
@@ -114,7 +117,7 @@ def build(universal=False, resources=True, keep_app=False, smoke=False):
     if retained.exists():
         raise RuntimeError("Move the previous dist/RimeQ.app with install_macos.py before building again")
     # Never leave a second discoverable app behind after producing an installer.
-    with tempfile.TemporaryDirectory(prefix="macos-package-", dir=cache) as temporary:
+    with tempfile.TemporaryDirectory(prefix="rimeq-macos-package-") as temporary:
         staging = Path(temporary)
         payload = staging / "payload"
         app = payload / "RimeQ.app"
@@ -136,6 +139,7 @@ def build(universal=False, resources=True, keep_app=False, smoke=False):
   <options customize="never" require-scripts="false" hostArchitectures="x86_64,arm64"/>
   <domains enable_anywhere="false" enable_currentUserHome="false" enable_localSystem="true"/>
   <allowed-os-versions><os-version min="13.0"/></allowed-os-versions>
+  <welcome file="welcome.html" mime-type="text/html"/>
   <conclusion file="conclusion.html" mime-type="text/html"/>
   <choices-outline><line choice="rimeq"/></choices-outline>
   <choice id="rimeq" title="Rime Q" visible="false"><pkg-ref id="{IDENTIFIER}"/></choice>
