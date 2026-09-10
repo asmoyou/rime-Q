@@ -6,7 +6,7 @@
 
 构建得到 `dist/RimeQ-0.1.0-preview.pkg`，双击即可安装应用与其内置的引擎、词库和模型。系统安装位置为 `/Library/Input Methods/RimeQ.app`。
 
-本地开发也可运行 `python3 scripts/install_macos.py`，只安装到当前用户的 `~/Library/Input Methods/RimeQ.app`，保留既有输入法与数据，不修改当前使用的输入源。两个位置请只保留一份 Rime Q，避免系统重复识别。
+本地开发也可运行 `python3 scripts/install_macos.py`，将构建目录中的应用移动到当前用户的 `~/Library/Input Methods/RimeQ.app`，不在构建目录留下重复 .app。先备份旧应用为非应用归档，再分阶段注册和核验父子模式；失败会报告尚未通过启用检查。两个位置请只保留一份 Rime Q，避免系统重复识别。
 
 在“系统设置 → 键盘 → 文本输入 → 编辑 → ＋”添加 Rime Q，然后从菜单栏切换。macOS 首次注册新的输入法有时需要注销并重新登录才能真正激活；“已注册”不等于“已经可以选中”。
 
@@ -28,6 +28,8 @@ dist/RimeQ.app/Contents/MacOS/RimeQ --smoke
 dist/RimeQ.app/Contents/MacOS/RimeQ --benchmark
 dist/RimeQ.app/Contents/MacOS/RimeQ --render /tmp/rimeq-candidates.png
 ```
+
+开发安装移动应用后，应将上述命令路径替换为 `~/Library/Input Methods/RimeQ.app/Contents/MacOS/RimeQ`。
 
 引擎测试使用独立临时目录，分两个进程验证基础转换、逐字组词、学习、重启后的召回、模式切换与多会话隔离。性能测试使用合成输入，只统计引擎处理和候选快照，不包含 IMK 和绘制。
 

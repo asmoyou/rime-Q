@@ -48,7 +48,8 @@ def build(universal=False, resources=True):
     metadata = {
         "CFBundleName": "Rime Q", "CFBundleDisplayName": "Rime Q", "CFBundleExecutable": "RimeQ",
         "CFBundleIdentifier": IDENTIFIER, "CFBundleVersion": str(int(time.time())), "CFBundleShortVersionString": "0.1.0",
-        "CFBundlePackageType": "APPL", "CFBundleDevelopmentRegion": "zh-Hans",
+        "CFBundlePackageType": "APPL", "CFBundleDevelopmentRegion": "en",
+        "CFBundleIconFile": "AppIcon", "CFBundleIconName": "AppIcon",
         "CFBundleInfoDictionaryVersion": "6.0", "CFBundleSignature": "????",
         "CFBundleSupportedPlatforms": ["MacOSX"], "LSBackgroundOnly": False,
         "LSMinimumSystemVersion": "13.0", "LSUIElement": True, "NSPrincipalClass": "NSApplication",
@@ -69,11 +70,12 @@ def build(universal=False, resources=True):
     for language in ["en", "zh-Hans", "zh-Hant"]:
         localized = contents / "Resources" / (language + ".lproj")
         localized.mkdir(exist_ok=True)
-        (localized / "InfoPlist.strings").write_bytes(plistlib.dumps({
-            "CFBundleName": "Rime Q", "CFBundleDisplayName": "Rime Q",
-            IDENTIFIER: "Rime Q", mode: "Rime Q"
-        }))
-    icon(contents / "Resources/menu.pdf")
+        (localized / "InfoPlist.strings").write_text(
+            '\n'.join(f'"{key}" = "Rime Q";' for key in ["CFBundleName", "CFBundleDisplayName", IDENTIFIER, mode]) + '\n',
+            encoding="utf-16")
+    run("swift", ROOT / "scripts/create_icons.swift", contents / "Resources")
+    run("iconutil", "-c", "icns", contents / "Resources/AppIcon.iconset", "-o", contents / "Resources/AppIcon.icns")
+    shutil.rmtree(contents / "Resources/AppIcon.iconset")
     if not resources and not (contents / "SharedSupport/build").is_dir():
         cached = ROOT / ".cache/prepared-resources"
         for directory in ["Frameworks", "SharedSupport"]:
