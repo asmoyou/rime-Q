@@ -25,19 +25,26 @@ def digest(path):
 def fetch(name, metadata):
     path = CACHE / name
     expected = metadata.get("sha256")
-    if path.is_file() and expected and digest(path) == expected:
+    def verified(candidate):
+        return candidate.is_file() and (not expected or digest(candidate) == expected) \
+            and ("bytes" not in metadata or candidate.stat().st_size == metadata["bytes"])
+
+    if expected and verified(path):
         return path
     temporary = path.with_suffix(path.suffix + ".download")
-    subprocess.run(["curl", "--fail", "--location", "--silent", "--show-error", "--proto", "=https",
-                    "--output", str(temporary), metadata["url"]], check=True)
-    if expected and digest(temporary) != expected:
-        temporary.unlink()
-        raise RuntimeError(f"Checksum mismatch: {name}; upstream may have replaced this release asset")
-    if "bytes" in metadata and temporary.stat().st_size != metadata["bytes"]:
-        temporary.unlink()
-        raise RuntimeError(f"Size mismatch: {name}")
-    temporary.replace(path)
-    return path
+    for url in [metadata["url"], *metadata.get("mirrors", [])]:
+        try:
+            subprocess.run(["curl", "--fail", "--location", "--silent", "--show-error", "--proto", "=https",
+                            "--connect-timeout", "20", "--retry", "2", "--output", str(temporary), url], check=True)
+            if verified(temporary):
+                temporary.replace(path)
+                return path
+            print(f"Rejected unverified download: {name}; trying the next pinned source", flush=True)
+        except subprocess.CalledProcessError:
+            print(f"Download unavailable: {name}; trying the next pinned source", flush=True)
+        finally:
+            temporary.unlink(missing_ok=True)
+    raise RuntimeError(f"No verified download for {name}; all sources failed or differed from the pinned checksum/size")
 
 
 def prepare(destination):

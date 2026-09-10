@@ -12,6 +12,7 @@ import json
 from contextlib import contextmanager
 import uuid
 from dictionary_catalog import write_catalog
+from prepare_resources import digest
 
 ROOT = Path(__file__).resolve().parents[1]
 IDENTIFIER = "com.asmoyou.inputmethod.RimeQ"
@@ -115,7 +116,12 @@ def build_app(app, universal=False, resources=True):
             compiled = contents / "SharedSupport/build"
             shutil.rmtree(compiled)
             run(contents / "MacOS/RimeQ", "--prepare", compiled)
-    write_catalog(contents, json.loads((ROOT / "dependencies.lock.json").read_text()))
+    lock = json.loads((ROOT / "dependencies.lock.json").read_text())
+    model = lock["wanxiang_model"]
+    model_file = contents / "SharedSupport" / model["filename"]
+    if digest(model_file) != model["sha256"] or model_file.stat().st_size != model["bytes"]:
+        raise RuntimeError("Prepared model differs from dependencies.lock.json; rebuild without --reuse-resources")
+    write_catalog(contents, lock)
     notices = contents / "Resources/Licenses"
     notices.mkdir(parents=True, exist_ok=True)
     for name in ["LICENSE", "THIRD_PARTY_NOTICES.md", "dependencies.lock.json"]:
@@ -178,6 +184,7 @@ def build(universal=False, resources=True, keep_app=False, smoke=False):
         build_app(app, universal, resources)
         if smoke:
             run(sys.executable, ROOT / "scripts/test_macos_install_plan.py")
+            run(sys.executable, ROOT / "scripts/test_resource_fetch.py")
             run(app / "Contents/MacOS/RimeQ", "--rimeq-tis-validate-bundle")
             with isolated_smoke_app(app) as preview:
                 exe = preview / "Contents/MacOS/RimeQ"
