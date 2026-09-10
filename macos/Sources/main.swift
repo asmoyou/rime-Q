@@ -28,6 +28,8 @@ if arguments.count > 1 {
         case "--controller-smoke": try ControllerSmoke.run()
         case "--installation-smoke": try installationFlowSmoke()
         case "--maintenance-smoke": try AppMaintenance.smoke()
+        case "--maintenance-quit-worker" where arguments.count == 3:
+            try AppMaintenance.quitWorker(root: URL(fileURLWithPath: arguments[2]))
         case "--update-smoke": try UpdateSmoke.run()
         case "--update-live-smoke" where arguments.count == 4:
             try UpdateSmoke.live(installed: arguments[2], expected: arguments[3])
@@ -79,8 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var server: IMKServer?
     var runtimeResponder: RuntimeResponder?
     func applicationDidFinishLaunching(_ notification: Notification) {
-        DistributedNotificationCenter.default().addObserver(self, selector: #selector(prepareUpdateQuit(_:)),
-            name: UpdateQuitRequest.name, object: Bundle.main.bundleURL.path)
+        _ = UpdateQuitObserver.shared
         // Do not expose an input controller while ensureSession() still fails.
         // IMK can finish connecting after launch instead of losing initial keys.
         do {
@@ -125,13 +126,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             alert.runModal()
         }
     }
-    @objc private func prepareUpdateQuit(_ notification: Notification) {
-        guard UpdateQuitRequest.accepts(notification, appPath: Bundle.main.bundleURL.path,
-                                       processID: ProcessInfo.processInfo.processIdentifier) else { return }
-        NSApp.terminate(nil)
-    }
     func applicationWillTerminate(_ notification: Notification) {
-        DistributedNotificationCenter.default().removeObserver(self)
         if Engine.ready { QRimeStop() }
         InstallationDiagnostics.append("input-server-stopped")
     }

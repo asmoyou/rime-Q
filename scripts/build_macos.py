@@ -101,6 +101,7 @@ def build_app(app, universal=False, resources=True):
         # Cache resources without an application identity for incremental builds.
         for directory in ["Frameworks", "SharedSupport"]:
             shutil.copytree(contents / directory, ROOT / ".cache/prepared-resources" / directory, dirs_exist_ok=True)
+        shutil.copytree(contents / "Resources/Licenses", ROOT / ".cache/prepared-resources/Licenses", dirs_exist_ok=True)
     elif not (contents / "SharedSupport/build").is_dir():
         raise RuntimeError("No prepared resources; omit --reuse-resources on the first build")
     else:
@@ -124,6 +125,11 @@ def build_app(app, universal=False, resources=True):
     write_catalog(contents, lock)
     notices = contents / "Resources/Licenses"
     notices.mkdir(parents=True, exist_ok=True)
+    if not resources:
+        cached_notices = ROOT / ".cache/prepared-resources/Licenses"
+        if not (cached_notices / "rime-ice-source.tar.gz").is_file():
+            raise RuntimeError("Cached dependency notices are missing; rebuild without --reuse-resources")
+        shutil.copytree(cached_notices, notices, dirs_exist_ok=True)
     for name in ["LICENSE", "THIRD_PARTY_NOTICES.md", "dependencies.lock.json"]:
         shutil.copy2(ROOT / name, notices / name)
     for name in ["librime-lua", "librime-octagram", "rimes"]:

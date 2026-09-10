@@ -107,7 +107,18 @@ jobs:
             fi
             sleep 1
           done
+          tail -100 "$HOME/Library/Application Support/RimeQ/installation.log"
           test -f "$rimeq_status"
+          rimeq_state="$(plutil -extract state raw -o - "$rimeq_status")"
+          case "$rimeq_state" in
+            ready) ;;
+            pending)
+              test "$(plutil -extract retryScheduled raw -o - "$rimeq_status")" = true
+              test -f "$HOME/Library/LaunchAgents/com.asmoyou.rimeq.activation.plist"
+              echo '::notice::Repair retained the explicit pending activation/login-retry fallback.'
+              ;;
+            *) exit 1 ;;
+          esac
           if test "$(plutil -extract state raw -o - "$rimeq_status")" = ready; then
             "$rimeq_app/Contents/MacOS/RimeQ" --verify-runtime
           fi

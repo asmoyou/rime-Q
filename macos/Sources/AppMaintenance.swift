@@ -12,6 +12,23 @@ enum UpdateQuitRequest {
     }
 }
 
+/// Installation alerts can be shown before AppDelegate starts the input server.
+/// They must still let a later repair replace this process without Apple events.
+final class UpdateQuitObserver: NSObject {
+    static let shared = UpdateQuitObserver()
+    private override init() {
+        super.init()
+        DistributedNotificationCenter.default().addObserver(self, selector: #selector(receive(_:)),
+            name: UpdateQuitRequest.name, object: Bundle.main.bundleURL.path)
+    }
+    @objc private func receive(_ notification: Notification) {
+        guard UpdateQuitRequest.accepts(notification, appPath: Bundle.main.bundleURL.path,
+                                       processID: ProcessInfo.processInfo.processIdentifier) else { return }
+        NSApp.terminate(nil)
+    }
+    deinit { DistributedNotificationCenter.default().removeObserver(self) }
+}
+
 enum AppMaintenance {
     static let releases = Product.downloads
 
@@ -200,6 +217,45 @@ enum AppMaintenance {
         alert.runModal()
     }
 
+    static func quitWorker(root: URL) throws {
+        let temporary = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+        guard root.resolvingSymlinksInPath().deletingLastPathComponent() == temporary,
+              root.lastPathComponent.hasPrefix("rimeq-quit-smoke-") else { throw error("Invalid quit-test directory") }
+        _ = NSApplication.shared
+        NSApp.setActivationPolicy(.accessory)
+        _ = UpdateQuitObserver.shared
+        let alert = NSAlert(); alert.messageText = "Rime Q 安装提示退出测试"
+        DispatchQueue.main.async {
+            if NSApp.modalWindow != nil { try? Data().write(to: root.appendingPathComponent("ready")) }
+        }
+        alert.runModal()
+    }
+
+    private static func quitSmoke() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("rimeq-quit-smoke-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let process = Process()
+        process.executableURL = Bundle.main.executableURL
+        process.arguments = ["--maintenance-quit-worker", root.path]
+        try process.run()
+        defer { if process.isRunning { process.terminate() } }
+        let deadline = Date().addingTimeInterval(5)
+        let ready = root.appendingPathComponent("ready")
+        while !FileManager.default.fileExists(atPath: ready.path) && process.isRunning && Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
+        }
+        try EngineSmoke.check(FileManager.default.fileExists(atPath: ready.path), "quit test did not enter an installation-style modal alert")
+        DistributedNotificationCenter.default().postNotificationName(UpdateQuitRequest.name,
+            object: Bundle.main.bundleURL.path,
+            userInfo: ["targetPID": process.processIdentifier, "senderPID": ProcessInfo.processInfo.processIdentifier],
+            deliverImmediately: true)
+        let quitDeadline = Date().addingTimeInterval(3)
+        while process.isRunning && Date() < quitDeadline { RunLoop.current.run(until: Date().addingTimeInterval(0.02)) }
+        try EngineSmoke.check(!process.isRunning && process.terminationStatus == 0, "pending installation alert ignored cooperative update quit")
+        print("PASS pending installation alert exits through scoped update notification before AppDelegate starts")
+    }
+
     static func smoke() throws {
         let appPath = "/Library/Input Methods/RimeQ.app"
         let quit = Notification(name: UpdateQuitRequest.name, object: appPath,
@@ -227,6 +283,7 @@ enum AppMaintenance {
                 throw error("InputMethodKit 菜单动作必须接收 sender，并由控制器响应。")
             }
         }
+        try quitSmoke()
         print("PASS maintenance: update-quit scope, numeric versions, release errors, and IMK menu action signatures")
     }
 }

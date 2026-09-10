@@ -119,6 +119,7 @@ func showInstallationResult(_ readiness: InstallationReadiness, retryScheduled: 
 /// server. Never exit after registration while leaving no serving process.
 func completeInputSourceInstallation(isLoginRetry: Bool) -> Bool {
     _ = NSApplication.shared
+    _ = UpdateQuitObserver.shared
     // Keep only installation diagnostics here; no keystrokes or user text.
     try? FileManager.default.createDirectory(at: Product.userRoot, withIntermediateDirectories: true,
                                              attributes: [.posixPermissions: 0o700])
@@ -147,6 +148,8 @@ func completeInputSourceInstallation(isLoginRetry: Bool) -> Bool {
         close(logDescriptor)
     }
     guard inputSourceInstallPhaseExitStatus(arguments: ["RimeQ", "--rimeq-tis-validate-bundle"]) == 0 else {
+        _ = try? InstallationFiles.current.record(.failed, app: Bundle.main.bundleURL, isLoginRetry: isLoginRetry)
+        InstallationDiagnostics.append("activation-failed bundle-validation")
         showInstallationResult(.failed, retryScheduled: false)
         return false
     }
@@ -154,7 +157,9 @@ func completeInputSourceInstallation(isLoginRetry: Bool) -> Bool {
     if existing == nil {
         do { try AppMaintenance.prepareInstalledUpdate() }
         catch {
-            showInstallationResult(.failed, retryScheduled: false, detail: error.localizedDescription)
+            let retry = (try? InstallationFiles.current.record(.pending, app: Bundle.main.bundleURL, isLoginRetry: isLoginRetry)) ?? false
+            InstallationDiagnostics.append("activation-pending previous-process-did-not-exit")
+            showInstallationResult(.failed, retryScheduled: retry, detail: error.localizedDescription)
             return false
         }
     }

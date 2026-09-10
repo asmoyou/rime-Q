@@ -9,6 +9,11 @@ import xml.etree.ElementTree as ET
 
 
 def verify(package):
+    files = set(line.removeprefix("./") for line in subprocess.check_output(
+        ["pkgutil", "--payload-files", str(package)], text=True).splitlines())
+    for name in ["rime-ice-source.tar.gz", "rime-ice-GPL-3.0.txt", "wanxiang-CC-BY-4.0.txt",
+                 "librime-BSD-3-Clause.txt", "runtime/Resources/LICENSE.txt"]:
+        assert "RimeQ.app/Contents/Resources/Licenses/" + name in files, f"Missing dependency source/notice: {name}"
     with tempfile.TemporaryDirectory(prefix="rimeq-pkg-check-") as temporary:
         expanded = Path(temporary) / "package"
         subprocess.run(["pkgutil", "--expand", str(package), str(expanded)], check=True)
@@ -44,7 +49,7 @@ def verify(package):
         assert {choice.get("id") for choice in distribution.findall("choice")} == {"install", "upgrade", "repair"}
         assert all(reference.get("onConclusion") not in {"RequireLogout", "RequireRestart", "RequireShutdown"}
                    for reference in distribution.findall("pkg-ref")), "Do not require session changes after successful activation"
-    print("PKG verified: fixed system path, relocation disabled, install scripts and activation instructions present")
+    print("PKG verified: fixed system path, relocation disabled, install scripts, activation instructions and dependency sources/notices present")
 
 
 if __name__ == "__main__":
