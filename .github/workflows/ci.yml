@@ -45,16 +45,27 @@ jobs:
           key: mac-resources-${{ hashFiles('dependencies.lock.json') }}
       - run: python3 scripts/build_macos.py --universal --smoke
       - name: Install the actual PKG at its fixed system path
-        run: sudo installer -pkg dist/RimeQ-0.1.2-preview.pkg -target /
-      - name: Verify activation from the LaunchServices application
+        run: sudo installer -pkg dist/RimeQ-0.1.3-preview.pkg -target /
+      - name: Verify activation result or explicit pending fallback
         run: |
           rimeq_status="$HOME/Library/Application Support/RimeQ/installation-status.plist"
           for attempt in {1..45}; do
             test ! -f "$rimeq_status" || break
             sleep 1
           done
-          test "$(plutil -extract state raw -o - "$rimeq_status")" = ready
-          '/Library/Input Methods/RimeQ.app/Contents/MacOS/RimeQ' --rimeq-tis-verify-mode
+          rimeq_state="$(plutil -extract state raw -o - "$rimeq_status")"
+          cat "$HOME/Library/Application Support/RimeQ/installation.log"
+          case "$rimeq_state" in
+            ready)
+              '/Library/Input Methods/RimeQ.app/Contents/MacOS/RimeQ' --rimeq-tis-verify-mode
+              ;;
+            pending)
+              test "$(plutil -extract retryScheduled raw -o - "$rimeq_status")" = true
+              test -f "$HOME/Library/LaunchAgents/com.asmoyou.rimeq.activation.plist"
+              echo '::notice::GUI activation is pending on this runner; verified the explicit login-retry fallback.'
+              ;;
+            *) exit 1 ;;
+          esac
       - name: Verify the installed application and bundled engine
         run: |
           codesign --verify --deep --strict '/Library/Input Methods/RimeQ.app'

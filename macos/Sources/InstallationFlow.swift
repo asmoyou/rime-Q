@@ -115,6 +115,16 @@ func showInstallationResult(_ readiness: InstallationReadiness, retryScheduled: 
 
 func completeInputSourceInstallation(isLoginRetry: Bool) {
     _ = NSApplication.shared
+    // Keep only installation diagnostics here; no keystrokes or user text.
+    try? FileManager.default.createDirectory(at: Product.userRoot, withIntermediateDirectories: true,
+                                             attributes: [.posixPermissions: 0o700])
+    let logPath = Product.userRoot.appendingPathComponent("installation.log").path
+    let logDescriptor = Darwin.open(logPath, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0o600)
+    if logDescriptor >= 0 {
+        _ = dup2(logDescriptor, STDOUT_FILENO)
+        _ = dup2(logDescriptor, STDERR_FILENO)
+        close(logDescriptor)
+    }
     guard inputSourceInstallPhaseExitStatus(arguments: ["RimeQ", "--rimeq-tis-validate-bundle"]) == 0 else {
         showInstallationResult(.failed, retryScheduled: false)
         return
@@ -131,14 +141,17 @@ func completeInputSourceInstallation(isLoginRetry: Bool) {
         let retry = try InstallationFiles.current.record(readiness, app: Bundle.main.bundleURL,
                                                         isLoginRetry: isLoginRetry)
         print("installation: state=\(readiness.rawValue) retryScheduled=\(retry)")
-        // A successful automatic login retry requires no additional user action.
-        if !(isLoginRetry && readiness == .ready) {
+        fflush(stdout)
+        // Successful installation is silent; Installer already has a completion page.
+        if readiness != .ready {
             showInstallationResult(readiness, retryScheduled: retry)
         }
     } catch {
         // A storage failure must not misreport the actual input-source state.
         print("installation: could not record result: \(error.localizedDescription)")
-        showInstallationResult(readiness, retryScheduled: false, detail: error.localizedDescription)
+        if readiness != .ready {
+            showInstallationResult(readiness, retryScheduled: false, detail: error.localizedDescription)
+        }
     }
 }
 

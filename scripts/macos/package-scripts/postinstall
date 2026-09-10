@@ -26,4 +26,4 @@ as_login_user "$LSREGISTER" -f "$APP"
 # directly from this package script can return successful TIS calls without
 # actually enabling the source. The app verifies and presents the real result.
 as_login_user /usr/bin/open -n -g "$APP" --args --complete-install
-echo "Rime Q: application installed; the Rime Q window will report activation readiness."
+echo "Rime Q: application installed; activation continues in the user session. A prompt appears only if action is needed."

@@ -159,35 +159,35 @@ final class InputSession: NSObject {
         }
     }
 
-    func makeMenu() -> NSMenu! {
+    func makeMenu(target: AnyObject? = nil) -> NSMenu! {
         let menu = NSMenu()
         let english = menu.addItem(withTitle: "英文输入", action: #selector(toggleEnglish), keyEquivalent: "")
-        english.target = self
+        english.target = target ?? self
         english.state = session != 0 && QRimeGetOption(session, "ascii_mode") ? .on : .off
         menu.addItem(.separator())
         let settings = menu.addItem(withTitle: "设置…", action: #selector(openSettings), keyEquivalent: "")
-        settings.target = self
+        settings.target = target ?? self
         let data = menu.addItem(withTitle: "打开个人数据文件夹", action: #selector(openData), keyEquivalent: "")
-        data.target = self
+        data.target = target ?? self
         let help = menu.addItem(withTitle: "使用说明", action: #selector(openHelp), keyEquivalent: "")
-        help.target = self
+        help.target = target ?? self
         let update = menu.addItem(withTitle: "检查更新…", action: #selector(checkForUpdates), keyEquivalent: "")
-        update.target = self
+        update.target = target ?? self
         menu.addItem(.separator())
         let uninstall = menu.addItem(withTitle: "卸载 Rime Q…", action: #selector(uninstall), keyEquivalent: "")
-        uninstall.target = self
+        uninstall.target = target ?? self
         return menu
     }
 
-    @objc fileprivate func toggleEnglish() {
+    @objc fileprivate func toggleEnglish(_ sender: Any? = nil) {
         if let owner { commitCurrent(owner) }
         if ensureSession() { QRimeSetOption(session, "ascii_mode", !QRimeGetOption(session, "ascii_mode")) }
     }
-    @objc fileprivate func openSettings() { if let owner { commitCurrent(owner) }; SettingsWindow.shared.show() }
-    @objc fileprivate func openData() { NSWorkspace.shared.open(Product.userRoot) }
-    @objc fileprivate func openHelp() { if let owner { commitCurrent(owner) }; AppMaintenance.openHelp() }
-    @objc fileprivate func checkForUpdates() { if let owner { commitCurrent(owner) }; AppMaintenance.checkForUpdates() }
-    @objc fileprivate func uninstall() { if let owner { commitCurrent(owner) }; AppMaintenance.uninstall() }
+    @objc fileprivate func openSettings(_ sender: Any? = nil) { if let owner { commitCurrent(owner) }; SettingsWindow.shared.show() }
+    @objc fileprivate func openData(_ sender: Any? = nil) { NSWorkspace.shared.open(Product.userRoot) }
+    @objc fileprivate func openHelp(_ sender: Any? = nil) { if let owner { commitCurrent(owner) }; AppMaintenance.openHelp() }
+    @objc fileprivate func checkForUpdates(_ sender: Any? = nil) { if let owner { commitCurrent(owner) }; AppMaintenance.checkForUpdates() }
+    @objc fileprivate func uninstall(_ sender: Any? = nil) { if let owner { commitCurrent(owner) }; AppMaintenance.uninstall() }
 }
 
 // InputMethodKit owns the actual client proxy. Keep event/session behavior independently testable.
@@ -199,11 +199,11 @@ final class RimeQController: IMKInputController {
     override func commitComposition(_ sender: Any!) { input.commit(sender) }
     override func recognizedEvents(_ sender: Any!) -> Int { input.eventMask(sender) }
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool { input.process(event, client: sender) }
-    override func menu() -> NSMenu! { input.makeMenu() }
-    @objc private func toggleEnglish() { input.toggleEnglish() }
-    @objc private func openSettings() { input.openSettings() }
-    @objc private func openData() { input.openData() }
-    @objc private func openHelp() { input.openHelp() }
-    @objc private func checkForUpdates() { input.checkForUpdates() }
-    @objc private func uninstall() { input.uninstall() }
+    override func menu() -> NSMenu! { input.makeMenu(target: self) }
+    @objc private func toggleEnglish(_ sender: Any?) { input.toggleEnglish(sender) }
+    @objc private func openSettings(_ sender: Any?) { input.openSettings(sender) }
+    @objc private func openData(_ sender: Any?) { input.openData(sender) }
+    @objc private func openHelp(_ sender: Any?) { input.openHelp(sender) }
+    @objc private func checkForUpdates(_ sender: Any?) { input.checkForUpdates(sender) }
+    @objc private func uninstall(_ sender: Any?) { input.uninstall(sender) }
 }

@@ -209,6 +209,15 @@ enum AppMaintenance {
               case .invalid = ReleaseLookup.parse(data: Data(), status: 403, installed: "0.1.2"),
               ReleaseLookup.version("malformed") == nil,
               ReleaseLookup.version("") == nil else { throw error("更新版本比较测试失败。") }
-        print("PASS maintenance: numeric version comparison, unpublished releases, failed requests, invalid version")
+        let session = InputSession()
+        let menu = session.makeMenu()!
+        for item in menu.items {
+            guard let selector = item.action else { continue }
+            guard NSStringFromSelector(selector).hasSuffix(":"), session.responds(to: selector),
+                  RimeQController.instancesRespond(to: selector) else {
+                throw error("InputMethodKit 菜单动作必须接收 sender，并由控制器响应。")
+            }
+        }
+        print("PASS maintenance: numeric versions, release errors, and IMK menu action signatures")
     }
 }

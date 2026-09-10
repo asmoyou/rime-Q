@@ -10,7 +10,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 IDENTIFIER = "com.asmoyou.inputmethod.RimeQ"
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 
 
 def run(*args):

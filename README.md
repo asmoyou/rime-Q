@@ -14,7 +14,7 @@
 python3 scripts/build_macos.py --universal --smoke
 ```
 
-双击产物 `dist/RimeQ-0.1.2-preview.pkg` 安装，包含 Intel 与 Apple Silicon 程序。安装后自动打开 Rime Q 窗口完成启用；显示“已启用”即可从菜单选择 **Rime Q**。如果启用仍未通过，窗口提供稍后处理或注销选项，并安排下次登录重试。
+双击产物 `dist/RimeQ-0.1.3-preview.pkg` 安装，包含 Intel 与 Apple Silicon 程序。安装后在后台自动启用，完成后即可从菜单选择 **Rime Q**。只有启用未通过时才显示提示，提供稍后处理或注销选项，并安排下次登录重试。
 
 输入法菜单提供设置、使用说明、检查更新和卸载。更新检查由用户主动触发，卸载默认保留个人词库。
 
