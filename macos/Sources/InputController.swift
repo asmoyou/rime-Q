@@ -4,6 +4,10 @@ import InputMethodKit
 import QRimeBridge
 
 final class InputSession: NSObject {
+    private static let instances = NSHashTable<InputSession>.weakObjects()
+    static var hasComposition: Bool {
+        instances.allObjects.contains { $0.session != 0 && Engine.snapshot($0.session).active }
+    }
     private var session: UInt = 0
     private var active = false
     private var marked = false
@@ -12,7 +16,27 @@ final class InputSession: NSObject {
     private var appliedSchema = ""
     private var generation: UInt = 0
 
-    deinit { if session != 0 { QRimeDestroySession(session) } }
+    override init() {
+        super.init()
+        Self.instances.add(self)
+        NotificationCenter.default.addObserver(self, selector: #selector(prepareMaintenance), name: Engine.willMaintain, object: nil)
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+        if session != 0 { QRimeDestroySession(session) }
+    }
+
+    @objc private func prepareMaintenance() {
+        if let owner { commitCurrent(owner) }
+        if session != 0 { QRimeDestroySession(session) }
+        session = 0
+        appliedSchema = ""
+        marked = false
+        shiftAlone = false
+        generation &+= 1
+        CandidatePanel.shared.hide(owner: ObjectIdentifier(self))
+    }
 
     private func owns(_ client: IMKTextInput) -> Bool {
         active && owner.map { ObjectIdentifier($0 as AnyObject) == ObjectIdentifier(client as AnyObject) } == true

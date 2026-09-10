@@ -22,6 +22,16 @@ const char* QRimeTakeCommit(uintptr_t session);
 void QRimeSetOption(uintptr_t session, const char* name, bool value);
 bool QRimeGetOption(uintptr_t session, const char* name);
 
+// The host settles compositions before maintenance. These functions close all
+// engine sessions; the host must recreate them before accepting further input.
+int QRimePersonalDictionaryState(void); // -1 unavailable, 0 absent, 1 present
+int QRimeExportPersonalDictionary(const char* file);
+int QRimeImportPersonalDictionary(const char* file);
+bool QRimeParseDictionaryHeader(const char* yaml);
+const char* QRimeDictionaryName(void);
+const char* QRimeDictionaryVersion(void);
+const char* QRimeDictionaryColumns(void); // tab separated
+
 // Snapshot strings remain valid until the next Read. Host copies them immediately.
 bool QRimeRead(uintptr_t session);
 const char* QRimePreedit(void);

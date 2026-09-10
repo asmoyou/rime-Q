@@ -1,5 +1,6 @@
 #include "QRimeBridge.h"
 #include "../../third_party/librime/rime_api.h"
+#include "../../third_party/librime/rime_levers_api.h"
 #include <dlfcn.h>
 #include <algorithm>
 #include <filesystem>
@@ -12,6 +13,7 @@ bool started = false;
 std::vector<void*> libraries;
 std::string error_message, shared_path, user_path, prebuilt_path, staging_path;
 std::string preedit, input, committed;
+std::string dictionary_name, dictionary_version, dictionary_columns;
 std::vector<std::string> texts, comments;
 int cursor = 0, highlighted = 0, page = 0;
 bool last_page = true;
@@ -23,6 +25,14 @@ bool load(const std::string& path) {
     return true;
 }
 const char* safe(const char* text) { return text ? text : ""; }
+RimeLeversApi* levers() {
+    if (!started) return nullptr;
+    auto module = api->find_module("levers");
+    if (!module || !module->get_api) return nullptr;
+    auto result = reinterpret_cast<RimeLeversApi*>(module->get_api());
+    return result && RIME_API_AVAILABLE(result, import_user_dict) &&
+           RIME_API_AVAILABLE(result, export_user_dict) ? result : nullptr;
+}
 }
 
 bool QRimeStart(const char* frameworks, const char* shared, const char* user, bool deploy) {
@@ -44,7 +54,7 @@ bool QRimeStart(const char* frameworks, const char* shared, const char* user, bo
     user_path = user;
     prebuilt_path = shared_path + "/build";
     staging_path = user_path + "/build";
-    static const char* modules[] = {"default", "lua", "octagram", nullptr};
+    static const char* modules[] = {"default", "levers", "lua", "octagram", nullptr};
     RIME_STRUCT(RimeTraits, traits);
     traits.shared_data_dir = shared_path.c_str();
     traits.user_data_dir = user_path.c_str();
@@ -91,6 +101,54 @@ bool QRimeCommitComposition(uintptr_t session) { return started && session && ap
 void QRimeSetOption(uintptr_t session, const char* name, bool value) { if (started && session) api->set_option(session, name, value); }
 bool QRimeGetOption(uintptr_t session, const char* name) { return started && session && api->get_option(session, name); }
 
+int QRimePersonalDictionaryState(void) {
+    auto manager = levers();
+    if (!manager || !RIME_API_AVAILABLE(manager, next_user_dict) ||
+        !manager->user_dict_iterator_init || !manager->user_dict_iterator_destroy) return -1;
+    RimeUserDictIterator iterator{};
+    if (!manager->user_dict_iterator_init(&iterator)) return -1;
+    int found = 0;
+    while (const char* name = manager->next_user_dict(&iterator)) {
+        if (std::string(name) == "rime_q") { found = 1; break; }
+    }
+    manager->user_dict_iterator_destroy(&iterator);
+    return found;
+}
+int QRimeExportPersonalDictionary(const char* file) {
+    auto manager = levers();
+    if (!manager || !file || !*file) return -1;
+    api->cleanup_all_sessions();
+    return manager->export_user_dict("rime_q", file);
+}
+int QRimeImportPersonalDictionary(const char* file) {
+    auto manager = levers();
+    if (!manager || !file || !*file) return -1;
+    api->cleanup_all_sessions();
+    return manager->import_user_dict("rime_q", file);
+}
+
+bool QRimeParseDictionaryHeader(const char* yaml) {
+    dictionary_name.clear(); dictionary_version.clear(); dictionary_columns.clear();
+    if (!started || !yaml) return false;
+    RimeConfig config{};
+    if (!api->config_init(&config)) return false;
+    const bool loaded = api->config_load_string(&config, yaml);
+    bool valid = loaded && api->config_list_size(&config, "import_tables") == 0;
+    if (valid) {
+        dictionary_name = safe(api->config_get_cstring(&config, "name"));
+        dictionary_version = safe(api->config_get_cstring(&config, "version"));
+        const auto count = api->config_list_size(&config, "columns");
+        if (!count) dictionary_columns = "text\tcode\tweight";
+        for (size_t i = 0; i < count; ++i) {
+            if (i) dictionary_columns += '\t';
+            dictionary_columns += safe(api->config_get_cstring(&config, ("columns/@" + std::to_string(i)).c_str()));
+        }
+        valid = !dictionary_name.empty();
+    }
+    api->config_close(&config);
+    return valid;
+}
+
 const char* QRimeTakeCommit(uintptr_t session) {
     committed.clear();
     if (started && session) {
@@ -132,3 +190,6 @@ bool QRimeLastPage(void) { return last_page; }
 size_t QRimeCandidateCount(void) { return texts.size(); }
 const char* QRimeCandidateText(size_t index) { return index < texts.size() ? texts[index].c_str() : ""; }
 const char* QRimeCandidateComment(size_t index) { return index < comments.size() ? comments[index].c_str() : ""; }
+const char* QRimeDictionaryName(void) { return dictionary_name.c_str(); }
+const char* QRimeDictionaryVersion(void) { return dictionary_version.c_str(); }
+const char* QRimeDictionaryColumns(void) { return dictionary_columns.c_str(); }

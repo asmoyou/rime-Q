@@ -2,8 +2,8 @@ import Foundation
 import QRimeBridge
 
 enum EngineSmoke {
-    static func check(_ condition: @autoclosure () -> Bool, _ message: String) throws {
-        if !condition() { throw NSError(domain: "RimeQSmoke", code: 1, userInfo: [NSLocalizedDescriptionKey: message]) }
+    static func check(_ condition: @autoclosure () throws -> Bool, _ message: String) throws {
+        if try !condition() { throw NSError(domain: "RimeQSmoke", code: 1, userInfo: [NSLocalizedDescriptionKey: message]) }
     }
 
     static func type(_ input: String, session: UInt) {

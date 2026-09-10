@@ -6,6 +6,7 @@ final class CandidateCanvas: NSView {
     var composition = Composition()
     var select: ((Int) -> Void)?
     var fontSize: CGFloat = 18
+    var skin: CandidateSkin = .system
     let padding: CGFloat = 8
     private let horizontalPadding: CGFloat = 10
     private let labelGap: CGFloat = 8
@@ -14,7 +15,7 @@ final class CandidateCanvas: NSView {
     private var textFont: NSFont { .systemFont(ofSize: fontSize) }
     private var smallFont: NSFont { .systemFont(ofSize: 12) }
     private var numberFont: NSFont { .monospacedDigitSystemFont(ofSize: 12, weight: .regular) }
-    private var secondaryTextColor: NSColor { .labelColor.withAlphaComponent(0.68) }
+    private var secondaryTextColor: NSColor { skin.text.withAlphaComponent(0.68) }
     private func width(_ string: String, font: NSFont) -> CGFloat {
         ceil((string as NSString).size(withAttributes: [.font: font]).width)
     }
@@ -45,8 +46,8 @@ final class CandidateCanvas: NSView {
         for (index, item) in composition.candidates.enumerated() {
             let row = NSRect(x: 4, y: padding + CGFloat(index) * rowHeight, width: bounds.width - 8, height: rowHeight)
             if index == composition.highlighted {
-                NSColor.controlAccentColor.withAlphaComponent(0.15).setFill()
-                NSBezierPath(roundedRect: row, xRadius: 6, yRadius: 6).fill()
+                skin.selection.setFill()
+                NSBezierPath(roundedRect: row, xRadius: 9, yRadius: 9).fill()
             }
             let y = row.minY + (rowHeight - fontSize - 4) / 2
             ("\(index + 1)" as NSString).draw(at: NSPoint(x: horizontalPadding, y: y + 3),
@@ -56,7 +57,7 @@ final class CandidateCanvas: NSView {
             paragraph.lineBreakMode = .byTruncatingTail
             let widths = textWidths(for: item)
             (item.text as NSString).draw(in: NSRect(x: textX, y: y, width: widths.text, height: rowHeight),
-                withAttributes: [.font: textFont, .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph])
+                withAttributes: [.font: textFont, .foregroundColor: skin.text, .paragraphStyle: paragraph])
             let commentX = textX + min(width(item.text, font: textFont), widths.text) + commentGap
             if widths.comment > 0 {
                 (item.comment as NSString).draw(in: NSRect(x: commentX, y: y + 4,
@@ -81,6 +82,8 @@ final class CandidateCanvas: NSView {
 
 final class CandidateSurface: NSVisualEffectView {
     let canvas = CandidateCanvas(frame: .zero)
+    private let tint = CandidateTint()
+    var skin: CandidateSkin = .system { didSet { applySkin() } }
 
     init() {
         super.init(frame: .zero)
@@ -88,13 +91,43 @@ final class CandidateSurface: NSVisualEffectView {
         blendingMode = .behindWindow
         state = .active
         wantsLayer = true
-        layer?.cornerRadius = 10
+        layer?.cornerRadius = CandidateGeometry.cornerRadius
+        layer?.cornerCurve = .continuous
         layer?.masksToBounds = true
+        maskImage = CandidateGeometry.materialMask
+        tint.autoresizingMask = [.width, .height]
+        addSubview(tint)
         canvas.autoresizingMask = [.width, .height]
         addSubview(canvas)
+        applySkin()
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    private func applySkin() {
+        canvas.skin = skin
+        tint.skin = skin
+        tint.needsDisplay = true
+        canvas.needsDisplay = true
+    }
+    override func layout() {
+        super.layout()
+        tint.frame = bounds
+        canvas.frame = bounds
+        window?.invalidateShadow()
+    }
+}
+
+private final class CandidateTint: NSView {
+    var skin: CandidateSkin = .system
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    override func draw(_ dirtyRect: NSRect) {
+        let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5),
+                                xRadius: CandidateGeometry.cornerRadius, yRadius: CandidateGeometry.cornerRadius)
+        // Solid colors retain contrast for fixed palettes. System skin keeps
+        // the native material and macOS's Reduce Transparency behavior.
+        if skin != .system { skin.background.setFill(); path.fill() }
+        skin.border.setStroke(); path.lineWidth = 1; path.stroke()
+    }
 }
 
 final class CandidatePanel: NSPanel {
@@ -102,10 +135,12 @@ final class CandidatePanel: NSPanel {
     let surface = CandidateSurface()
     var canvas: CandidateCanvas { surface.canvas }
     private var owner: ObjectIdentifier?
+    private let preferences: AppearancePreferences
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 
-    init() {
+    init(preferences: AppearancePreferences = .shared) {
+        self.preferences = preferences
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         isOpaque = false
         backgroundColor = .clear
@@ -121,8 +156,8 @@ final class CandidatePanel: NSPanel {
         self.owner = owner
         canvas.composition = composition
         canvas.select = select
-        let configured = UserDefaults.standard.double(forKey: "candidateFontSize")
-        canvas.fontSize = [16.0, 18.0, 20.0, 22.0].contains(configured) ? configured : 18
+        canvas.fontSize = preferences.fontSize
+        surface.skin = preferences.skin
         let size = canvas.measuredSize()
         let plausible = anchor.origin.x.isFinite && anchor.origin.y.isFinite && anchor.height.isFinite && anchor.height > 0
         let caret = plausible ? anchor : NSRect(origin: NSEvent.mouseLocation, size: NSSize(width: 1, height: 20))
@@ -133,6 +168,8 @@ final class CandidatePanel: NSPanel {
         if y < visible.minY { y = caret.maxY + 5 }
         y = max(visible.minY, min(y, visible.maxY - size.height))
         setFrame(NSRect(origin: NSPoint(x: x, y: y), size: size), display: false)
+        surface.layoutSubtreeIfNeeded()
+        invalidateShadow()
         canvas.needsDisplay = true
         orderFrontRegardless()
     }

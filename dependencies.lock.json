@@ -29,5 +29,10 @@
   "librime_header": {
     "version": "1.17.0",
     "revision": "33e78140250125871856cdc5b42ddc6a5fcd3cd4"
+  },
+  "librime_levers_header": {
+    "revision": "a251145d3aafa33871824a40bbec04c966bd8b56",
+    "url": "https://raw.githubusercontent.com/rime/librime/a251145d3aafa33871824a40bbec04c966bd8b56/src/rime_levers_api.h",
+    "sha256": "b2ec30a89125f0fe5e91ea6cb209e8ae71e5f67fa87bc3d4a1dd3be3b5753b5a"
   }
 }

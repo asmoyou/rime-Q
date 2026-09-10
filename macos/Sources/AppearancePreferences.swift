@@ -1,0 +1,111 @@
+import AppKit
+
+extension NSColor {
+    static func rgb(_ hex: UInt32, alpha: CGFloat = 1) -> NSColor {
+        NSColor(srgbRed: CGFloat((hex >> 16) & 255) / 255, green: CGFloat((hex >> 8) & 255) / 255,
+                blue: CGFloat(hex & 255) / 255, alpha: alpha)
+    }
+    static func adaptive(_ light: UInt32, _ dark: UInt32) -> NSColor {
+        NSColor(name: nil) { appearance in
+            .rgb(appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light)
+        }
+    }
+}
+
+enum CandidateSkin: String, CaseIterable {
+    case system, paper, mist, jade, rose, midnight
+    var name: String {
+        switch self {
+        case .system: return "随系统"
+        case .paper: return "纸白"
+        case .mist: return "雾蓝"
+        case .jade: return "青玉"
+        case .rose: return "浅樱"
+        case .midnight: return "暮色"
+        }
+    }
+    var summary: String {
+        switch self {
+        case .system: return "原生材质，随深浅模式变化"
+        case .paper: return "温润纸色，安静清晰"
+        case .mist: return "清浅蓝调，轻盈柔和"
+        case .jade: return "淡绿底色，自然舒适"
+        case .rose: return "暖粉与陶色，柔和明亮"
+        case .midnight: return "深色背景，低光环境更舒适"
+        }
+    }
+    var background: NSColor {
+        switch self {
+        case .system: return .adaptive(0xF3F4F7, 0x272A31)
+        case .paper: return .rgb(0xFAF8F2)
+        case .mist: return .rgb(0xEFF4FC)
+        case .jade: return .rgb(0xF0F6F2)
+        case .rose: return .rgb(0xFCF2EF)
+        case .midnight: return .rgb(0x252B38)
+        }
+    }
+    var text: NSColor {
+        switch self {
+        case .system: return .labelColor
+        case .paper: return .rgb(0x383A3B)
+        case .mist: return .rgb(0x293C59)
+        case .jade: return .rgb(0x244637)
+        case .rose: return .rgb(0x62413B)
+        case .midnight: return .rgb(0xEDF1F8)
+        }
+    }
+    var accent: NSColor {
+        switch self {
+        case .system: return .controlAccentColor
+        case .paper: return .rgb(0x71624C)
+        case .mist: return .rgb(0x386BAF)
+        case .jade: return .rgb(0x317458)
+        case .rose: return .rgb(0xA45B53)
+        case .midnight: return .rgb(0xB5CFF5)
+        }
+    }
+    var selection: NSColor {
+        switch self {
+        case .system: return .controlAccentColor.withAlphaComponent(0.15)
+        case .paper: return .rgb(0xEBE5D8)
+        case .mist: return .rgb(0xD6E4F7)
+        case .jade: return .rgb(0xD4E9DC)
+        case .rose: return .rgb(0xF1DAD4)
+        case .midnight: return .rgb(0x3A4B68)
+        }
+    }
+    var border: NSColor { text.withAlphaComponent(self == .midnight ? 0.16 : 0.1) }
+}
+
+final class AppearancePreferences {
+    static let shared = AppearancePreferences(defaults: .standard)
+    static let didChange = Notification.Name("RimeQAppearanceDidChange")
+    private let defaults: UserDefaults
+    init(defaults: UserDefaults) { self.defaults = defaults }
+    var skin: CandidateSkin {
+        get { CandidateSkin(rawValue: defaults.string(forKey: "candidateSkin") ?? "") ?? .system }
+        set { defaults.set(newValue.rawValue, forKey: "candidateSkin"); changed() }
+    }
+    var fontSize: CGFloat {
+        get { let value = defaults.double(forKey: "candidateFontSize"); return [16, 18, 20, 22].contains(value) ? value : 18 }
+        set { guard [16, 18, 20, 22].contains(newValue) else { return }; defaults.set(Double(newValue), forKey: "candidateFontSize"); changed() }
+    }
+    private func changed() { NotificationCenter.default.post(name: Self.didChange, object: self) }
+}
+
+enum CandidateGeometry {
+    static let cornerRadius: CGFloat = 14
+    // NSVisualEffectView's material is rendered separately from its layer.
+    // Mask that material explicitly, using a reusable nine-slice alpha image.
+    static let materialMask: NSImage = {
+        let r = cornerRadius, size = NSSize(width: r * 2 + 1, height: r * 2 + 1)
+        let image = NSImage(size: size, flipped: false) { rect in
+            NSColor.white.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: r, yRadius: r).fill()
+            return true
+        }
+        image.capInsets = NSEdgeInsets(top: r, left: r, bottom: r, right: r)
+        image.resizingMode = .stretch
+        return image
+    }()
+}

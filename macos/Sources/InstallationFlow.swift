@@ -19,7 +19,7 @@ struct InstallationFiles {
 
     /// Retry once at the next GUI login. It also goes through LaunchServices;
     /// invoking the input-method executable from an installer shell is insufficient.
-    func record(_ readiness: InstallationReadiness, app: URL, isLoginRetry: Bool) throws -> Bool {
+    func record(_ readiness: InstallationReadiness, app: URL, isLoginRetry: Bool, runtimePID: Int32? = nil) throws -> Bool {
         let fm = FileManager.default
         try fm.createDirectory(at: root, withIntermediateDirectories: true,
                                attributes: [.posixPermissions: 0o700])
@@ -43,9 +43,11 @@ struct InstallationFiles {
             try PropertyListSerialization.data(fromPropertyList: agent, format: .xml, options: 0)
                 .write(to: retryAgent, options: .atomic)
         }
-        let value: [String: Any] = ["state": readiness.rawValue, "retryScheduled": retry,
+        var value: [String: Any] = ["state": readiness.rawValue, "retryScheduled": retry,
                                     "updatedAt": Date(), "appPath": app.path,
+                                    "inputServerReady": readiness == .ready && runtimePID != nil,
                                     "version": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""]
+        if let runtimePID { value["runtimePID"] = runtimePID }
         try PropertyListSerialization.data(fromPropertyList: value, format: .xml, options: 0)
             .write(to: status, options: .atomic)
         return retry
@@ -113,13 +115,32 @@ func showInstallationResult(_ readiness: InstallationReadiness, retryScheduled: 
     }
 }
 
-func completeInputSourceInstallation(isLoginRetry: Bool) {
+/// true transfers this LaunchServices-launched process into the normal input
+/// server. Never exit after registration while leaving no serving process.
+func completeInputSourceInstallation(isLoginRetry: Bool) -> Bool {
     _ = NSApplication.shared
     // Keep only installation diagnostics here; no keystrokes or user text.
     try? FileManager.default.createDirectory(at: Product.userRoot, withIntermediateDirectories: true,
                                              attributes: [.posixPermissions: 0o700])
     let logPath = Product.userRoot.appendingPathComponent("installation.log").path
-    let logDescriptor = Darwin.open(logPath, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0o600)
+    // Retain the previous activation attempt, including before a login retry.
+    if let attributes = try? FileManager.default.attributesOfItem(atPath: logPath),
+       (attributes[.size] as? NSNumber)?.intValue ?? 0 > 512 * 1024,
+       attributes[.type] as? FileAttributeType == .typeRegular {
+        let previous = Product.userRoot.appendingPathComponent("installation-previous.log")
+        do {
+            try LexiconFiles.write(Data(contentsOf: URL(fileURLWithPath: logPath)), to: previous)
+            try FileManager.default.removeItem(atPath: logPath)
+        } catch { /* Keep the existing diagnostics if rotation fails. */ }
+    }
+    InstallationDiagnostics.append("activation-begin loginRetry=\(isLoginRetry)")
+    let savedOut = dup(STDOUT_FILENO), savedError = dup(STDERR_FILENO)
+    defer {
+        fflush(stdout); fflush(stderr)
+        if savedOut >= 0 { _ = dup2(savedOut, STDOUT_FILENO); close(savedOut) }
+        if savedError >= 0 { _ = dup2(savedError, STDERR_FILENO); close(savedError) }
+    }
+    let logDescriptor = Darwin.open(logPath, O_WRONLY | O_CREAT | O_APPEND | O_NOFOLLOW, 0o600)
     if logDescriptor >= 0 {
         _ = dup2(logDescriptor, STDOUT_FILENO)
         _ = dup2(logDescriptor, STDERR_FILENO)
@@ -127,16 +148,32 @@ func completeInputSourceInstallation(isLoginRetry: Bool) {
     }
     guard inputSourceInstallPhaseExitStatus(arguments: ["RimeQ", "--rimeq-tis-validate-bundle"]) == 0 else {
         showInstallationResult(.failed, retryScheduled: false)
-        return
+        return false
     }
-    if !isLoginRetry {
+    let existing = RuntimeReadiness.probe(timeout: 0.35)
+    if existing == nil {
         do { try AppMaintenance.prepareInstalledUpdate() }
         catch {
             showInstallationResult(.failed, retryScheduled: false, detail: error.localizedDescription)
-            return
+            return false
         }
     }
     let readiness: InstallationReadiness = installInputSource() ? .ready : .pending
+    if readiness == .ready {
+        if let existing {
+            _ = try? InstallationFiles.current.record(.ready, app: Bundle.main.bundleURL,
+                isLoginRetry: isLoginRetry, runtimePID: existing.pid)
+            InstallationDiagnostics.append("activation-complete existing-server pid=\(existing.pid)")
+            return false
+        }
+        do {
+            // Invalidate stale success from a prior build. Start the service in
+            // this process; AppDelegate records ready only after initialization.
+            _ = try InstallationFiles.current.record(.pending, app: Bundle.main.bundleURL, isLoginRetry: true)
+        } catch { print("installation: could not record startup phase: \(error.localizedDescription)") }
+        InstallationDiagnostics.append("sources-enabled; continuing as input server")
+        return true
+    }
     do {
         let retry = try InstallationFiles.current.record(readiness, app: Bundle.main.bundleURL,
                                                         isLoginRetry: isLoginRetry)
@@ -153,6 +190,7 @@ func completeInputSourceInstallation(isLoginRetry: Bool) {
             showInstallationResult(readiness, retryScheduled: false, detail: error.localizedDescription)
         }
     }
+    return false
 }
 
 func installationFlowSmoke() throws {
@@ -179,6 +217,11 @@ func installationFlowSmoke() throws {
     let status = try PropertyListSerialization.propertyList(from: Data(contentsOf: files.status), format: nil) as! [String: Any]
     try require(status["state"] as? String == "ready" && status["retryScheduled"] as? Bool == false,
                 "Saved installation state does not match activation")
+    try require(status["inputServerReady"] as? Bool == false, "TIS-only result claimed serving readiness")
+    _ = try files.record(.ready, app: app, isLoginRetry: false, runtimePID: 321)
+    let serving = try PropertyListSerialization.propertyList(from: Data(contentsOf: files.status), format: nil) as! [String: Any]
+    try require(serving["inputServerReady"] as? Bool == true && serving["runtimePID"] as? Int == 321,
+                "Serving process identity was not recorded")
     try Data("unrelated contents".utf8).write(to: files.retryAgent)
     do {
         _ = try files.record(.ready, app: app, isLoginRetry: false)

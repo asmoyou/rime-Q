@@ -34,4 +34,12 @@ as_login_user "$LSREGISTER" -f "$APP"
 # directly from this package script can return successful TIS calls without
 # actually enabling the source. The app verifies and presents the real result.
 as_login_user /usr/bin/open -n -g "$APP" --args --complete-install
-echo "Rime Q: application installed; activation continues in the user session. A prompt appears only if action is needed."
+# Verification is read-only. It challenges the exact build's serving process;
+# TIS enabled flags alone do not prove that an IMK server survived installation.
+for rimeq_attempt in 1 2 3; do
+    if as_login_user "$EXE" --verify-runtime; then
+        echo "Rime Q: installed input server responded; no login refresh requested."
+        exit 0
+    fi
+done
+echo "Rime Q: payload installed; input-server response remains pending. See the per-user installation log."

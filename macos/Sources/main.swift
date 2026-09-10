@@ -4,24 +4,43 @@ import InputMethodKit
 import QRimeBridge
 
 let arguments = CommandLine.arguments
+var finishInstallationAsServer = false
+var installationIsLoginRetry = false
 if let status = inputSourceInstallPhaseExitStatus(arguments: arguments) { exit(status) }
 if arguments.count > 1 {
     do {
         switch arguments[1] {
         case "--version": print("Rime Q \(Product.version) (\(Product.build))")
+        case "--compile-dictionaries" where arguments.count == 3:
+            try DictionaryResources.compileHelper(URL(fileURLWithPath: arguments[2]))
+        case "--settings-render" where arguments.count == 3:
+            try SettingsWindow.render(to: URL(fileURLWithPath: arguments[2]))
+        case "--personal-dictionary-smoke": try DictionarySmoke.personal()
+        case "--dictionary-resources-smoke": try DictionarySmoke.resources()
+        case "--settings-ui-smoke": try SettingsWindow.smoke()
         case "--candidate-smoke": try CandidateAppearanceSmoke.run()
+        case "--candidate-render" where arguments.count == 3:
+            try CandidateAppearanceSmoke.render(to: URL(fileURLWithPath: arguments[2]))
         case "--candidate-preview": CandidateAppearanceSmoke.preview(dark: arguments.contains("dark"))
         case "--smoke": try EngineSmoke.run()
         case "--benchmark": try EngineSmoke.benchmark()
         case "--controller-smoke": try ControllerSmoke.run()
         case "--installation-smoke": try installationFlowSmoke()
         case "--maintenance-smoke": try AppMaintenance.smoke()
+        case "--runtime-smoke": try RuntimeReadinessSmoke.run()
+        case "--runtime-smoke-worker" where arguments.count == 4:
+            try RuntimeReadinessSmoke.worker(root: URL(fileURLWithPath: arguments[2]), ready: arguments[3] == "ready")
+        case "--verify-runtime":
+            _ = NSApplication.shared
+            guard let identity = RuntimeReadiness.probe() else { fputs("Rime Q input server has not responded.\n", stderr); exit(75) }
+            print("PASS input server responding: build=\(identity.build) pid=\(identity.pid)")
         case "--uninstall-preview":
             _ = NSApplication.shared
             NSApp.setActivationPolicy(.accessory)
             AppMaintenance.uninstall(preview: true)
         case "--complete-install", "--retry-install":
-            completeInputSourceInstallation(isLoginRetry: arguments[1] == "--retry-install")
+            installationIsLoginRetry = arguments[1] == "--retry-install"
+            finishInstallationAsServer = completeInputSourceInstallation(isLoginRetry: installationIsLoginRetry)
         case "--installation-preview" where arguments.count == 3:
             guard let readiness = InstallationReadiness(rawValue: arguments[2]) else { exit(2) }
             showInstallationResult(readiness, retryScheduled: readiness == .pending, allowSystemActions: false)
@@ -45,7 +64,7 @@ if arguments.count > 1 {
             fputs("Usage: RimeQ --smoke | --benchmark | --prepare DEST | --register\n", stderr)
             exit(2)
         }
-        exit(0)
+        if !finishInstallationAsServer { exit(0) }
     } catch {
         fputs("Rime Q: \(error.localizedDescription)\n", stderr)
         exit(1)
@@ -54,18 +73,46 @@ if arguments.count > 1 {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var server: IMKServer?
+    var runtimeResponder: RuntimeResponder?
     func applicationDidFinishLaunching(_ notification: Notification) {
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(prepareUpdateQuit(_:)),
             name: UpdateQuitRequest.name, object: Bundle.main.bundleURL.path)
         // Do not expose an input controller while ensureSession() still fails.
         // IMK can finish connecting after launch instead of losing initial keys.
         do {
-            try Engine.start(user: Product.userRoot.appendingPathComponent("rime"))
+            let resources: URL
+            do { resources = try DictionaryResources.shared.activeResources() }
+            catch {
+                resources = Engine.bundledShared
+                DictionaryResources.shared.reportUnavailable(error.localizedDescription)
+            }
+            do { try Engine.start(user: Product.userRoot.appendingPathComponent("rime"), shared: resources) }
+            catch {
+                guard resources != Engine.bundledShared else { throw error }
+                QRimeStop()
+                DictionaryResources.shared.reportUnavailable("自定义词库未能加载，已使用内置词库。可在设置中重新应用或恢复内置配置。")
+                try Engine.start(user: Product.userRoot.appendingPathComponent("rime"))
+            }
             Engine.ready = true
             server = IMKServer(name: Product.connection, bundleIdentifier: Product.identifier)
-            guard server != nil else { NSApp.terminate(nil); return }
+            guard server != nil else { throw LexiconError.message("系统输入服务未能建立连接。") }
+            runtimeResponder = RuntimeResponder { [weak self] in Engine.ready && self?.server != nil }
+            InstallationDiagnostics.append("input-server-ready")
+            if finishInstallationAsServer {
+                do {
+                    _ = try InstallationFiles.current.record(.ready, app: Bundle.main.bundleURL,
+                        isLoginRetry: false, runtimePID: ProcessInfo.processInfo.processIdentifier)
+                } catch { InstallationDiagnostics.append("could-not-record-ready-status") }
+                InstallationDiagnostics.append("activation-complete serving-in-installer-process")
+            }
         } catch {
             Engine.failure = error.localizedDescription
+            Engine.ready = false
+            QRimeStop()
+            if finishInstallationAsServer {
+                _ = try? InstallationFiles.current.record(.pending, app: Bundle.main.bundleURL, isLoginRetry: installationIsLoginRetry)
+            }
+            InstallationDiagnostics.append("input-server-start-failed")
             let alert = NSAlert()
             alert.messageText = "Rime Q 暂时无法启动"
             alert.informativeText = "输入资源未能加载，请重新安装。你的个人词库会保留。\n" + error.localizedDescription
@@ -80,6 +127,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         DistributedNotificationCenter.default().removeObserver(self)
         if Engine.ready { QRimeStop() }
+        InstallationDiagnostics.append("input-server-stopped")
     }
 }
 

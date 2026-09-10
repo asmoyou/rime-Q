@@ -7,10 +7,12 @@ import subprocess
 import sys
 import tempfile
 import time
+import json
+from dictionary_catalog import write_catalog
 
 ROOT = Path(__file__).resolve().parents[1]
 IDENTIFIER = "com.asmoyou.inputmethod.RimeQ"
-VERSION = "0.1.5"
+VERSION = "0.2.2"
 
 
 def run(*args):
@@ -97,6 +99,7 @@ def build_app(app, universal=False, resources=True):
             shutil.copytree(contents / directory, ROOT / ".cache/prepared-resources" / directory, dirs_exist_ok=True)
     elif not (contents / "SharedSupport/build").is_dir():
         raise RuntimeError("No prepared resources; omit --reuse-resources on the first build")
+    write_catalog(contents, json.loads((ROOT / "dependencies.lock.json").read_text()))
     notices = contents / "Resources/Licenses"
     notices.mkdir(parents=True, exist_ok=True)
     for name in ["LICENSE", "THIRD_PARTY_NOTICES.md", "dependencies.lock.json"]:
@@ -126,9 +129,15 @@ def build(universal=False, resources=True, keep_app=False, smoke=False):
             run(sys.executable, ROOT / "scripts/test_macos_install_plan.py")
             run(app / "Contents/MacOS/RimeQ", "--smoke")
             run(app / "Contents/MacOS/RimeQ", "--installation-smoke")
+            run(app / "Contents/MacOS/RimeQ", "--runtime-smoke")
             run(app / "Contents/MacOS/RimeQ", "--maintenance-smoke")
             run(app / "Contents/MacOS/RimeQ", "--candidate-smoke")
             run(app / "Contents/MacOS/RimeQ", "--controller-smoke")
+            run(app / "Contents/MacOS/RimeQ", "--personal-dictionary-smoke")
+            run(app / "Contents/MacOS/RimeQ", "--settings-ui-smoke")
+            run(app / "Contents/MacOS/RimeQ", "--dictionary-resources-smoke")
+            run(app / "Contents/MacOS/RimeQ", "--settings-render", ROOT / f"artifacts/settings-{VERSION}")
+            run(app / "Contents/MacOS/RimeQ", "--candidate-render", ROOT / f"artifacts/candidates-{VERSION}")
         component = staging / "RimeQ-component.pkg"
         package_scripts = staging / "Scripts"
         shutil.copytree(ROOT / "scripts/macos/package-scripts", package_scripts)

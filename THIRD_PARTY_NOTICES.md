@@ -6,6 +6,7 @@ Rime Q 自有代码按 GPL-3.0-only 发布，完整许可证见根目录 `LICENS
 | --- | --- | --- |
 | librime 1.16.0 | 来自 Squirrel 1.1.2 官方安装包的运行库，源码基线 `a251145d3aafa33871824a40bbec04c966bd8b56` | BSD-3-Clause |
 | librime C API 头文件 | 1.17.0，`33e78140250125871856cdc5b42ddc6a5fcd3cd4`，运行时检查可用 API | BSD-3-Clause |
+| librime levers API 头文件 | 与运行库对应的 `a251145d3aafa33871824a40bbec04c966bd8b56`，用于个人学习词库维护；地址和校验值在依赖锁文件中 | BSD-3-Clause |
 | [librime-lua](https://github.com/hchunhui/librime-lua) | Squirrel 1.1.2 随附的 Lua 插件 | BSD-3-Clause；Lua 保留其 MIT 许可 |
 | [librime-octagram](https://github.com/lotem/librime-octagram) | Squirrel 1.1.2 随附的语法插件；保留上游 LICENSE | BSD-3-Clause |
 | [雾凇拼音](https://github.com/iDvel/rime-ice) | 固定版本词库、输入规则、Lua 与 OpenCC 映射；Q 的方案通过 include 派生并裁剪扩展 | GPL-3.0-only，子组件另有声明时保留原声明 |

@@ -42,7 +42,74 @@ enum CandidateAppearanceSmoke {
                     "Long text/comment geometry overlaps")
         canvas.composition.candidates = []
         try require(canvas.measuredSize() == .zero, "Empty candidate list retained a visible layout")
+        let surface = CandidateSurface()
+        try require(surface.maskImage != nil, "Native material lacks a rounded mask")
+        let mask = CandidateGeometry.materialMask
+        guard let data = mask.tiffRepresentation, let bitmap = NSBitmapImageRep(data: data) else {
+            throw LexiconError.message("Candidate mask could not render")
+        }
+        try require((bitmap.colorAt(x: 0, y: 0)?.alphaComponent ?? 1) < 0.1, "Candidate material corner is opaque")
+        try require((bitmap.colorAt(x: bitmap.pixelsWide / 2, y: bitmap.pixelsHigh / 2)?.alphaComponent ?? 0) > 0.9,
+                    "Candidate material center is transparent")
+        let suite = "RimeQ.CandidateSmoke." + UUID().uuidString
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let preferences = AppearancePreferences(defaults: defaults)
+        let panel = CandidatePanel(preferences: preferences), owner = NSObject()
+        defer { panel.hide(owner: ObjectIdentifier(owner)) }
+        for skin in CandidateSkin.allCases {
+            preferences.skin = skin
+            panel.show(Composition(candidates: [.init(text: "你好", comment: ""), .init(text: "拟好", comment: "")]),
+                       anchor: NSRect(x: 100, y: 400, width: 1, height: 20), owner: ObjectIdentifier(owner), select: { _ in })
+            try require(panel.canvas.skin == skin && panel.surface.skin == skin, "Selected skin did not reach live candidate panel")
+            try require(panel.contentView === panel.surface && panel.surface.maskImage != nil, "Material mask is not the window content view")
+        }
+        defaults.set("unknown", forKey: "candidateSkin")
+        try require(preferences.skin == .system, "Unknown skin did not fall back to system")
         print("PASS candidate layout: single=\(single.width)pt two=\(double.width)pt annotated=\(annotated.width)pt; hit testing and long-text limits")
+        print("PASS candidate appearance: transparent rounded corners, six palettes, saved skin applied to live panel")
+    }
+
+    static func render(to directory: URL) throws {
+        _ = NSApplication.shared
+        NSApp.setActivationPolicy(.accessory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let suite = "RimeQ.CandidateRender." + UUID().uuidString
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let preferences = AppearancePreferences(defaults: defaults)
+        let panel = CandidatePanel(preferences: preferences), owner = NSObject()
+        let backdrop = NSWindow(contentRect: NSRect(x: 120, y: 180, width: 500, height: 360),
+                                styleMask: [.borderless], backing: .buffered, defer: false)
+        backdrop.contentView = CandidatePreviewBackground(frame: backdrop.contentView!.bounds)
+        backdrop.level = .floating; backdrop.orderFrontRegardless()
+        defer { panel.hide(owner: ObjectIdentifier(owner)); backdrop.close() }
+        let canCapture = CGPreflightScreenCaptureAccess()
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            panel.appearance = NSAppearance(named: appearance)
+            for skin in CandidateSkin.allCases {
+                preferences.skin = skin
+                panel.show(Composition(candidates: [.init(text: "你好世界", comment: ""), .init(text: "你好", comment: ""), .init(text: "拟好", comment: "")]),
+                           anchor: NSRect(x: 260, y: 450, width: 1, height: 20), owner: ObjectIdentifier(owner), select: { _ in })
+                RunLoop.current.run(until: Date().addingTimeInterval(0.12))
+                let name = "\(skin.rawValue)-\(appearance == .aqua ? "light" : "dark")"
+                if canCapture {
+                    let process = Process(); process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+                    process.arguments = ["-x", "-o", "-l", String(panel.windowNumber), directory.appendingPathComponent(name + ".png").path]
+                    process.environment = ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin"]
+                    try process.run(); process.waitUntilExit()
+                    guard process.terminationStatus == 0 else { throw LexiconError.message("候选窗口截图失败。") }
+                } else {
+                    let view = CandidatePreviewView(rows: 3, height: 180)
+                    view.frame = NSRect(x: 0, y: 0, width: 300, height: 180); view.skin = skin
+                    view.appearance = NSAppearance(named: appearance); view.layoutSubtreeIfNeeded()
+                    guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { throw LexiconError.message("候选预览渲染失败。") }
+                    view.appearance!.performAsCurrentDrawingAppearance { view.cacheDisplay(in: view.bounds, to: bitmap) }
+                    try bitmap.representation(using: .png, properties: [:])?.write(to: directory.appendingPathComponent(name + "-preview.png"))
+                }
+            }
+        }
+        print(canCapture ? "PASS captured live rounded candidate windows in all six skins, light/dark" : "Rendered candidate previews; live window capture unavailable without Screen Recording access")
     }
 
     static func preview(dark: Bool) {
