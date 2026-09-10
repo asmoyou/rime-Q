@@ -28,7 +28,7 @@ enum Product {
     static let userRoot = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Application Support/RimeQ", isDirectory: true)
     static var schema: String {
-        UserDefaults.standard.bool(forKey: "sentenceOptimization") ? "rime_q_grammar" : "rime_q"
+        OptionalModel.shared.activeOptimization ? "rime_q_grammar" : "rime_q"
     }
 }
 

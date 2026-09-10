@@ -37,11 +37,12 @@ final class SettingsWindow: NSObject {
     private let updateChecker: UpdateChecker
 
     init(personalStore: PersonalDictionary = .shared, resourceStore: DictionaryResources = .shared,
-         preferences: AppearancePreferences = .shared, updateChecker: UpdateChecker = .shared) {
-        general = InputSettingsViewController(preferences: preferences)
+         preferences: AppearancePreferences = .shared, updateChecker: UpdateChecker = .shared,
+         model: OptionalModel = .shared) {
+        general = InputSettingsViewController(preferences: preferences, model: model)
         skins = SkinSettingsViewController(preferences: preferences)
         personal = PersonalDictionaryViewController(store: personalStore)
-        resources = DictionaryResourcesViewController(store: resourceStore)
+        resources = DictionaryResourcesViewController(store: resourceStore, model: model)
         self.updateChecker = updateChecker
         updates = UpdateSettingsViewController(checker: updateChecker)
         super.init()
@@ -106,6 +107,7 @@ final class SettingsWindow: NSObject {
             footer.bottomAnchor.constraint(equalTo: sidebar.bottomAnchor, constant: -16)
         ])
         general.manageSkins = { [weak self] in self?.selectPage(.skins) }
+        resources.manageModel = { [weak self] in self?.selectPage(.input) }
         self.window = window
         refreshUpdateBadge()
         selectPage(.input)
@@ -151,7 +153,8 @@ final class SettingsWindow: NSObject {
         let defaults = UserDefaults(suiteName: suite)!
         defer { try? FileManager.default.removeItem(at: temporary); defaults.removePersistentDomain(forName: suite) }
         let settings = SettingsWindow(personalStore: .init(root: temporary), resourceStore: .init(root: temporary),
-                                      preferences: .init(defaults: defaults), updateChecker: .init(defaults: defaults))
+                                      preferences: .init(defaults: defaults), updateChecker: .init(defaults: defaults),
+                                      model: .init(root: temporary, defaults: defaults))
         settings.build()
         settings.window?.orderFront(nil)
         defer { settings.window?.close() }
@@ -205,7 +208,8 @@ final class SettingsWindow: NSObject {
         defer { defaults.removePersistentDomain(forName: suite) }
         let preferences = AppearancePreferences(defaults: defaults)
         let checker = UpdateChecker(defaults: defaults)
-        let settings = SettingsWindow(personalStore: store, resourceStore: .init(root: root), preferences: preferences, updateChecker: checker)
+        let settings = SettingsWindow(personalStore: store, resourceStore: .init(root: root), preferences: preferences,
+                                      updateChecker: checker, model: .init(root: root, defaults: defaults))
         settings.build()
         defer { settings.window?.close() }
         settings.window?.orderFront(nil)

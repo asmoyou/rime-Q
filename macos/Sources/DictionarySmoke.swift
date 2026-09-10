@@ -41,7 +41,9 @@ enum DictionarySmoke {
         try EngineSmoke.check(!rows.contains(edited), "deleted entry still exported")
         rows = try store.undo()
         try EngineSmoke.check(rows.contains(edited), "undo did not restore entry")
-        try EngineSmoke.check(try candidates("qinglansongshuxuexi", schema: "rime_q_grammar").contains(edited.text), "grammar mode lost edited entry")
+        if EngineSmoke.schemas.contains("rime_q_grammar") {
+            try EngineSmoke.check(try candidates("qinglansongshuxuexi", schema: "rime_q_grammar").contains(edited.text), "grammar mode lost edited entry")
+        }
         let raised = LexiconEntry(text: edited.text, code: edited.code, weight: 20)
         _ = try store.merge([raised])
         try reject({ _ = try store.save(original, replacing: edited) }, "stale edit overwrote newer learning")
@@ -79,7 +81,7 @@ enum DictionarySmoke {
         controller.deactivate(client)
         QRimeStop(); try Engine.start(user: user)
         try EngineSmoke.check(try store.entries().contains(edited), "edited entry did not persist across engine restart")
-        print("PASS personal dictionary: real librime CRUD, undo, TSV merge, stale edits, backup, both modes, maintenance sessions, persistence")
+        print("PASS personal dictionary: real librime CRUD, undo, TSV merge, stale edits, backup, available schemas, maintenance sessions, persistence")
     }
 
     static func apply(_ store: DictionaryResources, _ config: DictionaryConfiguration) throws {
@@ -123,7 +125,7 @@ enum DictionarySmoke {
         try EngineSmoke.check(try !candidates("xingheciku").contains("星河词库甲乙"), "fixture already in bundled dictionary")
         print("Compiling imported dictionary…")
         try apply(store, config)
-        for schema in ["rime_q", "rime_q_grammar"] {
+        for schema in EngineSmoke.schemas {
             try EngineSmoke.check(try candidates("xingheciku", schema: schema).contains("星河词库甲乙"), "import not active in \(schema)")
             try EngineSmoke.check(try candidates("hello", schema: schema).contains("hello"), "resource update lost English dictionary in \(schema)")
             try EngineSmoke.check(try candidates("uUmumumu", schema: schema).contains("森"), "resource update lost radical lookup in \(schema)")
@@ -165,6 +167,6 @@ enum DictionarySmoke {
         try store.restoreBundled()
         try EngineSmoke.check(try personal.entries().contains(learned), "restore bundled lost personal records")
         try EngineSmoke.check(store.configuration.generation == nil, "restore bundled left managed generation active")
-        print("PASS dictionary resources: real compile, import, both modes, disable, restart, failure rollback, learning retained")
+        print("PASS dictionary resources: real compile, import, available schemas, disable, restart, failure rollback, learning retained")
     }
 }

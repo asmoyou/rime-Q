@@ -235,6 +235,8 @@ final class PersonalDictionaryViewController: NSViewController, NSTableViewDataS
 
 final class DictionaryResourcesViewController: NSViewController, NSTableViewDataSource, NSTableViewDelegate {
     let store: DictionaryResources
+    private let model: OptionalModel
+    var manageModel: (() -> Void)?
     private let table = NSTableView()
     private let detail = SettingsUI.label("选择词库查看来源、版本与使用情况。", size: 11, secondary: true)
     private var metadataText = ""
@@ -247,7 +249,12 @@ final class DictionaryResourcesViewController: NSViewController, NSTableViewData
     private var exportButton: NSButton!
     private var applyButton: NSButton!
     private var preview: DictionaryEntriesWindow?
-    init(store: DictionaryResources = .shared) { self.store = store; super.init(nibName: nil, bundle: nil) }
+    init(store: DictionaryResources = .shared, model: OptionalModel = .shared) {
+        self.store = store; self.model = model
+        super.init(nibName: nil, bundle: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(modelChanged), name: OptionalModel.didChange, object: model)
+    }
+    deinit { NotificationCenter.default.removeObserver(self) }
     required init?(coder: NSCoder) { fatalError() }
     override func loadView() {
         view = SettingsBackgroundView()
@@ -276,6 +283,11 @@ final class DictionaryResourcesViewController: NSViewController, NSTableViewData
         reload()
     }
     func activate() { reload() }
+    @objc private func modelChanged() {
+        guard isViewLoaded, let row = store.catalog.firstIndex(where: { $0.kind == "model" }) else { return }
+        table.reloadData(forRowIndexes: IndexSet(integer: row), columnIndexes: IndexSet(integersIn: 0..<table.numberOfColumns))
+        updateSelection()
+    }
     private var imported: ImportedDictionary? {
         let row = table.selectedRow - store.catalog.count
         return store.configuration.imported.indices.contains(row) ? store.configuration.imported[row] : nil
@@ -295,9 +307,9 @@ final class DictionaryResourcesViewController: NSViewController, NSTableViewData
             let entry = store.catalog[row]
             switch id {
             case "name": text = entry.name
-            case "kind": text = entry.kind == "model" ? "内置模型" : "内置词库"
+            case "kind": text = entry.kind == "model" ? "可选模型" : "内置词库"
             case "count": text = entry.kind == "model" ? ByteCountFormatter.string(fromByteCount: Int64(entry.bytes), countStyle: .file) : entry.count.formatted()
-            default: text = entry.kind == "model" ? (UserDefaults.standard.bool(forKey: "sentenceOptimization") ? "随整句优化启用" : "未启用")
+            default: text = entry.kind == "model" ? model.statusDescription
                 : entry.kind == "support" ? "随功能内置" : !entry.optional ? "基础必需" : store.configuration.disabled.contains(entry.id) ? "已停用" : "已启用"
             }
         } else {
@@ -320,13 +332,19 @@ final class DictionaryResourcesViewController: NSViewController, NSTableViewData
         removeButton?.isEnabled = !busy && imported != nil
         browseButton?.isEnabled = !busy && (imported != nil || (builtin != nil && builtin?.kind != "model"))
         exportButton?.isEnabled = !busy && (imported != nil || builtin != nil)
+        browseButton?.title = builtin?.kind == "model" ? "管理模型…" : "查看词条…"
+        if builtin?.kind == "model" {
+            toggleButton?.isEnabled = !busy && model.available && !model.state.busy
+            browseButton?.isEnabled = true
+            exportButton?.isEnabled = model.available && !model.state.busy
+        }
         if let entry = imported {
             toggleButton?.title = entry.enabled ? "停用" : "启用"
             detail.stringValue = "\(entry.source)\n版本 \(entry.version) · \(entry.originalName)\n\(entry.license)"
             metadataText = "来源：\(entry.source)\n版本：\(entry.version)\n原文件：\(entry.originalName)\n许可：\(entry.license)\n\nSHA-256：\n\(entry.sha256)"
         } else if let entry = builtin {
-            toggleButton?.title = store.configuration.disabled.contains(entry.id) ? "启用" : "停用"
-            detail.stringValue = "\(entry.source)\n版本 \(entry.version) · \(entry.file)\n\(entry.kind == "model" ? "在「输入与外观」中开启整句优化即可使用。" : entry.license)"
+            toggleButton?.title = entry.kind == "model" ? (model.enabled ? "停用" : "启用") : (store.configuration.disabled.contains(entry.id) ? "启用" : "停用")
+            detail.stringValue = "\(entry.source)\n版本 \(entry.version) · \(entry.file)\n\(entry.kind == "model" ? model.statusDescription : entry.license)"
             metadataText = "来源：\(entry.source)\n版本：\(entry.version)\n文件：\(entry.file)\n许可：\(entry.license)\n\nSHA-256：\n\(entry.sha256)"
         }
     }
@@ -349,6 +367,7 @@ final class DictionaryResourcesViewController: NSViewController, NSTableViewData
         updateSelection()
     }
     @objc private func toggle() {
+        if builtin?.kind == "model" { model.setEnabled(!model.enabled); return }
         var config = store.configuration
         if let entry = imported, let index = config.imported.firstIndex(where: { $0.id == entry.id }) { config.imported[index].enabled.toggle() }
         else if let entry = builtin, entry.optional {
@@ -399,7 +418,7 @@ final class DictionaryResourcesViewController: NSViewController, NSTableViewData
     @objc private func exportSource() {
         let url: URL, name: String
         if let entry = imported { url = store.importedURL(entry, original: true); name = entry.originalName }
-        else if let entry = builtin { url = store.bundled.appendingPathComponent(entry.file); name = URL(fileURLWithPath: entry.file).lastPathComponent }
+        else if let entry = builtin { url = entry.kind == "model" ? model.fileURL : store.bundled.appendingPathComponent(entry.file); name = URL(fileURLWithPath: entry.file).lastPathComponent }
         else { return }
         let panel = NSSavePanel(); panel.nameFieldStringValue = name
         guard let window = view.window else { return }
@@ -410,6 +429,7 @@ final class DictionaryResourcesViewController: NSViewController, NSTableViewData
         }
     }
     @objc private func browse() {
+        if builtin?.kind == "model" { manageModel?(); return }
         let url: URL, name: String
         if let entry = imported { url = store.importedURL(entry); name = entry.name }
         else if let entry = builtin, entry.kind != "model" { url = store.bundled.appendingPathComponent(entry.file); name = entry.name }

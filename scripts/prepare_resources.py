@@ -52,7 +52,6 @@ def prepare(destination):
     runtime = LOCK["squirrel_runtime"]
     package = fetch("Squirrel-1.1.2.pkg", runtime)
     ice_archive = fetch("rime-ice.tar.gz", LOCK["rime_ice"])
-    model = fetch(LOCK["wanxiang_model"]["filename"], LOCK["wanxiang_model"])
     license_file = fetch("wanxiang-LICENSE", {"url": LOCK["wanxiang_model"]["license_url"],
                                             "sha256": LOCK["wanxiang_model"]["license_sha256"]})
     with tempfile.TemporaryDirectory(prefix="rimeq-resources-") as temporary:
@@ -88,7 +87,6 @@ def prepare(destination):
         for original in (ROOT / "data").glob("*.yaml"):
             shutil.copy2(original, shared / original.name)
         shutil.copytree(ROOT / "data/lua", shared / "lua", dirs_exist_ok=True)
-        shutil.copy2(model, shared / model.name)
         notices = destination / "Resources/Licenses"
         notices.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ice / "LICENSE", notices / "rime-ice-GPL-3.0.txt")
@@ -104,7 +102,7 @@ def prepare(destination):
                 target = notices / "runtime" / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(original, target)
-    print("Prepared pinned runtime, rime-ice dictionaries and Wanxiang model", flush=True)
+    print("Prepared pinned runtime and rime-ice dictionaries; Wanxiang is an optional download", flush=True)
 
 
 if __name__ == "__main__":

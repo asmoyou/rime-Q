@@ -156,7 +156,7 @@ final class DictionaryResources {
 
     private func bundledConfigurationFingerprint() throws -> String {
         var hash = SHA256()
-        for name in ["rime_q.schema.yaml", "rime_q_grammar.schema.yaml", "rime_ice.schema.yaml", "default.yaml", "lua/q_lunar.lua"] {
+        for name in ["rime_q.schema.yaml", "rime_q_grammar.schema.yaml", "rime_ice.schema.yaml", "default.yaml", "default.custom.yaml", "lua/q_lunar.lua"] {
             hash.update(data: try Data(contentsOf: bundled.appendingPathComponent(name)))
         }
         return hash.finalize().map { String(format: "%02x", $0) }.joined()
@@ -331,7 +331,9 @@ final class DictionaryResources {
                 throw LexiconError.message("未能生成完整的词库：\(name)")
             }
         }
-        for schema in ["rime_q", "rime_q_grammar"] {
+        // Both schemas were compiled above; validate base input without fetching
+        // an optional model into this temporary compiler's user directory.
+        for schema in ["rime_q"] {
             let session = QRimeCreateSession()
             defer { QRimeDestroySession(session) }
             guard QRimeSchema(session, schema) else { throw LexiconError.message("输入方案未能加载。") }
@@ -357,7 +359,7 @@ final class DictionaryResources {
                 }
             }
         }
-        print("PASS dictionary compilation: both Chinese schemas and complete English/radical indexes")
+        print("PASS dictionary compilation: both Chinese schemas compiled, base input and complete English/radical indexes verified")
     }
 
     private func pruneGenerations(keeping ids: Set<String>) {

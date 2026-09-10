@@ -21,6 +21,13 @@ def write_catalog(contents: Path, lock: dict):
     ]
     result = []
     for resource_id, name, relative, optional, kind in definitions:
+        if kind == "model":
+            model = lock["wanxiang_model"]
+            result.append(dict(id=resource_id, name=name, file=relative, count=0,
+                bytes=model["bytes"], sha256=model["sha256"], optional=False, kind=kind,
+                source="https://github.com/amzxyz/RIME-LMDG", version="LTS · " + model["sha256"][:12],
+                license="CC-BY-4.0 · amzxyz"))
+            continue
         path = shared / relative
         if not path.exists():
             raise RuntimeError(f"Bundled resource missing: {relative}")

@@ -7,7 +7,7 @@ enum LuaSmoke {
         defer { try? FileManager.default.removeItem(at: root) }
         try Engine.start(user: root)
         defer { QRimeStop() }
-        for schema in ["rime_q", "rime_q_grammar"] {
+        for schema in EngineSmoke.schemas {
             let session = QRimeCreateSession()
             defer { QRimeDestroySession(session) }
             try EngineSmoke.check(QRimeSchema(session, schema), "Lua test schema missing")

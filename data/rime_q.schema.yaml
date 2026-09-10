@@ -4,7 +4,7 @@ __include: rime_ice.schema:/
 schema:
   schema_id: rime_q
   name: Rime Q
-  version: "0.2.4"
+  version: "0.3.1"
   author: [Rime Q contributors, Dvel]
   description: 简体全拼，离线输入。
   dependencies: [melt_eng, radical_pinyin]

@@ -16,7 +16,7 @@ from prepare_resources import digest
 
 ROOT = Path(__file__).resolve().parents[1]
 IDENTIFIER = "com.asmoyou.inputmethod.RimeQ"
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 
 
 def run(*args):
@@ -92,6 +92,8 @@ def build_app(app, universal=False, resources=True):
         for directory in ["Frameworks", "SharedSupport"]:
             if (cached / directory).is_dir():
                 shutil.copytree(cached / directory, contents / directory, dirs_exist_ok=True)
+        # Older prepared caches included the optional model. Never ship it again.
+        (contents / "SharedSupport/wanxiang-lts-zh-hans.gram").unlink(missing_ok=True)
     if resources:
         run(sys.executable, ROOT / "scripts/prepare_resources.py", contents)
         compiled = contents / "SharedSupport/build"
@@ -101,6 +103,7 @@ def build_app(app, universal=False, resources=True):
         # Cache resources without an application identity for incremental builds.
         for directory in ["Frameworks", "SharedSupport"]:
             shutil.copytree(contents / directory, ROOT / ".cache/prepared-resources" / directory, dirs_exist_ok=True)
+        (ROOT / ".cache/prepared-resources/SharedSupport/wanxiang-lts-zh-hans.gram").unlink(missing_ok=True)
         shutil.copytree(contents / "Resources/Licenses", ROOT / ".cache/prepared-resources/Licenses", dirs_exist_ok=True)
     elif not (contents / "SharedSupport/build").is_dir():
         raise RuntimeError("No prepared resources; omit --reuse-resources on the first build")
@@ -119,9 +122,9 @@ def build_app(app, universal=False, resources=True):
             run(contents / "MacOS/RimeQ", "--prepare", compiled)
     lock = json.loads((ROOT / "dependencies.lock.json").read_text())
     model = lock["wanxiang_model"]
-    model_file = contents / "SharedSupport" / model["filename"]
-    if digest(model_file) != model["sha256"] or model_file.stat().st_size != model["bytes"]:
-        raise RuntimeError("Prepared model differs from dependencies.lock.json; rebuild without --reuse-resources")
+    (contents / "Resources/optional-model.json").write_text(json.dumps({
+        "file": model["filename"], "bytes": model["bytes"], "sha256": model["sha256"], "url": model["url"]
+    }, indent=2) + "\n")
     write_catalog(contents, lock)
     notices = contents / "Resources/Licenses"
     notices.mkdir(parents=True, exist_ok=True)
@@ -191,9 +194,11 @@ def build(universal=False, resources=True, keep_app=False, smoke=False):
         if smoke:
             run(sys.executable, ROOT / "scripts/test_macos_install_plan.py")
             run(sys.executable, ROOT / "scripts/test_resource_fetch.py")
+            run(sys.executable, ROOT / "scripts/test_model_preservation.py")
             run(app / "Contents/MacOS/RimeQ", "--rimeq-tis-validate-bundle")
             with isolated_smoke_app(app) as preview:
                 exe = preview / "Contents/MacOS/RimeQ"
+                run(sys.executable, ROOT / "scripts/test_optional_model.py", exe)
                 for command in ["--smoke", "--lua-smoke", "--installation-smoke", "--runtime-smoke", "--maintenance-smoke", "--update-smoke", "--candidate-smoke",
                                 "--controller-smoke", "--personal-dictionary-smoke", "--settings-ui-smoke", "--dictionary-resources-smoke"]:
                     run(exe, command)
@@ -204,6 +209,8 @@ def build(universal=False, resources=True, keep_app=False, smoke=False):
         shutil.copytree(ROOT / "scripts/macos/package-scripts", package_scripts)
         build_number = plistlib.loads((app / "Contents/Info.plist").read_bytes())["CFBundleVersion"]
         (package_scripts / "package-version.plist").write_bytes(plistlib.dumps({"Version": VERSION, "Build": build_number}))
+        model = json.loads((ROOT / "dependencies.lock.json").read_text())["wanxiang_model"]
+        (package_scripts / "model-info.plist").write_bytes(plistlib.dumps({"SHA256": model["sha256"]}))
         resources = staging / "Resources"
         shutil.copytree(ROOT / "scripts/macos/package-resources", resources)
         for resource in resources.glob("*.html"):

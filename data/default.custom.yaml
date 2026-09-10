@@ -5,3 +5,5 @@ patch:
     - schema: rime_q_grammar
   menu/page_size: 5
   switcher/hotkeys: []
+  # The app selects grammar only after the optional model has been verified.
+  switcher/fix_schema_list_order: true

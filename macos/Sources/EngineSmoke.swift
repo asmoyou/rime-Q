@@ -2,6 +2,12 @@ import Foundation
 import QRimeBridge
 
 enum EngineSmoke {
+    static var schemas: [String] {
+        let filename = "wanxiang-lts-zh-hans.gram"
+        let roots = [Engine.userDirectory, Engine.sharedDirectory].compactMap { $0 }
+        let hasModel = roots.contains { FileManager.default.fileExists(atPath: $0.appendingPathComponent(filename).path) }
+        return hasModel ? ["rime_q", "rime_q_grammar"] : ["rime_q"]
+    }
     static func check(_ condition: @autoclosure () throws -> Bool, _ message: String) throws {
         if try !condition() { throw NSError(domain: "RimeQSmoke", code: 1, userInfo: [NSLocalizedDescriptionKey: message]) }
     }
@@ -59,7 +65,7 @@ enum EngineSmoke {
             type("shi", session: session)
             try check(Engine.snapshot(session).candidates.contains { $0.text == "诗" }, "frequent character is not on first page")
             QRimeClear(session)
-            try check(QRimeSchema(session, "rime_q_grammar"), "grammar schema missing")
+            if schemas.contains("rime_q_grammar") { try check(QRimeSchema(session, "rime_q_grammar"), "grammar schema missing") }
             type("qinglansongshuceci", session: session)
             try check(Engine.snapshot(session).candidates.contains { $0.text == "青岚松鼠测词" }, "mode switch lost shared learning")
             QRimeClear(session)
@@ -100,7 +106,7 @@ enum EngineSmoke {
         defer { QRimeStop() }
         let session = QRimeCreateSession()
         defer { QRimeDestroySession(session) }
-        for schema in ["rime_q", "rime_q_grammar"] {
+        for schema in schemas {
             try check(QRimeSchema(session, schema), "benchmark schema unavailable")
             var times: [Double] = []
             for cycle in 0..<60 {

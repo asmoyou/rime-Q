@@ -160,16 +160,19 @@ final class SkinSettingsViewController: NSViewController {
 
 final class InputSettingsViewController: NSViewController {
     let preferences: AppearancePreferences
+    private let model: OptionalModel
     private let optimization = NSSwitch()
     private let font = NSPopUpButton()
     private let skinButton = NSButton()
     private let preview = CandidatePreviewView()
     private var explanation: NSPopover?
     var manageSkins: (() -> Void)?
-    init(preferences: AppearancePreferences = .shared) {
+    init(preferences: AppearancePreferences = .shared, model: OptionalModel = .shared) {
         self.preferences = preferences
+        self.model = model
         super.init(nibName: nil, bundle: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(refresh), name: AppearancePreferences.didChange, object: preferences)
+        NotificationCenter.default.addObserver(self, selector: #selector(refreshModel), name: OptionalModel.didChange, object: model)
     }
     required init?(coder: NSCoder) { fatalError() }
     deinit { NotificationCenter.default.removeObserver(self) }
@@ -180,10 +183,18 @@ final class InputSettingsViewController: NSViewController {
         let help = NSButton(image: NSImage(systemSymbolName: "questionmark.circle", accessibilityDescription: "了解整句优化")!, target: self, action: #selector(explain(_:)))
         help.isBordered = false; help.contentTintColor = .secondaryLabelColor
         help.widthAnchor.constraint(equalToConstant: 20).isActive = true
-        let switches = SettingsUI.row([help, optimization])
+        let switches = NSView()
         switches.widthAnchor.constraint(equalToConstant: 96).isActive = true
-        switches.distribution = .gravityAreas
-        switches.setViews([help, optimization], in: .trailing)
+        switches.heightAnchor.constraint(equalToConstant: 28).isActive = true
+        help.translatesAutoresizingMaskIntoConstraints = false
+        optimization.translatesAutoresizingMaskIntoConstraints = false
+        switches.addSubview(help); switches.addSubview(optimization)
+        NSLayoutConstraint.activate([
+            optimization.trailingAnchor.constraint(equalTo: switches.trailingAnchor),
+            optimization.centerYAnchor.constraint(equalTo: switches.centerYAnchor),
+            help.trailingAnchor.constraint(equalTo: optimization.leadingAnchor, constant: -8),
+            help.centerYAnchor.constraint(equalTo: switches.centerYAnchor)
+        ])
         let inputRow = SettingsLayout.setting("整句优化", detail: "使用万象语法模型，辅助连续输入时的组词。",
             control: switches, height: 76)
         font.addItems(withTitles: ["16", "18", "20", "22"])
@@ -202,7 +213,7 @@ final class InputSettingsViewController: NSViewController {
         shortcuts.distribution = .fillEqually; shortcuts.spacing = 12; shortcuts.alignment = .top
         SettingsLayout.scrollPage([
             SettingsLayout.heading("输入与外观", subtitle: "按自己的习惯，调整输入与候选显示。"),
-            SettingsLayout.section("输入", content: SettingsCard([inputRow]), note: "开启或关闭，都共用雾凇词库和同一份个人学习记录。"),
+            SettingsLayout.section("输入", content: SettingsCard([inputRow, SettingsLayout.separator(), ModelSettingsView(model: model)]), note: "万象模型按需下载。基础组词与个人学习无需模型，也能离线使用。"),
             SettingsLayout.section("候选显示", content: appearance),
             SettingsLayout.section("常用按键", content: shortcuts),
             SettingsLayout.section("快捷输入", content: SettingsCard([
@@ -218,12 +229,17 @@ final class InputSettingsViewController: NSViewController {
     }
     @objc func refresh() {
         guard isViewLoaded else { return }
-        optimization.state = UserDefaults.standard.bool(forKey: "sentenceOptimization") ? .on : .off
+        refreshModel()
         font.selectItem(withTitle: "\(Int(preferences.fontSize))")
         skinButton.title = preferences.skin.name + "  ›"
         preview.skin = preferences.skin; preview.fontSize = preferences.fontSize
     }
-    @objc private func changeOptimization() { UserDefaults.standard.set(optimization.state == .on, forKey: "sentenceOptimization") }
+    @objc private func refreshModel() {
+        guard isViewLoaded else { return }
+        optimization.state = model.enabled ? .on : .off
+        optimization.isEnabled = model.available && !model.state.busy
+    }
+    @objc private func changeOptimization() { model.setEnabled(optimization.state == .on) }
     @objc private func changeFont() { preferences.fontSize = CGFloat(Int(font.titleOfSelectedItem ?? "18") ?? 18) }
     @objc private func openSkins() { manageSkins?() }
     @objc private func explain(_ sender: NSButton) {

@@ -11,6 +11,8 @@ import xml.etree.ElementTree as ET
 def verify(package):
     files = set(line.removeprefix("./") for line in subprocess.check_output(
         ["pkgutil", "--payload-files", str(package)], text=True).splitlines())
+    assert not any(name.endswith(".gram") for name in files), "Optional models must not be bundled"
+    assert "RimeQ.app/Contents/Resources/optional-model.json" in files, "Missing optional model download metadata"
     for name in ["rime-ice-source.tar.gz", "rime-ice-GPL-3.0.txt", "wanxiang-CC-BY-4.0.txt",
                  "librime-BSD-3-Clause.txt", "runtime/Resources/LICENSE.txt"]:
         assert "RimeQ.app/Contents/Resources/Licenses/" + name in files, f"Missing dependency source/notice: {name}"
@@ -31,6 +33,8 @@ def verify(package):
         assert metadata["Version"] == info.get("version"), "Version guard differs from the packaged release"
         assert metadata["Build"] == bundles[0].get("CFBundleVersion"), "Version guard differs from the packaged build"
         assert (infos[0].parent / "Scripts/version-check.sh").exists(), "Missing preinstall downgrade protection"
+        assert (infos[0].parent / "Scripts/preserve-model.sh").exists(), "Missing enabled model preservation helper"
+        assert (infos[0].parent / "Scripts/model-info.plist").exists(), "Missing pinned model preservation metadata"
         postinstall = infos[0].parent / "Scripts/postinstall"
         script = postinstall.read_text()
         assert '/usr/bin/open -n -g "$APP" --args --complete-install' in script, "Activation must use LaunchServices"

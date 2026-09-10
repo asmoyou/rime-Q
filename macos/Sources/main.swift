@@ -31,6 +31,11 @@ if arguments.count > 1 {
         case "--maintenance-quit-worker" where arguments.count == 3:
             try AppMaintenance.quitWorker(root: URL(fileURLWithPath: arguments[2]))
         case "--update-smoke": try UpdateSmoke.run()
+        case "--optional-model-smoke" where arguments.count == 3:
+            try ModelSmoke.run(server: URL(string: arguments[2])!)
+        case "--optional-model-live-smoke": try ModelSmoke.live()
+        case "--optional-model-engine-smoke" where arguments.count == 3:
+            try ModelSmoke.live(localSource: URL(fileURLWithPath: arguments[2]))
         case "--update-live-smoke" where arguments.count == 4:
             try UpdateSmoke.live(installed: arguments[2], expected: arguments[3])
         case "--runtime-smoke": try RuntimeReadinessSmoke.run()
@@ -105,6 +110,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             InstallationDiagnostics.append("input-server-ready")
             DictionaryResources.shared.refreshBundledConfigurationIfNeeded()
             UpdateChecker.shared.start()
+            OptionalModel.shared.restore()
             if finishInstallationAsServer {
                 do {
                     _ = try InstallationFiles.current.record(.ready, app: Bundle.main.bundleURL,
