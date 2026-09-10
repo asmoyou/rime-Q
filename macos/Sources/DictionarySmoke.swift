@@ -127,7 +127,21 @@ enum DictionarySmoke {
             try EngineSmoke.check(try candidates("xingheciku", schema: schema).contains("星河词库甲乙"), "import not active in \(schema)")
             try EngineSmoke.check(try candidates("hello", schema: schema).contains("hello"), "resource update lost English dictionary in \(schema)")
             try EngineSmoke.check(try candidates("uUmumumu", schema: schema).contains("森"), "resource update lost radical lookup in \(schema)")
+            try EngineSmoke.check(try candidates("cC1+2*3", schema: schema).contains("7"), "resource update lost Lua utilities in \(schema)")
         }
+        let previousGeneration = store.configuration.generation!
+        try LexiconFiles.write("previous-input-configuration", to: store.directory.appendingPathComponent("generations/\(previousGeneration)/.rimeq-input-config"))
+        var migration: Result<Void, Error>?
+        try EngineSmoke.check(store.refreshBundledConfigurationIfNeeded { migration = $0 }, "old input configuration was not migrated")
+        let migrationDeadline = Date().addingTimeInterval(600)
+        while migration == nil && Date() < migrationDeadline { RunLoop.current.run(until: Date().addingTimeInterval(0.05)) }
+        guard let migration else { throw LexiconError.message("input configuration migration timed out") }
+        try migration.get()
+        try EngineSmoke.check(store.configuration.generation != previousGeneration, "migration mutated the existing generation")
+        try EngineSmoke.check(store.configuration.imported == config.imported && store.configuration.disabled == config.disabled,
+                              "migration changed dictionary choices")
+        try EngineSmoke.check(try candidates("xingheciku").contains("星河词库甲乙"), "migration lost an imported entry")
+        try EngineSmoke.check(!store.refreshBundledConfigurationIfNeeded(), "current input configuration migrated repeatedly")
         try EngineSmoke.check(try personal.entries().contains(learned), "resource switch lost learning")
         let reopened = DictionaryResources(root: root)
         try EngineSmoke.check(reopened.configuration == store.configuration, "resource manifest did not persist")

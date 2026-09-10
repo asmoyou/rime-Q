@@ -7,8 +7,6 @@ final class CandidateCanvas: NSView {
     var select: ((Int) -> Void)?
     var fontSize: CGFloat = 18
     var skin: CandidateSkin = .system
-    var decorationEnabled = true
-    var decorationHeight: CGFloat { skin.animated && decorationEnabled ? 40 : 0 }
     let padding: CGFloat = 8
     private let horizontalPadding: CGFloat = 10
     private let labelGap: CGFloat = 8
@@ -31,8 +29,8 @@ final class CandidateCanvas: NSView {
         let widest = composition.candidates.map {
             width($0.text, font: textFont) + ($0.comment.isEmpty ? 0 : commentGap + width($0.comment, font: smallFont))
         }.max() ?? 0
-        return NSSize(width: min(580, max(decorationHeight > 0 ? 88 : 0, ceil(textX + widest + horizontalPadding))),
-                      height: CGFloat(composition.candidates.count) * rowHeight + padding * 2 + decorationHeight)
+        return NSSize(width: min(580, ceil(textX + widest + horizontalPadding)),
+                      height: CGFloat(composition.candidates.count) * rowHeight + padding * 2)
     }
 
     func textWidths(for item: CandidateItem) -> (text: CGFloat, comment: CGFloat) {
@@ -46,7 +44,7 @@ final class CandidateCanvas: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         for (index, item) in composition.candidates.enumerated() {
-            let row = NSRect(x: 4, y: padding + decorationHeight + CGFloat(index) * rowHeight, width: bounds.width - 8, height: rowHeight)
+            let row = NSRect(x: 4, y: padding + CGFloat(index) * rowHeight, width: bounds.width - 8, height: rowHeight)
             if index == composition.highlighted {
                 skin.selection.setFill()
                 NSBezierPath(roundedRect: row, xRadius: 9, yRadius: 9).fill()
@@ -72,8 +70,8 @@ final class CandidateCanvas: NSView {
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     func candidateIndex(at point: NSPoint) -> Int? {
-        guard bounds.contains(point), point.y >= padding + decorationHeight else { return nil }
-        let index = Int((point.y - padding - decorationHeight) / rowHeight)
+        guard bounds.contains(point), point.y >= padding else { return nil }
+        let index = Int((point.y - padding) / rowHeight)
         return composition.candidates.indices.contains(index) ? index : nil
     }
     override func mouseDown(with event: NSEvent) {
@@ -85,7 +83,6 @@ final class CandidateCanvas: NSView {
 final class CandidateSurface: NSVisualEffectView {
     let canvas = CandidateCanvas(frame: .zero)
     private let tint = CandidateTint()
-    let cat = TypingCatView()
     var skin: CandidateSkin = .system { didSet { applySkin() } }
 
     init() {
@@ -102,7 +99,6 @@ final class CandidateSurface: NSVisualEffectView {
         addSubview(tint)
         canvas.autoresizingMask = [.width, .height]
         addSubview(canvas)
-        addSubview(cat)
         applySkin()
     }
 
@@ -112,15 +108,12 @@ final class CandidateSurface: NSVisualEffectView {
         tint.skin = skin
         tint.needsDisplay = true
         canvas.needsDisplay = true
-        cat.isHidden = !skin.animated
-        if !skin.animated { cat.rest() }
         needsLayout = true
     }
     override func layout() {
         super.layout()
         tint.frame = bounds
         canvas.frame = bounds
-        cat.frame = NSRect(x: max(0, bounds.width - 72), y: bounds.height - 46, width: 66, height: 44)
         window?.invalidateShadow()
     }
 }
@@ -141,6 +134,7 @@ private final class CandidateTint: NSView {
 final class CandidatePanel: NSPanel {
     static let shared = CandidatePanel()
     let surface = CandidateSurface()
+    let pet = CandidatePetPanel()
     var canvas: CandidateCanvas { surface.canvas }
     private var owner: ObjectIdentifier?
     private let preferences: AppearancePreferences
@@ -171,23 +165,47 @@ final class CandidatePanel: NSPanel {
         let caret = plausible ? anchor : NSRect(origin: NSEvent.mouseLocation, size: NSSize(width: 1, height: 20))
         let screen = NSScreen.screens.first { $0.frame.contains(caret.origin) } ?? NSScreen.main
         let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1280, height: 800)
-        let x = max(visible.minX, min(caret.minX, visible.maxX - size.width))
-        var y = caret.minY - size.height - 5
-        if y < visible.minY { y = caret.maxY + 5 }
-        y = max(visible.minY, min(y, visible.maxY - size.height))
-        setFrame(NSRect(origin: NSPoint(x: x, y: y), size: size), display: false)
+        let placement = CandidateGeometry.placement(size: size, caret: caret, visible: visible, animated: surface.skin.animated)
+        setFrame(placement.body, display: false)
         surface.layoutSubtreeIfNeeded()
         invalidateShadow()
         canvas.needsDisplay = true
         orderFrontRegardless()
-        if keyActivity && surface.skin.animated { surface.cat.tap() }
+        if let frame = placement.pet {
+            pet.appearance = effectiveAppearance
+            pet.setFrame(frame, display: false)
+            if pet.parent !== self { addChildWindow(pet, ordered: .above) }
+            pet.orderFrontRegardless()
+            if keyActivity { pet.cat.tap() }
+        } else { hidePet() }
     }
 
     func hide(owner: ObjectIdentifier) {
         guard self.owner == owner else { return }
         self.owner = nil
         canvas.select = nil
-        surface.cat.rest()
+        hidePet()
         orderOut(nil)
+    }
+
+    private func hidePet() {
+        pet.cat.rest()
+        if pet.parent === self { removeChildWindow(pet) }
+        pet.orderOut(nil)
+    }
+}
+
+/// An independent, mouse-transparent child window lets the cat perch outside
+/// the material without adding blank candidate rows or blocking the host app.
+final class CandidatePetPanel: NSPanel {
+    let cat = TypingCatView()
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
+    init() {
+        super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        isOpaque = false; backgroundColor = .clear; hasShadow = false
+        ignoresMouseEvents = true; hidesOnDeactivate = false; level = .popUpMenu
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        contentView = cat
     }
 }

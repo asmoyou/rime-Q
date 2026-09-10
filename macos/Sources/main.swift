@@ -23,6 +23,7 @@ if arguments.count > 1 {
             try CandidateAppearanceSmoke.render(to: URL(fileURLWithPath: arguments[2]))
         case "--candidate-preview": CandidateAppearanceSmoke.preview(dark: arguments.contains("dark"))
         case "--smoke": try EngineSmoke.run()
+        case "--lua-smoke": try LuaSmoke.run()
         case "--benchmark": try EngineSmoke.benchmark()
         case "--controller-smoke": try ControllerSmoke.run()
         case "--installation-smoke": try installationFlowSmoke()
@@ -98,6 +99,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard server != nil else { throw LexiconError.message("系统输入服务未能建立连接。") }
             runtimeResponder = RuntimeResponder { [weak self] in Engine.ready && self?.server != nil }
             InstallationDiagnostics.append("input-server-ready")
+            DictionaryResources.shared.refreshBundledConfigurationIfNeeded()
             if finishInstallationAsServer {
                 do {
                     _ = try InstallationFiles.current.record(.ready, app: Bundle.main.bundleURL,

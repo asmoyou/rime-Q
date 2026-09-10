@@ -71,9 +71,22 @@ enum CandidateAppearanceSmoke {
         preferences.skin = .typingCat
         panel.show(Composition(candidates: [.init(text: "你", comment: "")]),
             anchor: NSRect(x: 100, y: 400, width: 1, height: 20), owner: ObjectIdentifier(owner), keyActivity: true, select: { _ in })
-        try require(panel.canvas.candidateIndex(at: NSPoint(x: 20, y: 25)) == nil, "Cat decoration selected a candidate")
-        try require(panel.canvas.candidateIndex(at: NSPoint(x: 20, y: 49)) == 0, "Cat skin first candidate hit test failed")
-        let cat = panel.surface.cat
+        let compactSize = panel.canvas.measuredSize()
+        panel.canvas.skin = .system
+        try require(panel.canvas.measuredSize() == compactSize, "Pet changed candidate content dimensions")
+        try require(panel.canvas.candidateIndex(at: NSPoint(x: 20, y: 25)) == 0, "Pet changed first candidate hit testing")
+        try require(panel.pet.parent === panel && panel.pet.ignoresMouseEvents && !panel.pet.canBecomeKey,
+                    "Pet must follow the candidate without intercepting input or focus")
+        try require(panel.pet.frame.minY >= panel.frame.maxY - CandidateGeometry.petOverlap,
+                    "Pet overlaps candidate content")
+        for origin in [NSPoint(x: 0, y: 0), NSPoint(x: 399, y: 0), NSPoint(x: 0, y: 298), NSPoint(x: 399, y: 298)] {
+            let visible = NSRect(x: 0, y: 0, width: 400, height: 320)
+            let placement = CandidateGeometry.placement(size: compactSize, caret: NSRect(origin: origin, size: NSSize(width: 1, height: 20)),
+                                                         visible: visible, animated: true)
+            try require(visible.contains(placement.body) && placement.pet.map { visible.contains($0) } == true,
+                        "Pet or candidate escaped a screen edge")
+        }
+        let cat = panel.pet.cat
         cat.tap(reduceMotion: false); let firstPose = cat.pose
         cat.tap(reduceMotion: false)
         try require(cat.pose != firstPose && cat.isAnimating, "Typing cat did not alternate paws")
@@ -82,7 +95,7 @@ enum CandidateAppearanceSmoke {
         cat.tap(reduceMotion: true)
         try require(cat.pose == 0 && !cat.isAnimating, "Typing cat ignored Reduce Motion")
         cat.tap(reduceMotion: false); panel.hide(owner: ObjectIdentifier(owner))
-        try require(!cat.isAnimating, "Hidden candidate panel kept animating")
+        try require(!cat.isAnimating && !panel.pet.isVisible && panel.pet.parent == nil, "Hidden candidate left a pet window or timer")
         print("PASS candidate layout: single=\(single.width)pt two=\(double.width)pt annotated=\(annotated.width)pt; hit testing and long-text limits")
         print("PASS candidate appearance: rounded corners, saved skins, typing cat key poses/idle/hide/Reduce Motion and hit testing")
     }
@@ -112,7 +125,14 @@ enum CandidateAppearanceSmoke {
                 let name = "\(skin.rawValue)-\(appearance == .aqua ? "light" : "dark")"
                 if canCapture {
                     let process = Process(); process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-                    process.arguments = ["-x", "-o", "-l", String(panel.windowNumber), directory.appendingPathComponent(name + ".png").path]
+                    if skin.animated {
+                        let rect = panel.frame.union(panel.pet.frame).insetBy(dx: -8, dy: -8)
+                        let top = (NSScreen.screens.first?.frame.maxY ?? 0) - rect.maxY
+                        process.arguments = ["-x", "-R", "\(Int(rect.minX)),\(Int(top)),\(Int(ceil(rect.width))),\(Int(ceil(rect.height)))",
+                                             directory.appendingPathComponent(name + ".png").path]
+                    } else {
+                        process.arguments = ["-x", "-o", "-l", String(panel.windowNumber), directory.appendingPathComponent(name + ".png").path]
+                    }
                     process.environment = ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin"]
                     try process.run(); process.waitUntilExit()
                     guard process.terminationStatus == 0 else { throw LexiconError.message("候选窗口截图失败。") }
@@ -135,7 +155,9 @@ enum CandidateAppearanceSmoke {
         canvas.skin = .typingCat
         canvas.composition.candidates = [.init(text: "你好世界", comment: ""), .init(text: "你好", comment: ""), .init(text: "拟好", comment: "")]
         canvas.frame.size = canvas.measuredSize()
-        let size = NSSize(width: canvas.bounds.width * 2, height: canvas.bounds.height * 2)
+        let petSize = CandidateGeometry.petSize(bodyWidth: canvas.bounds.width)
+        let body = NSRect(x: 16, y: 16 + petSize.height - CandidateGeometry.petOverlap, width: canvas.bounds.width, height: canvas.bounds.height)
+        let size = NSSize(width: (body.width + 32) * 2, height: (body.maxY + 16) * 2)
         let poses = [0, 1, 0, 2, 0, 1, 0, 2, 0]
         guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.gif.identifier as CFString, poses.count, nil) else {
             throw LexiconError.message("无法创建小猫动画预览。")
@@ -149,10 +171,15 @@ enum CandidateAppearanceSmoke {
                     NSGraphicsContext.saveGraphicsState()
                     defer { NSGraphicsContext.restoreGraphicsState() }
                     let scale = NSAffineTransform(); scale.scale(by: 2); scale.concat()
+                    NSColor.rgb(0xEEF0F5).setFill()
+                    NSRect(x: 0, y: 0, width: size.width / 2, height: size.height / 2).fill()
                     CandidateSkin.typingCat.background.setFill()
-                    NSBezierPath(roundedRect: canvas.bounds, xRadius: 14, yRadius: 14).fill()
+                    NSBezierPath(roundedRect: body, xRadius: 14, yRadius: 14).fill()
+                    NSGraphicsContext.saveGraphicsState()
+                    let move = NSAffineTransform(); move.translateX(by: body.minX, yBy: body.minY); move.concat()
                     canvas.draw(canvas.bounds)
-                    TypingCatView.draw(in: NSRect(x: canvas.bounds.width - 72, y: 2, width: 66, height: 44), pose: pose)
+                    NSGraphicsContext.restoreGraphicsState()
+                    TypingCatView.draw(in: NSRect(x: body.maxX - petSize.width - 4, y: 16, width: petSize.width, height: petSize.height), pose: pose)
                     return true
                 }
                 if let tiff = image.tiffRepresentation { bitmap = NSBitmapImageRep(data: tiff) }

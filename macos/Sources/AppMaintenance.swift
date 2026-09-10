@@ -35,16 +35,25 @@ enum ReleaseLookup {
 }
 
 enum AppMaintenance {
-    static let releases = URL(string: "https://github.com/asmoyou/rime-Q/releases")!
+    static let releases = Product.downloads
     private static var checkingUpdates = false
 
     static func openAbout() {
+        let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .center
+        let credits = NSMutableAttributedString(string: "免费开源 · 官方版本无需购买\n\n",
+            attributes: [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph])
+        credits.append(NSAttributedString(string: "项目主页", attributes: [.link: Product.homepage, .paragraphStyle: paragraph]))
+        credits.append(NSAttributedString(string: "  ·  "))
+        credits.append(NSAttributedString(string: "官方下载", attributes: [.link: Product.downloads, .paragraphStyle: paragraph]))
         NSApp.activate(ignoringOtherApps: true)
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationName: "Rime Q", .applicationVersion: Product.version, .version: Product.build,
-            .credits: NSAttributedString(string: "简洁、流畅、离线的中文输入法。")
+            .credits: credits
         ])
     }
+
+    static func openProject() { NSWorkspace.shared.open(Product.homepage) }
+    static func openDownloads() { NSWorkspace.shared.open(Product.downloads) }
 
     static func openHelp() {
         if let url = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "Help") {

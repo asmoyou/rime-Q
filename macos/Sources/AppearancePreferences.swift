@@ -34,7 +34,7 @@ enum CandidateSkin: String, CaseIterable {
         case .jade: return "淡绿底色，自然舒适"
         case .rose: return "暖粉与陶色，柔和明亮"
         case .midnight: return "深色背景，低光环境更舒适"
-        case .typingCat: return "你敲键盘，小猫也一起打字"
+        case .typingCat: return "小猫趴在栏边，陪你一起敲键盘"
         }
     }
     var background: NSColor {
@@ -102,6 +102,31 @@ final class AppearancePreferences {
 
 enum CandidateGeometry {
     static let cornerRadius: CGFloat = 14
+    static func petSize(bodyWidth: CGFloat) -> NSSize {
+        let width = min(88, max(64, bodyWidth + 12))
+        return NSSize(width: width, height: width * 2 / 3)
+    }
+    static let petOverlap: CGFloat = 2
+
+    static func petFrame(above body: NSRect, visible: NSRect) -> NSRect {
+        let size = petSize(bodyWidth: body.width)
+        let preferredX = body.width < size.width + 8 ? body.midX - size.width / 2 : body.maxX - size.width - 4
+        return NSRect(x: max(visible.minX, min(preferredX, visible.maxX - size.width)),
+                      y: body.maxY - petOverlap, width: size.width, height: size.height)
+    }
+
+    static func placement(size: NSSize, caret: NSRect, visible: NSRect, animated: Bool) -> (body: NSRect, pet: NSRect?) {
+        let extra = animated ? petSize(bodyWidth: size.width).height - petOverlap : 0
+        // Extremely small viewports retain usable text, without clipping a pet.
+        let showPet = animated && size.height + extra <= visible.height
+        let totalHeight = size.height + (showPet ? extra : 0)
+        let x = max(visible.minX, min(caret.minX, visible.maxX - size.width))
+        var y = caret.minY - totalHeight - 5
+        if y < visible.minY { y = caret.maxY + 5 }
+        y = max(visible.minY, min(y, visible.maxY - totalHeight))
+        let body = NSRect(origin: NSPoint(x: x, y: y), size: size)
+        return (body, showPet ? petFrame(above: body, visible: visible) : nil)
+    }
     // NSVisualEffectView's material is rendered separately from its layer.
     // Mask that material explicitly, using a reusable nine-slice alpha image.
     static let materialMask: NSImage = {

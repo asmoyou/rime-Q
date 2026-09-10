@@ -163,24 +163,35 @@ private final class SettingsScrollView: NSScrollView {
 
 final class CandidatePreviewView: NSView {
     let surface = CandidateSurface()
+    let cat = TypingCatView()
+    private var preferredHeight: CGFloat = 172
+    private var previewHeight: NSLayoutConstraint?
     private let caption = SettingsUI.label("", size: 11, secondary: true)
     private let preedit = SettingsUI.label("ni hao shi jie", size: 12, secondary: true)
     var skin: CandidateSkin = .system { didSet { refresh() } }
     var fontSize: CGFloat = 18 { didSet { refresh() } }
     init(rows: Int = 2, height: CGFloat = 172) {
         super.init(frame: .zero)
-        heightAnchor.constraint(equalToConstant: height).isActive = true
+        preferredHeight = height
+        previewHeight = heightAnchor.constraint(equalToConstant: height)
+        previewHeight?.isActive = true
         surface.blendingMode = .withinWindow
         surface.canvas.composition.candidates = Array([
             CandidateItem(text: "你好世界", comment: ""), CandidateItem(text: "你好", comment: ""),
             CandidateItem(text: "拟好", comment: "")].prefix(rows))
-        addSubview(surface); addSubview(caption); addSubview(preedit)
+        addSubview(surface); addSubview(cat); addSubview(caption); addSubview(preedit)
         surface.wantsLayer = true
         refresh()
     }
     required init?(coder: NSCoder) { fatalError() }
     private func refresh() {
         surface.skin = skin; surface.canvas.fontSize = fontSize
+        cat.isHidden = !skin.animated
+        preedit.isHidden = skin.animated
+        if !skin.animated { cat.rest() }
+        let body = surface.canvas.measuredSize()
+        let extra = skin.animated ? CandidateGeometry.petSize(bodyWidth: body.width).height - CandidateGeometry.petOverlap : 0
+        previewHeight?.constant = max(preferredHeight, body.height + extra + 42)
         caption.stringValue = "\(skin.name) · \(Int(fontSize)) 磅"
         needsLayout = true; needsDisplay = true
     }
@@ -198,8 +209,10 @@ final class CandidatePreviewView: NSView {
     override func layout() {
         super.layout()
         let size = surface.canvas.measuredSize()
-        surface.frame = NSRect(x: floor((bounds.width - size.width) / 2), y: floor((bounds.height - size.height) / 2) - 4,
+        let extra = skin.animated ? CandidateGeometry.petSize(bodyWidth: size.width).height - CandidateGeometry.petOverlap : 0
+        surface.frame = NSRect(x: floor((bounds.width - size.width) / 2), y: max(30, floor((bounds.height - size.height - extra) / 2)),
                                width: size.width, height: size.height)
+        cat.frame = CandidateGeometry.petFrame(above: surface.frame, visible: bounds)
         preedit.frame = NSRect(x: surface.frame.minX + 4, y: surface.frame.maxY + 5, width: 160, height: 17)
         caption.frame = NSRect(x: 14, y: 10, width: 180, height: 16)
         surface.layoutSubtreeIfNeeded()

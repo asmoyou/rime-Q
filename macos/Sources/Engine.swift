@@ -19,6 +19,8 @@ struct Composition {
 
 enum Product {
     static let identifier = "com.asmoyou.inputmethod.RimeQ"
+    static let homepage = URL(string: "https://github.com/asmoyou/rime-Q")!
+    static let downloads = homepage.appendingPathComponent("releases")
     static let connection = identifier + "_Connection"
     static let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "开发构建"
     static let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "本地"

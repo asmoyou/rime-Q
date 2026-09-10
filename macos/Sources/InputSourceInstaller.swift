@@ -14,6 +14,12 @@ enum InputSourceInstallPhase: String, CaseIterable {
     case validateBundle = "--rimeq-tis-validate-bundle"
     case register = "--rimeq-tis-register"
     case verifyInstalled = "--rimeq-tis-verify-installed"
+    case leaveSource = "--rimeq-tis-leave-source"
+    case verifyLeft = "--rimeq-tis-verify-left"
+    case disableMode = "--rimeq-tis-disable-mode"
+    case verifyModeDisabled = "--rimeq-tis-verify-mode-disabled"
+    case disableParent = "--rimeq-tis-disable-parent"
+    case verifyParentDisabled = "--rimeq-tis-verify-parent-disabled"
     case enableParent = "--rimeq-tis-enable-parent"
     case verifyParent = "--rimeq-tis-verify-parent"
     case enableMode = "--rimeq-tis-enable-mode"
@@ -202,8 +208,9 @@ private func inputSourceMetadata(_ source: TISInputSource)
 private func inputSourceRoster(identity: InputSourceInstallIdentity,
                                includeAllInstalled: Bool)
     -> InputSourceInstallRoster? {
-    let filter = [kTISPropertyBundleID as String: identity.bundleID] as CFDictionary
-    guard let cf = TISCreateInputSourceList(filter, includeAllInstalled)?
+    // A filtered TIS query returns nil for no matches. Query the complete
+    // roster so absence can be distinguished from an unavailable service.
+    guard let cf = TISCreateInputSourceList(nil, includeAllInstalled)?
             .takeRetainedValue(),
           let sources = cf as? [TISInputSource] else {
         print("install: TIS roster unavailable all=\(includeAllInstalled)")
@@ -214,7 +221,7 @@ private func inputSourceRoster(identity: InputSourceInstallIdentity,
     var mode: [InputSourceInstallMatch] = []
     var unexpected: [InputSourceInstallMatch] = []
     for source in sources {
-        guard let metadata = inputSourceMetadata(source) else { continue }
+        guard let metadata = inputSourceMetadata(source), metadata.bundleID == identity.bundleID else { continue }
         let match = InputSourceInstallMatch(
             source: source,
             metadata: metadata,
@@ -342,6 +349,43 @@ private func runInputSourceInstallPhase(_ phase: InputSourceInstallPhase) -> Int
             && uniqueMode(in: roster, identity: identity) != nil
             ? InputSourceInstallExit.success
             : InputSourceInstallExit.retryable
+
+    case .leaveSource, .verifyLeft:
+        guard let current = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue() else { return InputSourceInstallExit.retryable }
+        let isOurs = installerTISStringProperty(current, kTISPropertyBundleID) == identity.bundleID
+        if !isOurs { return InputSourceInstallExit.success }
+        if phase == .verifyLeft { return InputSourceInstallExit.retryable }
+        guard let all = TISCreateInputSourceList(nil, false)?.takeRetainedValue() as? [TISInputSource] else { return InputSourceInstallExit.retryable }
+        let fallbacks = all.filter {
+            installerTISStringProperty($0, kTISPropertyBundleID) != identity.bundleID
+                && installerTISBoolProperty($0, kTISPropertyInputSourceIsSelectCapable) == true
+                && installerTISBoolProperty($0, kTISPropertyInputSourceIsASCIICapable) == true
+        }
+        guard let fallback = fallbacks.first(where: { installerTISStringProperty($0, kTISPropertyInputSourceID) == "com.apple.keylayout.US" }) ?? fallbacks.first else {
+            return InputSourceInstallExit.retryable
+        }
+        let result = TISSelectInputSource(fallback)
+        print("install: leave own input source before refresh=\(result)")
+        return result == noErr ? InputSourceInstallExit.success : InputSourceInstallExit.retryable
+
+    case .disableMode, .disableParent:
+        guard let current = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
+              installerTISStringProperty(current, kTISPropertyBundleID) != identity.bundleID,
+              let roster = inputSourceRoster(identity: identity, includeAllInstalled: true) else { return InputSourceInstallExit.retryable }
+        let matches = phase == .disableMode ? roster.mode : roster.parent
+        if matches.isEmpty { return InputSourceInstallExit.success }
+        guard let match = phase == .disableMode ? uniqueMode(in: roster, identity: identity) : uniqueParent(in: roster, identity: identity) else {
+            return InputSourceInstallExit.failed
+        }
+        let result = TISDisableInputSource(match.source)
+        print("install: refresh disable=\(result) id=\(match.metadata.sourceID)")
+        return result == noErr ? InputSourceInstallExit.success : InputSourceInstallExit.retryable
+
+    case .verifyModeDisabled, .verifyParentDisabled:
+        guard let roster = inputSourceRoster(identity: identity, includeAllInstalled: false) else { return InputSourceInstallExit.retryable }
+        let absent = phase == .verifyModeDisabled ? roster.mode.isEmpty : roster.parent.isEmpty
+        print("install: refresh disabled boundary=\(phase.rawValue) ready=\(absent)")
+        return absent ? InputSourceInstallExit.success : InputSourceInstallExit.retryable
 
     case .enableParent:
         guard let roster = inputSourceRoster(
@@ -579,31 +623,16 @@ private func convergeInputSourceInstallBoundary(
 /// Register, enable, and (when safe) select the shipped child input mode.
 /// `false` means activation should be retried after a session refresh; package
 /// installation must not reinterpret it as a corrupt payload.
-func installInputSource(selectAfterEnabling: Bool = false) -> Bool {
+func installInputSource(selectAfterEnabling: Bool = false, refreshEnabledSources: Bool = false) -> Bool {
     guard InputSourceInstallIdentity.load() != nil else { return false }
     let deadlineUptime = ProcessInfo.processInfo.systemUptime
         + InputSourceInstallRules.totalInstallBudget
 
-    guard convergeInputSourceInstallBoundary(
-            "registered",
-            action: .register,
-            verify: .verifyInstalled,
-            deadlineUptime: deadlineUptime
-          ),
-          convergeInputSourceInstallBoundary(
-            "parent-enabled",
-            action: .enableParent,
-            verify: .verifyParent,
-            deadlineUptime: deadlineUptime
-          ),
-          convergeInputSourceInstallBoundary(
-            "mode-enabled",
-            action: .enableMode,
-            verify: .verifyMode,
-            deadlineUptime: deadlineUptime
-          ) else {
-        return false
-    }
+    guard InputSourceActivation.run(refresh: refreshEnabledSources, boundary: { label, action, verify in
+        let restoring = action == .enableParent || action == .enableMode
+        let boundaryDeadline = refreshEnabledSources && !restoring ? deadlineUptime - 12 : deadlineUptime
+        return convergeInputSourceInstallBoundary(label, action: action, verify: verify, deadlineUptime: boundaryDeadline)
+    }) else { return false }
 
     if !selectAfterEnabling { return true }
 
@@ -625,4 +654,24 @@ func installInputSource(selectAfterEnabling: Bool = false) -> Bool {
         print("install: mode is enabled; automatic selection remains best-effort")
     }
     return true
+}
+
+enum InputSourceActivation {
+    /// An upgrade can retain enabled=true while the menu/client still uses an
+    /// obsolete registration. Cycle our child then parent before re-enabling.
+    /// Always attempt to restore enabled state if a refresh boundary fails.
+    static func run(refresh: Bool, boundary: (String, InputSourceInstallPhase, InputSourceInstallPhase) -> Bool) -> Bool {
+        guard boundary("registered", .register, .verifyInstalled) else { return false }
+        var refreshed = true
+        if refresh {
+            refreshed = boundary("source-left", .leaveSource, .verifyLeft)
+                && boundary("mode-disabled", .disableMode, .verifyModeDisabled)
+                && boundary("parent-disabled", .disableParent, .verifyParentDisabled)
+            // Registration and restoration still run after a partial failure.
+            if !boundary("registered-after-refresh", .register, .verifyInstalled) { refreshed = false }
+        }
+        let parent = boundary("parent-enabled", .enableParent, .verifyParent)
+        let mode = boundary("mode-enabled", .enableMode, .verifyMode)
+        return refreshed && parent && mode
+    }
 }

@@ -4,7 +4,7 @@ __include: rime_q.schema:/
 schema:
   schema_id: rime_q_grammar
   name: Rime Q · 长句优化
-  version: "0.1.0"
+  version: "0.2.4"
   author: [Rime Q contributors, Dvel, amzxyz]
   description: 雾凇词库与万象语法模型，离线输入。
   dependencies: [melt_eng, radical_pinyin]

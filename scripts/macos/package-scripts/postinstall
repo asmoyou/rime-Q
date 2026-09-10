@@ -37,8 +37,10 @@ as_login_user /usr/bin/open -n -g "$APP" --args --complete-install
 # Verification is read-only. It challenges the exact build's serving process;
 # TIS enabled flags alone do not prove that an IMK server survived installation.
 for rimeq_attempt in 1 2 3; do
-    if as_login_user "$EXE" --verify-runtime; then
-        echo "Rime Q: installed input server responded; no login refresh requested."
+    if as_login_user "$EXE" --verify-runtime \
+        && as_login_user "$EXE" --rimeq-tis-verify-parent \
+        && as_login_user "$EXE" --rimeq-tis-verify-mode; then
+        echo "Rime Q: installed input server responded and input sources are enabled; no login refresh requested."
         exit 0
     fi
 done

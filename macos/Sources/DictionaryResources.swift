@@ -143,12 +143,42 @@ final class DictionaryResources {
 
     func activeResources() throws -> URL {
         if let loadingError { throw LexiconError.message(loadingError) }
+        // A historical "apply" with no customizations must not freeze the
+        // input schema at the version installed at that time.
+        if configuration.disabled.isEmpty && !configuration.imported.contains(where: \.enabled) { return bundled }
         guard let generation = configuration.generation else { return bundled }
         let resource = directory.appendingPathComponent("generations/\(generation)")
         guard FileManager.default.fileExists(atPath: resource.appendingPathComponent("build/rime_ice.table.bin").path) else {
             throw LexiconError.message("已启用的词库编译文件缺失。请在词库管理中重新应用配置。")
         }
         return resource
+    }
+
+    private func bundledConfigurationFingerprint() throws -> String {
+        var hash = SHA256()
+        for name in ["rime_q.schema.yaml", "rime_q_grammar.schema.yaml", "rime_ice.schema.yaml", "default.yaml", "lua/q_lunar.lua"] {
+            hash.update(data: try Data(contentsOf: bundled.appendingPathComponent(name)))
+        }
+        return hash.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Upgrade schemas in a new generation while the existing dictionaries
+    /// continue serving input. apply() waits for composition to finish and
+    /// retains the previous generation and personal learning on failure.
+    @discardableResult
+    func refreshBundledConfigurationIfNeeded(completion: @escaping (Result<Void, Error>) -> Void = { _ in }) -> Bool {
+        guard !busy, configurationReadable, let generation = configuration.generation,
+              !configuration.disabled.isEmpty || configuration.imported.contains(where: \.enabled),
+              let fingerprint = try? bundledConfigurationFingerprint() else { return false }
+        let marker = directory.appendingPathComponent("generations/\(generation)/.rimeq-input-config")
+        if (try? String(contentsOf: marker)) == fingerprint { return false }
+        InstallationDiagnostics.append("bundled-input-configuration-refresh-begin")
+        apply(configuration) { result in
+            if case .success = result { InstallationDiagnostics.append("bundled-input-configuration-refresh-complete") }
+            else { InstallationDiagnostics.append("bundled-input-configuration-refresh-failed; retained-previous-generation") }
+            completion(result)
+        }
+        return true
     }
 
     func importedURL(_ entry: ImportedDictionary, original: Bool = false) -> URL {
@@ -280,6 +310,7 @@ final class DictionaryResources {
             try? LexiconFiles.write(Data(contentsOf: log), to: directory.appendingPathComponent("last-compile.log"))
             throw LexiconError.message("词库编译失败，已继续使用原词库。请检查文件中的全拼编码和词频。")
         }
+        try LexiconFiles.write(bundledConfigurationFingerprint(), to: destination.appendingPathComponent(".rimeq-input-config"))
         return destination
     }
 

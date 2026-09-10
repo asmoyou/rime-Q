@@ -14,7 +14,7 @@ from dictionary_catalog import write_catalog
 
 ROOT = Path(__file__).resolve().parents[1]
 IDENTIFIER = "com.asmoyou.inputmethod.RimeQ"
-VERSION = "0.2.3"
+VERSION = "0.2.4"
 
 
 def run(*args):
@@ -101,6 +101,19 @@ def build_app(app, universal=False, resources=True):
             shutil.copytree(contents / directory, ROOT / ".cache/prepared-resources" / directory, dirs_exist_ok=True)
     elif not (contents / "SharedSupport/build").is_dir():
         raise RuntimeError("No prepared resources; omit --reuse-resources on the first build")
+    else:
+        # Resource reuse skips downloads, not local input configuration edits.
+        schema_changed = False
+        for original in (ROOT / "data").glob("*.yaml"):
+            target = contents / "SharedSupport" / original.name
+            if not target.exists() or target.read_bytes() != original.read_bytes():
+                shutil.copy2(original, target)
+                schema_changed = True
+        shutil.copytree(ROOT / "data/lua", contents / "SharedSupport/lua", dirs_exist_ok=True)
+        if schema_changed:
+            compiled = contents / "SharedSupport/build"
+            shutil.rmtree(compiled)
+            run(contents / "MacOS/RimeQ", "--prepare", compiled)
     write_catalog(contents, json.loads((ROOT / "dependencies.lock.json").read_text()))
     notices = contents / "Resources/Licenses"
     notices.mkdir(parents=True, exist_ok=True)
@@ -167,7 +180,7 @@ def build(universal=False, resources=True, keep_app=False, smoke=False):
             run(app / "Contents/MacOS/RimeQ", "--rimeq-tis-validate-bundle")
             with isolated_smoke_app(app) as preview:
                 exe = preview / "Contents/MacOS/RimeQ"
-                for command in ["--smoke", "--installation-smoke", "--runtime-smoke", "--maintenance-smoke", "--candidate-smoke",
+                for command in ["--smoke", "--lua-smoke", "--installation-smoke", "--runtime-smoke", "--maintenance-smoke", "--candidate-smoke",
                                 "--controller-smoke", "--personal-dictionary-smoke", "--settings-ui-smoke", "--dictionary-resources-smoke"]:
                     run(exe, command)
                 run(exe, "--settings-render", ROOT / f"artifacts/settings-{VERSION}")

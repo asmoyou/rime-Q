@@ -84,8 +84,13 @@ final class SettingsWindow: NSObject {
         stack.setCustomSpacing(8, after: preferenceTitle); stack.setCustomSpacing(8, after: dictionaryTitle)
         sidebar.addSubview(stack)
         let help = SettingsSidebarButton(title: "使用说明", symbol: "questionmark.circle", target: self, action: #selector(openHelp))
+        let project = SettingsSidebarButton(title: "项目主页", symbol: "chevron.left.forwardslash.chevron.right", target: self, action: #selector(openProject))
+        project.toolTip = Product.homepage.absoluteString
+        let download = SettingsSidebarButton(title: "官方下载", symbol: "arrow.down.circle", target: self, action: #selector(openDownloads))
+        download.toolTip = "免费获取官方发布版本 · " + Product.downloads.absoluteString
         let version = SettingsUI.label("版本 \(Product.version)\n构建 \(Product.build)", size: 10, secondary: true)
-        let footer = SettingsLayout.vertical([help, version], spacing: 10)
+        let free = SettingsUI.label("免费开源 · 无需购买", size: 11, secondary: true)
+        let footer = SettingsLayout.vertical([help, project, download, free, version], spacing: 5)
         sidebar.addSubview(footer)
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: sidebar.leadingAnchor, constant: 12), stack.trailingAnchor.constraint(equalTo: sidebar.trailingAnchor, constant: -12),
@@ -99,6 +104,8 @@ final class SettingsWindow: NSObject {
     }
     @objc private func navigate(_ sender: NSButton) { selectPage(SettingsPage.allCases[sender.tag]) }
     @objc private func openHelp() { AppMaintenance.openHelp() }
+    @objc private func openProject() { AppMaintenance.openProject() }
+    @objc private func openDownloads() { AppMaintenance.openDownloads() }
     private func selectPage(_ page: SettingsPage) {
         selected = page
         for (index, button) in navigation.enumerated() { button.selected = SettingsPage.allCases[index] == page }
@@ -225,7 +232,7 @@ final class SettingsWindow: NSObject {
         settings.selectPage(.resources)
         try EngineSmoke.check(settings.resources.numberOfRows(in: NSTableView()) >= 8, "resource page is empty")
         try click("皮肤", in: settings.window!.contentView!)
-        try click("敲敲猫", in: settings.skins.view)
+        try click("使用敲敲猫", in: settings.skins.view)
         try EngineSmoke.check(preferences.skin == .typingCat, "animated skin selection was not saved")
         try click("试敲一下", in: settings.skins.view)
         try EngineSmoke.check(descendants(settings.skins.view).compactMap({ $0 as? CandidateCanvas }).contains(where: { $0.skin == .typingCat }),

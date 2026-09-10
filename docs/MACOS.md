@@ -4,7 +4,7 @@
 
 ## 安装
 
-构建得到 `dist/RimeQ-0.2.3-preview.pkg`，双击即可安装应用与其内置的引擎、词库和模型。系统安装位置固定为 `/Library/Input Methods/RimeQ.app`，禁用 Installer 的应用重定位。安装后由 LaunchServices 启动当前登录用户的应用来注册输入法，再通过独立进程核验启用状态；不从包脚本直接执行注册入口。更新时会正常退出旧版本进程。
+构建得到 `dist/RimeQ-0.2.4-preview.pkg`，双击即可安装应用与其内置的引擎、词库和模型。系统安装位置固定为 `/Library/Input Methods/RimeQ.app`，禁用 Installer 的应用重定位。安装后由 LaunchServices 启动当前登录用户的应用来注册输入法，再通过独立进程核验启用状态；不从包脚本直接执行注册入口。更新时会正常退出旧版本进程。
 
 0.2.2 起，完成注册的安装进程继续运行引擎与 IMK 服务；如果本次构建的服务已经在响应，则沿用该进程。安装器额外调用 `--verify-runtime`，核对当前构建、应用路径和进程应答。状态文件分别记录启用状态、`inputServerReady` 与 `runtimePID`，不只把 TIS 返回成功当成输入服务已经接管。`installation.log` 保留带时间、构建号和进程号的记录，超过 512 KB 时保留一份前序日志。
 

@@ -12,8 +12,6 @@ final class SkinChoiceButton: NSButton {
         setAccessibilityLabel("\(skin.name)皮肤")
         toolTip = skin.summary
         sample.skin = skin; sample.fontSize = 12
-        sample.decorationEnabled = false
-        sample.isHidden = skin.animated
         sample.composition.candidates = [.init(text: "你好世界", comment: ""), .init(text: "你好", comment: "")]
         addSubview(sample)
     }
@@ -24,17 +22,6 @@ final class SkinChoiceButton: NSButton {
         SettingsPalette.card.setFill(); outline.fill()
         (selected ? NSColor.controlAccentColor : SettingsPalette.border).setStroke()
         outline.lineWidth = selected ? 2 : 1; outline.stroke()
-        if skin.animated {
-            skin.background.setFill()
-            NSBezierPath(roundedRect: NSRect(x: 10, y: 10, width: 86, height: bounds.height - 20), xRadius: 8, yRadius: 8).fill()
-            TypingCatView.draw(in: NSRect(x: 20, y: 17, width: 66, height: 44), pose: 1)
-            (skin.name as NSString).draw(at: NSPoint(x: 112, y: 18),
-                withAttributes: [.font: NSFont.systemFont(ofSize: 14, weight: .medium), .foregroundColor: NSColor.labelColor])
-            ("随按键敲击 · 停止输入后静止" as NSString).draw(at: NSPoint(x: 112, y: 43),
-                withAttributes: [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.secondaryLabelColor])
-            if selected { drawCheck(at: NSPoint(x: bounds.width - 33, y: 31)) }
-            return
-        }
         let preview = NSBezierPath(roundedRect: NSRect(x: 12, y: 10, width: bounds.width - 24, height: 80), xRadius: 8, yRadius: 8)
         skin.background.setFill(); preview.fill()
         (skin.name as NSString).draw(at: NSPoint(x: 16, y: 102),
@@ -55,7 +42,7 @@ final class SkinChoiceButton: NSButton {
     override func layout() {
         super.layout()
         let size = sample.measuredSize()
-        sample.frame = NSRect(x: skin.animated ? 20 : (bounds.width - size.width) / 2, y: 14, width: size.width, height: size.height)
+        sample.frame = NSRect(x: (bounds.width - size.width) / 2, y: 14, width: size.width, height: size.height)
     }
 }
 
@@ -85,12 +72,60 @@ final class SkinGrid: NSView {
     }
 }
 
+final class AdvancedSkinCard: NSView {
+    let preview = CandidatePreviewView(rows: 2, height: 190)
+    let skin: CandidateSkin
+    private let useButton = NSButton()
+    var selected = false {
+        didSet {
+            useButton.title = selected ? "正在使用" : "使用\(skin.name)"
+            useButton.isEnabled = !selected
+            needsDisplay = true
+        }
+    }
+    init(skin: CandidateSkin, target: AnyObject, action: Selector) {
+        self.skin = skin
+        super.init(frame: .zero)
+        preview.skin = skin
+        let title = SettingsUI.label(skin.name, size: 19)
+        title.font = .systemFont(ofSize: 19, weight: .semibold)
+        let tryButton = NSButton(title: "试敲一下", target: self, action: #selector(tryTyping))
+        tryButton.bezelStyle = .rounded
+        useButton.title = "使用\(skin.name)"; useButton.bezelStyle = .rounded
+        useButton.target = target; useButton.action = action
+        useButton.tag = CandidateSkin.allCases.firstIndex(of: skin)!
+        let labels = SettingsLayout.vertical([
+            SettingsUI.label("动态陪伴", size: 11, secondary: true), title,
+            SettingsUI.label("小猫趴在候选栏外，陪你一起敲键盘。\n候选内容保持紧凑，停笔后小猫也休息。", size: 12, secondary: true),
+            SettingsUI.row([tryButton, useButton])
+        ], spacing: 12)
+        preview.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(preview); addSubview(labels)
+        NSLayoutConstraint.activate([
+            preview.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+            preview.widthAnchor.constraint(equalToConstant: 196),
+            preview.topAnchor.constraint(equalTo: topAnchor, constant: 16),
+            preview.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -16),
+            labels.leadingAnchor.constraint(equalTo: preview.trailingAnchor, constant: 20),
+            labels.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
+            labels.centerYAnchor.constraint(equalTo: centerYAnchor)
+        ])
+    }
+    required init?(coder: NSCoder) { fatalError() }
+    @objc private func tryTyping() { preview.cat.tap() }
+    override func draw(_ dirtyRect: NSRect) {
+        let outline = NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), xRadius: 14, yRadius: 14)
+        SettingsPalette.card.setFill(); outline.fill()
+        (selected ? NSColor.controlAccentColor : SettingsPalette.border).setStroke()
+        outline.lineWidth = selected ? 2 : 1; outline.stroke()
+    }
+}
+
 final class SkinSettingsViewController: NSViewController {
     let preferences: AppearancePreferences
-    private let preview = CandidatePreviewView(rows: 3, height: 200)
-    private let animateButton = NSButton(title: "试敲一下", target: nil, action: nil)
     private let selection = SettingsUI.label("", size: 12, secondary: true)
     private var choices: [SkinChoiceButton] = []
+    private var advanced: [AdvancedSkinCard] = []
     init(preferences: AppearancePreferences = .shared) {
         self.preferences = preferences
         super.init(nibName: nil, bundle: nil)
@@ -100,27 +135,27 @@ final class SkinSettingsViewController: NSViewController {
     deinit { NotificationCenter.default.removeObserver(self) }
     override func loadView() {
         view = SettingsBackgroundView()
-        animateButton.bezelStyle = .rounded; animateButton.target = self; animateButton.action = #selector(previewTap)
-        choices = CandidateSkin.allCases.map { SkinChoiceButton(skin: $0, target: self, action: #selector(choose(_:))) }
-        let animated = choices.first { $0.skin.animated }!
-        animated.heightAnchor.constraint(equalToConstant: 80).isActive = true
+        choices = CandidateSkin.allCases.filter { !$0.animated }.map { SkinChoiceButton(skin: $0, target: self, action: #selector(choose(_:))) }
+        advanced = CandidateSkin.allCases.filter(\.animated).map { AdvancedSkinCard(skin: $0, target: self, action: #selector(chooseAdvanced(_:))) }
         SettingsLayout.scrollPage([
-            SettingsLayout.heading("皮肤", subtitle: "为候选栏选一种舒服的颜色。", action: animateButton),
-            SettingsLayout.section("实时预览", content: preview),
-            SettingsLayout.section("内置皮肤", content: SettingsLayout.vertical([
-                animated, SkinGrid(choices: choices.filter { !$0.skin.animated })], spacing: 12)), selection
+            SettingsLayout.heading("皮肤", subtitle: "选择舒服的配色，或让小伙伴陪你打字。"), selection,
+            SettingsLayout.section("高级皮肤", content: SettingsLayout.vertical(advanced, spacing: 12)),
+            SettingsLayout.section("简洁皮肤", content: SkinGrid(choices: choices))
         ], in: view)
         refresh()
     }
     @objc func refresh() {
         guard isViewLoaded else { return }
-        preview.skin = preferences.skin; preview.fontSize = preferences.fontSize
-        animateButton.isHidden = !preferences.skin.animated
         choices.forEach { $0.selected = $0.skin == preferences.skin }
+        advanced.forEach { $0.selected = $0.skin == preferences.skin; $0.preview.fontSize = preferences.fontSize }
         selection.stringValue = "\(preferences.skin.name) · \(preferences.skin.summary)。选择即保存，下一次输入时生效。"
     }
     @objc private func choose(_ sender: SkinChoiceButton) { preferences.skin = sender.skin }
-    @objc private func previewTap() { preview.surface.cat.tap() }
+    @objc private func chooseAdvanced(_ sender: NSButton) {
+        guard CandidateSkin.allCases.indices.contains(sender.tag) else { return }
+        let skin = CandidateSkin.allCases[sender.tag]
+        if skin.animated { preferences.skin = skin }
+    }
 }
 
 final class InputSettingsViewController: NSViewController {
@@ -166,7 +201,10 @@ final class InputSettingsViewController: NSViewController {
             SettingsLayout.heading("输入与外观", subtitle: "按自己的习惯，调整输入与候选显示。"),
             SettingsLayout.section("输入", content: SettingsCard([inputRow]), note: "开启或关闭，都共用雾凇词库和同一份个人学习记录。"),
             SettingsLayout.section("候选显示", content: appearance),
-            SettingsLayout.section("常用按键", content: shortcuts)
+            SettingsLayout.section("常用按键", content: shortcuts),
+            SettingsLayout.section("快捷输入", content: SettingsCard([
+                SettingsUI.label("rq 日期 · sj 时间 · xq 星期 · nl 农历\ncC1+2 计算器 · R123.45 金额大写 · U62fc Unicode\nuuid 随机标识 · [ / ] 取候选首字 / 尾字", size: 12, secondary: true)
+            ], padding: 16), note: "中文模式下输入，空格或数字键选取结果。完整用法见“使用说明”。")
         ], in: view)
         refresh()
     }

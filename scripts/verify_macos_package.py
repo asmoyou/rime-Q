@@ -31,6 +31,7 @@ def verify(package):
         assert '/usr/bin/open -n -g "$APP" --args --complete-install' in script, "Activation must use LaunchServices"
         assert 'as_login_user "$EXE" --register' not in script, "Direct package-script activation can silently fail"
         assert 'as_login_user "$EXE" --verify-runtime' in script, "Installed process readiness must be verified separately from TIS"
+        assert 'as_login_user "$EXE" --rimeq-tis-verify-parent' in script and 'as_login_user "$EXE" --rimeq-tis-verify-mode' in script, "Serving process alone is not sufficient to finish activation"
         distribution = ET.parse(expanded / "Distribution").getroot()
         domains = distribution.find("domains")
         assert domains is not None and domains.get("enable_anywhere") == "false"

@@ -80,6 +80,7 @@ def prepare(destination):
                 shutil.copy2(original, shared / original.name)
         for original in (ROOT / "data").glob("*.yaml"):
             shutil.copy2(original, shared / original.name)
+        shutil.copytree(ROOT / "data/lua", shared / "lua", dirs_exist_ok=True)
         shutil.copy2(model, shared / model.name)
         notices = destination / "Resources/Licenses"
         notices.mkdir(parents=True, exist_ok=True)

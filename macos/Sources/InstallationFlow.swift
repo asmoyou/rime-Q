@@ -158,7 +158,9 @@ func completeInputSourceInstallation(isLoginRetry: Bool) -> Bool {
             return false
         }
     }
-    let readiness: InstallationReadiness = installInputSource() ? .ready : .pending
+    // Explicit install/repair refreshes existing activation state. A login
+    // retry follows a new session already and does not cycle enabled sources.
+    let readiness: InstallationReadiness = installInputSource(refreshEnabledSources: !isLoginRetry) ? .ready : .pending
     if readiness == .ready {
         if let existing {
             _ = try? InstallationFiles.current.record(.ready, app: Bundle.main.bundleURL,
@@ -207,6 +209,23 @@ func installationFlowSmoke() throws {
     try require(InputSourceInstallRules.validConnectionName(Product.connection, bundleID: Product.identifier), "Runtime connection does not match bundle identifier")
     try require(!InputSourceInstallRules.validConnectionName("RimeQ_Connection", bundleID: Product.identifier), "Legacy connection name accepted")
     try require(!InputSourceInstallRules.validConnectionName(nil, bundleID: Product.identifier), "Missing connection name accepted")
+    for failure in [InputSourceInstallPhase.leaveSource, .disableMode, .disableParent] {
+        var phases: [InputSourceInstallPhase] = []
+        let result = InputSourceActivation.run(refresh: true) { _, action, _ in
+            phases.append(action); return action != failure
+        }
+        try require(!result, "Failed activation refresh reported success")
+        try require(phases.suffix(2) == [.enableParent, .enableMode], "Partial refresh failed to attempt re-enabling")
+        if failure == .leaveSource { try require(!phases.contains(.disableMode), "Refresh disabled the active source after leave failed") }
+        if failure == .disableMode { try require(!phases.contains(.disableParent), "Parent disabled before child disable was confirmed") }
+    }
+    var refreshedPhases: [InputSourceInstallPhase] = []
+    try require(InputSourceActivation.run(refresh: true) { _, action, _ in refreshedPhases.append(action); return true }, "Successful refresh failed")
+    try require(refreshedPhases == [.register, .leaveSource, .disableMode, .disableParent, .register, .enableParent, .enableMode],
+                "Activation refresh order differs from verified recovery")
+    var loginPhases: [InputSourceInstallPhase] = []
+    _ = InputSourceActivation.run(refresh: false) { _, action, _ in loginPhases.append(action); return true }
+    try require(!loginPhases.contains(.disableMode) && !loginPhases.contains(.disableParent), "Login retry unnecessarily cycled enabled sources")
     try require(try files.record(.pending, app: app, isLoginRetry: false), "Pending activation did not schedule a retry")
     let agent = try PropertyListSerialization.propertyList(from: Data(contentsOf: files.retryAgent), format: nil) as! [String: Any]
     try require(agent["ProgramArguments"] as? [String] == ["/usr/bin/open", "-n", "-g", app.path, "--args", "--retry-install"],
