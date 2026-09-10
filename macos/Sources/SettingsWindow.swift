@@ -2,13 +2,14 @@ import AppKit
 import QRimeBridge
 
 enum SettingsPage: String, CaseIterable {
-    case input, skins, personal, resources
+    case input, skins, personal, resources, updates
     var title: String {
         switch self {
         case .input: return "输入与外观"
         case .skins: return "皮肤"
         case .personal: return "个人词库"
         case .resources: return "词库与模型"
+        case .updates: return "版本与更新"
         }
     }
     var symbol: String {
@@ -17,6 +18,7 @@ enum SettingsPage: String, CaseIterable {
         case .skins: return "paintpalette"
         case .personal: return "text.book.closed"
         case .resources: return "square.stack.3d.up"
+        case .updates: return "arrow.triangle.2.circlepath"
         }
     }
 }
@@ -31,15 +33,21 @@ final class SettingsWindow: NSObject {
     private let skins: SkinSettingsViewController
     private let personal: PersonalDictionaryViewController
     private let resources: DictionaryResourcesViewController
+    private let updates: UpdateSettingsViewController
+    private let updateChecker: UpdateChecker
 
     init(personalStore: PersonalDictionary = .shared, resourceStore: DictionaryResources = .shared,
-         preferences: AppearancePreferences = .shared) {
+         preferences: AppearancePreferences = .shared, updateChecker: UpdateChecker = .shared) {
         general = InputSettingsViewController(preferences: preferences)
         skins = SkinSettingsViewController(preferences: preferences)
         personal = PersonalDictionaryViewController(store: personalStore)
         resources = DictionaryResourcesViewController(store: resourceStore)
+        self.updateChecker = updateChecker
+        updates = UpdateSettingsViewController(checker: updateChecker)
         super.init()
+        NotificationCenter.default.addObserver(self, selector: #selector(refreshUpdateBadge), name: UpdateChecker.didChange, object: updateChecker)
     }
+    deinit { NotificationCenter.default.removeObserver(self) }
     func show() {
         if window == nil { build(); window?.setFrameAutosaveName("RimeQ.Settings.Sidebar") }
         selectPage(selected)
@@ -84,28 +92,30 @@ final class SettingsWindow: NSObject {
         stack.setCustomSpacing(8, after: preferenceTitle); stack.setCustomSpacing(8, after: dictionaryTitle)
         sidebar.addSubview(stack)
         let help = SettingsSidebarButton(title: "使用说明", symbol: "questionmark.circle", target: self, action: #selector(openHelp))
-        let project = SettingsSidebarButton(title: "项目主页", symbol: "chevron.left.forwardslash.chevron.right", target: self, action: #selector(openProject))
+        let project = SettingsSidebarButton(title: "GitHub 项目", symbol: "chevron.left.forwardslash.chevron.right", target: self, action: #selector(openProject))
         project.toolTip = Product.homepage.absoluteString
-        let download = SettingsSidebarButton(title: "官方下载", symbol: "arrow.down.circle", target: self, action: #selector(openDownloads))
-        download.toolTip = "免费获取官方发布版本 · " + Product.downloads.absoluteString
-        let version = SettingsUI.label("版本 \(Product.version)\n构建 \(Product.build)", size: 10, secondary: true)
-        let free = SettingsUI.label("免费开源 · 无需购买", size: 11, secondary: true)
-        let footer = SettingsLayout.vertical([help, project, download, free, version], spacing: 5)
+        navigation[4].toolTip = Product.versionDescription
+        let footer = SettingsLayout.vertical([SettingsLayout.separator(), help, project, navigation[4]], spacing: 4)
+        footer.setCustomSpacing(12, after: footer.arrangedSubviews[0])
         sidebar.addSubview(footer)
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: sidebar.leadingAnchor, constant: 12), stack.trailingAnchor.constraint(equalTo: sidebar.trailingAnchor, constant: -12),
             stack.topAnchor.constraint(equalTo: sidebar.topAnchor, constant: 26),
             footer.leadingAnchor.constraint(equalTo: sidebar.leadingAnchor, constant: 12), footer.trailingAnchor.constraint(equalTo: sidebar.trailingAnchor, constant: -12),
-            footer.bottomAnchor.constraint(equalTo: sidebar.bottomAnchor, constant: -20)
+            footer.topAnchor.constraint(greaterThanOrEqualTo: stack.bottomAnchor, constant: 28),
+            footer.bottomAnchor.constraint(equalTo: sidebar.bottomAnchor, constant: -16)
         ])
         general.manageSkins = { [weak self] in self?.selectPage(.skins) }
         self.window = window
+        refreshUpdateBadge()
         selectPage(.input)
     }
     @objc private func navigate(_ sender: NSButton) { selectPage(SettingsPage.allCases[sender.tag]) }
     @objc private func openHelp() { AppMaintenance.openHelp() }
     @objc private func openProject() { AppMaintenance.openProject() }
-    @objc private func openDownloads() { AppMaintenance.openDownloads() }
+    @objc private func refreshUpdateBadge() {
+        navigation.last?.showsBadge = updateChecker.availableTag != nil
+    }
     private func selectPage(_ page: SettingsPage) {
         selected = page
         for (index, button) in navigation.enumerated() { button.selected = SettingsPage.allCases[index] == page }
@@ -115,6 +125,7 @@ final class SettingsWindow: NSObject {
         case .skins: controller = skins
         case .personal: controller = personal
         case .resources: controller = resources
+        case .updates: controller = updates
         }
         if controller.view.superview !== content {
             content.subviews.forEach { $0.removeFromSuperview() }
@@ -128,6 +139,7 @@ final class SettingsWindow: NSObject {
         case .skins: skins.refresh()
         case .personal: personal.activate()
         case .resources: resources.activate()
+        case .updates: updates.refresh()
         }
     }
 
@@ -139,7 +151,7 @@ final class SettingsWindow: NSObject {
         let defaults = UserDefaults(suiteName: suite)!
         defer { try? FileManager.default.removeItem(at: temporary); defaults.removePersistentDomain(forName: suite) }
         let settings = SettingsWindow(personalStore: .init(root: temporary), resourceStore: .init(root: temporary),
-                                      preferences: .init(defaults: defaults))
+                                      preferences: .init(defaults: defaults), updateChecker: .init(defaults: defaults))
         settings.build()
         settings.window?.orderFront(nil)
         defer { settings.window?.close() }
@@ -177,7 +189,7 @@ final class SettingsWindow: NSObject {
                 }
             }
         }
-        print("PASS settings rendering: four sidebar pages, light/dark, compact/default/wide windows; synthetic records")
+        print("PASS settings rendering: five sidebar pages, light/dark, compact/default/wide windows; synthetic records")
     }
 
     static func smoke() throws {
@@ -192,7 +204,8 @@ final class SettingsWindow: NSObject {
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         let preferences = AppearancePreferences(defaults: defaults)
-        let settings = SettingsWindow(personalStore: store, resourceStore: .init(root: root), preferences: preferences)
+        let checker = UpdateChecker(defaults: defaults)
+        let settings = SettingsWindow(personalStore: store, resourceStore: .init(root: root), preferences: preferences, updateChecker: checker)
         settings.build()
         defer { settings.window?.close() }
         settings.window?.orderFront(nil)
@@ -212,6 +225,15 @@ final class SettingsWindow: NSObject {
             phrase.stringValue = text; code.stringValue = "xing he ci ku jie mian"
             try click("保存", in: content)
         }
+        try click("版本与更新", in: settings.window!.contentView!)
+        guard let automatic = descendants(settings.updates.view).compactMap({ $0 as? NSSwitch }).first else {
+            throw LexiconError.message("Missing automatic update switch")
+        }
+        try EngineSmoke.check(automatic.state == .on, "automatic updates must default to enabled")
+        automatic.performClick(nil)
+        try EngineSmoke.check(!checker.automatic, "automatic update preference was not saved")
+        automatic.performClick(nil)
+        try EngineSmoke.check(checker.automatic && !checker.isChecking, "settings must not start a network request just by opening")
         try click("个人词库", in: settings.window!.contentView!)
         let page = settings.personal.view
         try click("新增…", in: page)

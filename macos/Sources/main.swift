@@ -28,6 +28,9 @@ if arguments.count > 1 {
         case "--controller-smoke": try ControllerSmoke.run()
         case "--installation-smoke": try installationFlowSmoke()
         case "--maintenance-smoke": try AppMaintenance.smoke()
+        case "--update-smoke": try UpdateSmoke.run()
+        case "--update-live-smoke" where arguments.count == 4:
+            try UpdateSmoke.live(installed: arguments[2], expected: arguments[3])
         case "--runtime-smoke": try RuntimeReadinessSmoke.run()
         case "--runtime-smoke-worker" where arguments.count == 4:
             try RuntimeReadinessSmoke.worker(root: URL(fileURLWithPath: arguments[2]), ready: arguments[3] == "ready")
@@ -100,6 +103,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             runtimeResponder = RuntimeResponder { [weak self] in Engine.ready && self?.server != nil }
             InstallationDiagnostics.append("input-server-ready")
             DictionaryResources.shared.refreshBundledConfigurationIfNeeded()
+            UpdateChecker.shared.start()
             if finishInstallationAsServer {
                 do {
                     _ = try InstallationFiles.current.record(.ready, app: Bundle.main.bundleURL,

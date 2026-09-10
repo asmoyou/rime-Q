@@ -12,39 +12,16 @@ enum UpdateQuitRequest {
     }
 }
 
-enum ReleaseLookup {
-    case unpublished, current, available(String), invalid
-
-    static func version(_ text: String) -> [Int]? {
-        let clean = text.hasPrefix("v") ? String(text.dropFirst()) : text
-        guard let base = clean.split(separator: "-", maxSplits: 1).first else { return nil }
-        let parts = base.split(separator: ".")
-        guard parts.count == 3 else { return nil }
-        let numbers = parts.compactMap { Int($0) }
-        return numbers.count == 3 && numbers.allSatisfy { $0 >= 0 } ? numbers : nil
-    }
-
-    static func parse(data: Data, status: Int, installed: String) -> ReleaseLookup {
-        if status == 404 { return .unpublished }
-        guard status == 200,
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let tag = json["tag_name"] as? String,
-              let latest = version(tag), let current = version(installed) else { return .invalid }
-        return current.lexicographicallyPrecedes(latest) ? .available(tag) : .current
-    }
-}
-
 enum AppMaintenance {
     static let releases = Product.downloads
-    private static var checkingUpdates = false
 
     static func openAbout() {
         let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .center
-        let credits = NSMutableAttributedString(string: "免费开源 · 官方版本无需购买\n\n",
+        let credits = NSMutableAttributedString(string: "简洁、流畅、离线的中文输入法。\n\n",
             attributes: [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph])
-        credits.append(NSAttributedString(string: "项目主页", attributes: [.link: Product.homepage, .paragraphStyle: paragraph]))
+        credits.append(NSAttributedString(string: "GitHub 项目", attributes: [.link: Product.homepage, .paragraphStyle: paragraph]))
         credits.append(NSAttributedString(string: "  ·  "))
-        credits.append(NSAttributedString(string: "官方下载", attributes: [.link: Product.downloads, .paragraphStyle: paragraph]))
+        credits.append(NSAttributedString(string: "发布记录", attributes: [.link: Product.downloads, .paragraphStyle: paragraph]))
         NSApp.activate(ignoringOtherApps: true)
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationName: "Rime Q", .applicationVersion: Product.version, .version: Product.build,
@@ -61,41 +38,22 @@ enum AppMaintenance {
         }
     }
 
-    static func checkForUpdates() {
-        guard !checkingUpdates else { return }
-        checkingUpdates = true
+    static func checkForUpdates(using checker: UpdateChecker = .shared) {
         let installed = Product.version
-        var request = URLRequest(url: URL(string: "https://api.github.com/repos/asmoyou/rime-Q/releases/latest")!)
-        request.timeoutInterval = 12
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("RimeQ/" + installed, forHTTPHeaderField: "User-Agent")
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            let result = error == nil
-                ? ReleaseLookup.parse(data: data ?? Data(), status: (response as? HTTPURLResponse)?.statusCode ?? 0, installed: installed)
-                : .invalid
-            DispatchQueue.main.async {
-                checkingUpdates = false
-                let alert = NSAlert()
-                switch result {
-                case .unpublished:
-                    alert.messageText = "暂时没有公开发布的更新"
-                    alert.informativeText = "当前版本：\(installed)（开发预览）。项目尚未发布可供检查的正式版本。"
-                case .current:
-                    alert.messageText = "没有发现更新版本"
-                    alert.informativeText = "当前版本：\(installed)。"
-                case .available(let tag):
-                    alert.messageText = "发现新版本 \(tag)"
-                    alert.informativeText = "当前版本：\(installed)。可以前往发布页面查看说明并下载。"
-                case .invalid:
-                    alert.messageText = "暂时无法检查更新"
-                    alert.informativeText = "请稍后再试，或打开发布页面查看。"
-                }
-                alert.addButton(withTitle: "关闭")
-                alert.addButton(withTitle: "打开发布页面")
-                NSApp.activate(ignoringOtherApps: true)
-                if alert.runModal() == .alertSecondButtonReturn { NSWorkspace.shared.open(releases) }
+        checker.check { result in
+            let alert = NSAlert()
+            alert.messageText = result.title
+            switch result {
+            case .unpublished: alert.informativeText = "当前版本：\(installed)。项目暂时没有可供检查的公开版本。"
+            case .current: alert.informativeText = "当前版本：\(installed)。"
+            case .available: alert.informativeText = "当前版本：\(installed)。可以前往发布页面查看说明并下载。"
+            case .invalid: alert.informativeText = "请检查网络连接后重试，或打开发布页面查看。"
             }
-        }.resume()
+            alert.addButton(withTitle: "关闭")
+            alert.addButton(withTitle: "打开发布页面")
+            NSApp.activate(ignoringOtherApps: true)
+            if alert.runModal() == .alertSecondButtonReturn { NSWorkspace.shared.open(releases) }
+        }
     }
 
     private static func sourceString(_ source: TISInputSource, _ key: CFString) -> String {
@@ -258,8 +216,8 @@ enum AppMaintenance {
               case .current = ReleaseLookup.parse(data: Data(#"{"tag_name":"0.1.2"}"#.utf8), status: 200, installed: "0.1.10"),
               case .unpublished = ReleaseLookup.parse(data: Data(), status: 404, installed: "0.1.2"),
               case .invalid = ReleaseLookup.parse(data: Data(), status: 403, installed: "0.1.2"),
-              ReleaseLookup.version("malformed") == nil,
-              ReleaseLookup.version("") == nil else { throw error("更新版本比较测试失败。") }
+              ReleaseVersion("malformed") == nil,
+              ReleaseVersion("") == nil else { throw error("更新版本比较测试失败。") }
         let session = InputSession()
         let menu = session.makeMenu()!
         for item in menu.items {

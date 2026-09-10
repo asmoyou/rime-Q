@@ -181,22 +181,25 @@ final class InputSettingsViewController: NSViewController {
         help.isBordered = false; help.contentTintColor = .secondaryLabelColor
         help.widthAnchor.constraint(equalToConstant: 20).isActive = true
         let switches = SettingsUI.row([help, optimization])
-        switches.widthAnchor.constraint(equalToConstant: 72).isActive = true
+        switches.widthAnchor.constraint(equalToConstant: 96).isActive = true
+        switches.distribution = .gravityAreas
+        switches.setViews([help, optimization], in: .trailing)
         let inputRow = SettingsLayout.setting("整句优化", detail: "使用万象语法模型，辅助连续输入时的组词。",
             control: switches, height: 76)
         font.addItems(withTitles: ["16", "18", "20", "22"])
         font.target = self; font.action = #selector(changeFont)
-        font.widthAnchor.constraint(equalToConstant: 78).isActive = true
+        font.widthAnchor.constraint(equalToConstant: 96).isActive = true
         skinButton.target = self; skinButton.action = #selector(openSkins)
         skinButton.bezelStyle = .rounded
         skinButton.setAccessibilityLabel("选择候选皮肤")
+        skinButton.widthAnchor.constraint(equalToConstant: 96).isActive = true
         let rows = SettingsCard([
             SettingsLayout.setting("候选字号", control: font), SettingsLayout.separator(),
             SettingsLayout.setting("候选皮肤", control: skinButton)
         ])
         let appearance = SettingsLayout.vertical([rows, preview], spacing: 12)
         let shortcuts = NSStackView(views: [shortcut("⇧ Shift", "中英文切换"), shortcut("数字键", "选择候选"), shortcut("− / =", "候选翻页")])
-        shortcuts.distribution = .fillEqually; shortcuts.spacing = 12
+        shortcuts.distribution = .fillEqually; shortcuts.spacing = 12; shortcuts.alignment = .top
         SettingsLayout.scrollPage([
             SettingsLayout.heading("输入与外观", subtitle: "按自己的习惯，调整输入与候选显示。"),
             SettingsLayout.section("输入", content: SettingsCard([inputRow]), note: "开启或关闭，都共用雾凇词库和同一份个人学习记录。"),
@@ -211,7 +214,7 @@ final class InputSettingsViewController: NSViewController {
     private func shortcut(_ key: String, _ description: String) -> NSView {
         let keyLabel = SettingsUI.label(key, size: 12)
         keyLabel.font = .monospacedSystemFont(ofSize: 12, weight: .medium)
-        return SettingsLayout.vertical([keyLabel, SettingsUI.label(description, size: 12, secondary: true)], spacing: 5)
+        return SettingsCard([keyLabel, SettingsUI.label(description, size: 12, secondary: true)], padding: 16, spacing: 8)
     }
     @objc func refresh() {
         guard isViewLoaded else { return }

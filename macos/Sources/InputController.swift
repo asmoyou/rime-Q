@@ -197,7 +197,8 @@ final class InputSession: NSObject {
         help.target = target ?? self
         let about = menu.addItem(withTitle: "关于 Rime Q…", action: #selector(openAbout), keyEquivalent: "")
         about.target = target ?? self
-        let update = menu.addItem(withTitle: "检查更新…", action: #selector(checkForUpdates), keyEquivalent: "")
+        let updateTitle = UpdateChecker.shared.availableTag.map { "发现新版本 \($0)…" } ?? "检查更新…"
+        let update = menu.addItem(withTitle: updateTitle, action: #selector(checkForUpdates), keyEquivalent: "")
         update.target = target ?? self
         menu.addItem(.separator())
         let uninstall = menu.addItem(withTitle: "卸载 Rime Q…", action: #selector(uninstall), keyEquivalent: "")

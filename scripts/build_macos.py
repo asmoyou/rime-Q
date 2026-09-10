@@ -2,6 +2,7 @@
 import argparse
 from pathlib import Path
 import plistlib
+import platform
 import shutil
 import subprocess
 import sys
@@ -14,7 +15,7 @@ from dictionary_catalog import write_catalog
 
 ROOT = Path(__file__).resolve().parents[1]
 IDENTIFIER = "com.asmoyou.inputmethod.RimeQ"
-VERSION = "0.2.4"
+VERSION = "0.3.0"
 
 
 def run(*args):
@@ -180,7 +181,7 @@ def build(universal=False, resources=True, keep_app=False, smoke=False):
             run(app / "Contents/MacOS/RimeQ", "--rimeq-tis-validate-bundle")
             with isolated_smoke_app(app) as preview:
                 exe = preview / "Contents/MacOS/RimeQ"
-                for command in ["--smoke", "--lua-smoke", "--installation-smoke", "--runtime-smoke", "--maintenance-smoke", "--candidate-smoke",
+                for command in ["--smoke", "--lua-smoke", "--installation-smoke", "--runtime-smoke", "--maintenance-smoke", "--update-smoke", "--candidate-smoke",
                                 "--controller-smoke", "--personal-dictionary-smoke", "--settings-ui-smoke", "--dictionary-resources-smoke"]:
                     run(exe, command)
                 run(exe, "--settings-render", ROOT / f"artifacts/settings-{VERSION}")
@@ -223,7 +224,8 @@ def build(universal=False, resources=True, keep_app=False, smoke=False):
   <script><![CDATA[{checks}]]></script>
 </installer-gui-script>
 ''')
-        package = ROOT / f"dist/RimeQ-{VERSION}-preview.pkg"
+        architecture = "universal" if universal else platform.machine()
+        package = ROOT / f"dist/RimeQ-{VERSION}-macos-{architecture}.pkg"
         run("productbuild", "--distribution", distribution, "--package-path", staging,
             "--resources", resources, package)
         run(sys.executable, ROOT / "scripts/verify_macos_package.py", package)

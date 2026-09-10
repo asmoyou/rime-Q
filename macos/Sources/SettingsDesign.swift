@@ -70,6 +70,9 @@ enum SettingsLayout {
         let container = NSView()
         let name = SettingsUI.label(title, size: 13); name.font = .systemFont(ofSize: 13, weight: .medium)
         let labels = vertical([name] + (detail.map { [SettingsUI.label($0, size: 12, secondary: true)] } ?? []), spacing: 5)
+        labels.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        control.setContentHuggingPriority(.required, for: .horizontal)
+        control.setContentCompressionResistancePriority(.required, for: .horizontal)
         control.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(labels); container.addSubview(control)
         NSLayoutConstraint.activate([
@@ -150,8 +153,8 @@ private final class SettingsScrollView: NSScrollView {
             tile()
             let width = contentView.bounds.width
             guard width > 0 else { return }
-            stackWidth.constant = min(760, max(1, width - 56))
-            stackLeading.constant = max(28, floor((width - stackWidth.constant) / 2))
+            stackWidth.constant = max(1, width - 56)
+            stackLeading.constant = 28
             document.setFrameSize(NSSize(width: width, height: max(1, document.frame.height)))
             document.layoutSubtreeIfNeeded()
             let height = ceil(stack.fittingSize.height) + 56
@@ -221,6 +224,7 @@ final class CandidatePreviewView: NSView {
 
 final class SettingsSidebarButton: NSButton {
     var selected = false { didSet { needsDisplay = true; setAccessibilityValue(selected ? "已选择" : "") } }
+    var showsBadge = false { didSet { needsDisplay = true; setAccessibilityHelp(showsBadge ? "有新版本可用" : nil) } }
     private let symbol: String
     init(title: String, symbol: String, target: AnyObject, action: Selector) {
         self.symbol = symbol
@@ -241,9 +245,17 @@ final class SettingsSidebarButton: NSButton {
         let icon = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
             .withSymbolConfiguration(.init(pointSize: 15, weight: .medium))?
             .withSymbolConfiguration(.init(paletteColors: [color]))
-        icon?.draw(in: NSRect(x: 12, y: (bounds.height - 18) / 2, width: 18, height: 18))
+        if let icon {
+            let scale = min(18 / icon.size.width, 18 / icon.size.height)
+            let size = NSSize(width: icon.size.width * scale, height: icon.size.height * scale)
+            icon.draw(in: NSRect(x: 21 - size.width / 2, y: (bounds.height - size.height) / 2, width: size.width, height: size.height))
+        }
         (title as NSString).draw(in: NSRect(x: 40, y: (bounds.height - 18) / 2, width: bounds.width - 48, height: 20),
             withAttributes: [.font: NSFont.systemFont(ofSize: 13, weight: selected ? .semibold : .regular),
                              .foregroundColor: NSColor.labelColor])
+        if showsBadge {
+            NSColor.controlAccentColor.setFill()
+            NSBezierPath(ovalIn: NSRect(x: bounds.width - 14, y: (bounds.height - 6) / 2, width: 6, height: 6)).fill()
+        }
     }
 }
