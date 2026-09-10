@@ -22,13 +22,8 @@ as_login_user() {
     /bin/launchctl asuser "$console_uid" /usr/bin/sudo -H -u "$console_user" -- "$@"
 }
 as_login_user "$LSREGISTER" -f "$APP"
-if as_login_user "$EXE" --register; then
-    echo "Rime Q: registered and enabled for $console_user. Select Rime Q from the input menu."
-else
-    status=$?
-    if [ "$status" -ne 75 ]; then
-        echo "Rime Q: input-source registration failed (status $status)."
-        exit "$status"
-    fi
-    echo "Rime Q: application installed, activation pending. Log out and back in, then add Rime Q in Keyboard settings."
-fi
+# LaunchServices must launch the GUI user's application. Calling its executable
+# directly from this package script can return successful TIS calls without
+# actually enabling the source. The app verifies and presents the real result.
+as_login_user /usr/bin/open -n -g "$APP" --args --complete-install
+echo "Rime Q: application installed; the Rime Q window will report activation readiness."

@@ -14,7 +14,9 @@
 python3 scripts/build_macos.py --universal --smoke
 ```
 
-双击产物 `dist/RimeQ-0.1.1-preview.pkg` 安装，包含 Intel 与 Apple Silicon 程序。安装器固定写入系统 Input Methods 目录，并为当前登录用户注册输入法。安装后从输入法菜单选择 **Rime Q**；如未显示，在“系统设置 → 键盘 → 文本输入”添加。首次安装若系统尚未刷新输入源，需要注销并重新登录。
+双击产物 `dist/RimeQ-0.1.2-preview.pkg` 安装，包含 Intel 与 Apple Silicon 程序。安装后自动打开 Rime Q 窗口完成启用；显示“已启用”即可从菜单选择 **Rime Q**。如果启用仍未通过，窗口提供稍后处理或注销选项，并安排下次登录重试。
+
+输入法菜单提供设置、使用说明、检查更新和卸载。更新检查由用户主动触发，卸载默认保留个人词库。
 
 构建会获取固定版本依赖；安装后的日常输入完全离线。当前预览未做 Developer ID 签名与公证。[测试与安装说明](docs/MACOS.md)
 

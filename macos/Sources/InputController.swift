@@ -169,6 +169,13 @@ final class InputSession: NSObject {
         settings.target = self
         let data = menu.addItem(withTitle: "打开个人数据文件夹", action: #selector(openData), keyEquivalent: "")
         data.target = self
+        let help = menu.addItem(withTitle: "使用说明", action: #selector(openHelp), keyEquivalent: "")
+        help.target = self
+        let update = menu.addItem(withTitle: "检查更新…", action: #selector(checkForUpdates), keyEquivalent: "")
+        update.target = self
+        menu.addItem(.separator())
+        let uninstall = menu.addItem(withTitle: "卸载 Rime Q…", action: #selector(uninstall), keyEquivalent: "")
+        uninstall.target = self
         return menu
     }
 
@@ -178,6 +185,9 @@ final class InputSession: NSObject {
     }
     @objc fileprivate func openSettings() { if let owner { commitCurrent(owner) }; SettingsWindow.shared.show() }
     @objc fileprivate func openData() { NSWorkspace.shared.open(Product.userRoot) }
+    @objc fileprivate func openHelp() { if let owner { commitCurrent(owner) }; AppMaintenance.openHelp() }
+    @objc fileprivate func checkForUpdates() { if let owner { commitCurrent(owner) }; AppMaintenance.checkForUpdates() }
+    @objc fileprivate func uninstall() { if let owner { commitCurrent(owner) }; AppMaintenance.uninstall() }
 }
 
 // InputMethodKit owns the actual client proxy. Keep event/session behavior independently testable.
@@ -193,4 +203,7 @@ final class RimeQController: IMKInputController {
     @objc private func toggleEnglish() { input.toggleEnglish() }
     @objc private func openSettings() { input.openSettings() }
     @objc private func openData() { input.openData() }
+    @objc private func openHelp() { input.openHelp() }
+    @objc private func checkForUpdates() { input.checkForUpdates() }
+    @objc private func uninstall() { input.uninstall() }
 }

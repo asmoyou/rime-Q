@@ -11,6 +11,17 @@ if arguments.count > 1 {
         case "--smoke": try EngineSmoke.run()
         case "--benchmark": try EngineSmoke.benchmark()
         case "--controller-smoke": try ControllerSmoke.run()
+        case "--installation-smoke": try installationFlowSmoke()
+        case "--maintenance-smoke": try AppMaintenance.smoke()
+        case "--uninstall-preview":
+            _ = NSApplication.shared
+            NSApp.setActivationPolicy(.accessory)
+            AppMaintenance.uninstall(preview: true)
+        case "--complete-install", "--retry-install":
+            completeInputSourceInstallation(isLoginRetry: arguments[1] == "--retry-install")
+        case "--installation-preview" where arguments.count == 3:
+            guard let readiness = InstallationReadiness(rawValue: arguments[2]) else { exit(2) }
+            showInstallationResult(readiness, retryScheduled: readiness == .pending, allowSystemActions: false)
         case "--render" where arguments.count == 3:
             try RenderSmoke.run(destination: URL(fileURLWithPath: arguments[2]))
         case "--smoke-phase" where arguments.count == 4:

@@ -21,11 +21,17 @@ def verify(package):
         assert len(bundles) == 1 and bundles[0].get("path", "").removeprefix("./") == "RimeQ.app"
         assert info.find("./scripts/preinstall") is not None, "Missing duplicate-installation guard"
         assert info.find("./scripts/postinstall") is not None, "Missing input-source registration"
+        postinstall = infos[0].parent / "Scripts/postinstall"
+        script = postinstall.read_text()
+        assert '/usr/bin/open -n -g "$APP" --args --complete-install' in script, "Activation must use LaunchServices"
+        assert 'as_login_user "$EXE" --register' not in script, "Direct package-script activation can silently fail"
         distribution = ET.parse(expanded / "Distribution").getroot()
         domains = distribution.find("domains")
         assert domains is not None and domains.get("enable_anywhere") == "false"
         assert domains.get("enable_currentUserHome") == "false"
         assert distribution.find("conclusion") is not None, "Missing activation instructions"
+        assert all(reference.get("onConclusion") not in {"RequireLogout", "RequireRestart", "RequireShutdown"}
+                   for reference in distribution.findall("pkg-ref")), "Do not require session changes after successful activation"
     print("PKG verified: fixed system path, relocation disabled, install scripts and activation instructions present")
 
 

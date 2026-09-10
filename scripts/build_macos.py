@@ -10,7 +10,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 IDENTIFIER = "com.asmoyou.inputmethod.RimeQ"
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 
 
 def run(*args):
@@ -68,6 +68,7 @@ def build_app(app, universal=False, resources=True):
     }
     (contents / "Info.plist").write_bytes(plistlib.dumps(metadata))
     (contents / "PkgInfo").write_bytes(b"APPL????")
+    shutil.copytree(ROOT / "macos/Resources", contents / "Resources", dirs_exist_ok=True)
     for language in ["en", "zh-Hans", "zh-Hant"]:
         localized = contents / "Resources" / (language + ".lproj")
         localized.mkdir(exist_ok=True)
@@ -88,6 +89,9 @@ def build_app(app, universal=False, resources=True):
         if compiled.exists():
             shutil.rmtree(compiled)
         run(contents / "MacOS/RimeQ", "--prepare", compiled)
+        # Cache resources without an application identity for incremental builds.
+        for directory in ["Frameworks", "SharedSupport"]:
+            shutil.copytree(contents / directory, ROOT / ".cache/prepared-resources" / directory, dirs_exist_ok=True)
     elif not (contents / "SharedSupport/build").is_dir():
         raise RuntimeError("No prepared resources; omit --reuse-resources on the first build")
     notices = contents / "Resources/Licenses"
@@ -117,6 +121,8 @@ def build(universal=False, resources=True, keep_app=False, smoke=False):
         build_app(app, universal, resources)
         if smoke:
             run(app / "Contents/MacOS/RimeQ", "--smoke")
+            run(app / "Contents/MacOS/RimeQ", "--installation-smoke")
+            run(app / "Contents/MacOS/RimeQ", "--maintenance-smoke")
         component = staging / "RimeQ-component.pkg"
         run("pkgbuild", "--root", payload,
             "--component-plist", ROOT / "scripts/macos/component.plist",
@@ -133,7 +139,7 @@ def build(universal=False, resources=True, keep_app=False, smoke=False):
   <conclusion file="conclusion.html" mime-type="text/html"/>
   <choices-outline><line choice="rimeq"/></choices-outline>
   <choice id="rimeq" title="Rime Q" visible="false"><pkg-ref id="{IDENTIFIER}"/></choice>
-  <pkg-ref id="{IDENTIFIER}" version="{VERSION}" onConclusion="none">RimeQ-component.pkg</pkg-ref>
+  <pkg-ref id="{IDENTIFIER}" version="{VERSION}" onConclusion="None">RimeQ-component.pkg</pkg-ref>
 </installer-gui-script>
 ''')
         package = ROOT / f"dist/RimeQ-{VERSION}-preview.pkg"
