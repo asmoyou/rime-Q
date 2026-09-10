@@ -1,0 +1,52 @@
+name: Build and test
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SQLite on Linux
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
+      - name: Install SQLite on Windows
+        if: runner.os == 'Windows'
+        run: vcpkg install sqlite3:x64-windows
+      - name: Configure Unix
+        if: runner.os != 'Windows'
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Configure Windows
+        if: runner.os == 'Windows'
+        run: cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows -A x64
+      - run: cmake --build build --config Release --parallel
+      - run: ctest --test-dir build -C Release --output-on-failure
+      - name: Compile the Mac client
+        if: runner.os == 'macOS'
+        run: swift build -c release
+
+  mac-package:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache verified build downloads
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: mac-resources-${{ hashFiles('dependencies.lock.json') }}
+      - run: python3 scripts/build_macos.py --universal
+      - run: dist/RimeQ.app/Contents/MacOS/RimeQ --smoke
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RimeQ-macOS-preview
+          path: dist/*.pkg
+          retention-days: 7

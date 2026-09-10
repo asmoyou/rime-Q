@@ -1,0 +1,68 @@
+import AppKit
+import Carbon
+import InputMethodKit
+import QRimeBridge
+
+let arguments = CommandLine.arguments
+if let status = inputSourceInstallPhaseExitStatus(arguments: arguments) { exit(status) }
+if arguments.count > 1 {
+    do {
+        switch arguments[1] {
+        case "--smoke": try EngineSmoke.run()
+        case "--benchmark": try EngineSmoke.benchmark()
+        case "--controller-smoke": try ControllerSmoke.run()
+        case "--render" where arguments.count == 3:
+            try RenderSmoke.run(destination: URL(fileURLWithPath: arguments[2]))
+        case "--smoke-phase" where arguments.count == 4:
+            try EngineSmoke.phase(arguments[2], user: URL(fileURLWithPath: arguments[3]))
+        case "--prepare" where arguments.count == 3:
+            let temporary = FileManager.default.temporaryDirectory.appendingPathComponent("rimeq-deploy-" + UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: temporary) }
+            try Engine.start(user: temporary, deploy: true)
+            QRimeStop()
+            let destination = URL(fileURLWithPath: arguments[2])
+            try FileManager.default.copyItem(at: temporary.appendingPathComponent("build"), to: destination)
+            print("Prepared bundled dictionaries")
+        case "--register", "--activate-source":
+            guard installInputSource(selectAfterEnabling: arguments[1] == "--activate-source") else {
+                exit(75)
+            }
+        default:
+            fputs("Usage: RimeQ --smoke | --benchmark | --prepare DEST | --register\n", stderr)
+            exit(2)
+        }
+        exit(0)
+    } catch {
+        fputs("Rime Q: \(error.localizedDescription)\n", stderr)
+        exit(1)
+    }
+}
+
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    var server: IMKServer?
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        server = IMKServer(name: Product.connection, bundleIdentifier: Product.identifier)
+        guard server != nil else { NSApp.terminate(nil); return }
+        DispatchQueue(label: "com.asmoyou.rimeq.startup", qos: .userInitiated).async {
+            do {
+                try Engine.start(user: Product.userRoot.appendingPathComponent("rime"))
+                DispatchQueue.main.async { Engine.ready = true }
+            } catch {
+                DispatchQueue.main.async {
+                    Engine.failure = error.localizedDescription
+                    let alert = NSAlert()
+                    alert.messageText = "Rime Q 暂时无法启动"
+                    alert.informativeText = "输入资源未能加载，请重新安装。你的个人词库会保留。\n" + error.localizedDescription
+                    alert.runModal()
+                }
+            }
+        }
+    }
+    func applicationWillTerminate(_ notification: Notification) { if Engine.ready { QRimeStop() } }
+}
+
+let app = NSApplication.shared
+let delegate = AppDelegate()
+app.delegate = delegate
+app.setActivationPolicy(.accessory)
+app.run()

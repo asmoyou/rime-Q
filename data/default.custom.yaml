@@ -1,0 +1,7 @@
+# Rime Q application policy. User-specific patches remain in the private user directory.
+patch:
+  schema_list:
+    - schema: rime_q
+    - schema: rime_q_grammar
+  menu/page_size: 5
+  switcher/hotkeys: []

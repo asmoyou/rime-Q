@@ -1,0 +1,33 @@
+{
+  "squirrel_runtime": {
+    "version": "1.1.2",
+    "url": "https://github.com/rime/squirrel/releases/download/1.1.2/Squirrel-1.1.2.pkg",
+    "bytes": 25498033,
+    "sha256": "614746013212937623d5bbab9901e9c43d1ec937aa32307d6b6092a05e308287",
+    "files": {
+      "librime.1.dylib": "abb06aa5b3f53de375bc401512b49a7a31b7ed5ee62b2ef7a438512abee5958f",
+      "rime-plugins/librime-lua.dylib": "a0862901b4d36d35aba7012f05c132dd087890cca564609c5d1ea3ba9de7c12b",
+      "rime-plugins/librime-octagram.dylib": "70f587ca908e1b857f4180dc50584b8843ec0852dbc2013248badc5fb0571525"
+    },
+    "librime_version": "1.16.0",
+    "librime_revision": "a251145d3aafa33871824a40bbec04c966bd8b56"
+  },
+  "rime_ice": {
+    "revision": "fbb516b2786e4d5444383706d13c31c2e4d10c08",
+    "url": "https://codeload.github.com/iDvel/rime-ice/tar.gz/fbb516b2786e4d5444383706d13c31c2e4d10c08",
+    "sha256": "06bd64f7874e76ce8bdd6b16f3ce2b304d438027f3729b856016879ea1acccd9"
+  },
+  "wanxiang_model": {
+    "release_id": 268075342,
+    "url": "https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hans.gram",
+    "filename": "wanxiang-lts-zh-hans.gram",
+    "bytes": 420339756,
+    "sha256": "1eb651288b117e68374110b32796346e128be790e994559cb7c1e3b0fd63029d",
+    "license_url": "https://raw.githubusercontent.com/amzxyz/RIME-LMDG/b47637d2b6db1721743543e2e54c9d3c41662ffb/LICENSE",
+    "license_sha256": "9e5f1b3c610b9c2da5c313bf81d577a7d1acec686bdb0384edefa6df0f90cd94"
+  },
+  "librime_header": {
+    "version": "1.17.0",
+    "revision": "33e78140250125871856cdc5b42ddc6a5fcd3cd4"
+  }
+}
