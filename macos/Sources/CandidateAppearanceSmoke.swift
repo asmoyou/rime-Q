@@ -1,4 +1,6 @@
 import AppKit
+import ImageIO
+import UniformTypeIdentifiers
 
 private final class CandidatePreviewBackground: NSView {
     override func draw(_ dirtyRect: NSRect) {
@@ -66,8 +68,23 @@ enum CandidateAppearanceSmoke {
         }
         defaults.set("unknown", forKey: "candidateSkin")
         try require(preferences.skin == .system, "Unknown skin did not fall back to system")
+        preferences.skin = .typingCat
+        panel.show(Composition(candidates: [.init(text: "你", comment: "")]),
+            anchor: NSRect(x: 100, y: 400, width: 1, height: 20), owner: ObjectIdentifier(owner), keyActivity: true, select: { _ in })
+        try require(panel.canvas.candidateIndex(at: NSPoint(x: 20, y: 25)) == nil, "Cat decoration selected a candidate")
+        try require(panel.canvas.candidateIndex(at: NSPoint(x: 20, y: 49)) == 0, "Cat skin first candidate hit test failed")
+        let cat = panel.surface.cat
+        cat.tap(reduceMotion: false); let firstPose = cat.pose
+        cat.tap(reduceMotion: false)
+        try require(cat.pose != firstPose && cat.isAnimating, "Typing cat did not alternate paws")
+        RunLoop.current.run(until: Date().addingTimeInterval(0.22))
+        try require(cat.pose == 0 && !cat.isAnimating, "Typing cat did not stop after idle")
+        cat.tap(reduceMotion: true)
+        try require(cat.pose == 0 && !cat.isAnimating, "Typing cat ignored Reduce Motion")
+        cat.tap(reduceMotion: false); panel.hide(owner: ObjectIdentifier(owner))
+        try require(!cat.isAnimating, "Hidden candidate panel kept animating")
         print("PASS candidate layout: single=\(single.width)pt two=\(double.width)pt annotated=\(annotated.width)pt; hit testing and long-text limits")
-        print("PASS candidate appearance: transparent rounded corners, six palettes, saved skin applied to live panel")
+        print("PASS candidate appearance: rounded corners, saved skins, typing cat key poses/idle/hide/Reduce Motion and hit testing")
     }
 
     static func render(to directory: URL) throws {
@@ -109,7 +126,42 @@ enum CandidateAppearanceSmoke {
                 }
             }
         }
-        print(canCapture ? "PASS captured live rounded candidate windows in all six skins, light/dark" : "Rendered candidate previews; live window capture unavailable without Screen Recording access")
+        try renderCatAnimation(to: directory.appendingPathComponent("typing-cat.gif"))
+        print(canCapture ? "PASS captured live rounded candidate windows in all skins, light/dark" : "Rendered candidate previews; live window capture unavailable without Screen Recording access")
+    }
+
+    private static func renderCatAnimation(to url: URL) throws {
+        let canvas = CandidateCanvas(frame: .zero)
+        canvas.skin = .typingCat
+        canvas.composition.candidates = [.init(text: "你好世界", comment: ""), .init(text: "你好", comment: ""), .init(text: "拟好", comment: "")]
+        canvas.frame.size = canvas.measuredSize()
+        let size = NSSize(width: canvas.bounds.width * 2, height: canvas.bounds.height * 2)
+        let poses = [0, 1, 0, 2, 0, 1, 0, 2, 0]
+        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.gif.identifier as CFString, poses.count, nil) else {
+            throw LexiconError.message("无法创建小猫动画预览。")
+        }
+        CGImageDestinationSetProperties(destination, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)
+        for pose in poses {
+            let appearance = NSAppearance(named: .aqua)!
+            var bitmap: NSBitmapImageRep?
+            appearance.performAsCurrentDrawingAppearance {
+                let image = NSImage(size: size, flipped: true) { _ in
+                    NSGraphicsContext.saveGraphicsState()
+                    defer { NSGraphicsContext.restoreGraphicsState() }
+                    let scale = NSAffineTransform(); scale.scale(by: 2); scale.concat()
+                    CandidateSkin.typingCat.background.setFill()
+                    NSBezierPath(roundedRect: canvas.bounds, xRadius: 14, yRadius: 14).fill()
+                    canvas.draw(canvas.bounds)
+                    TypingCatView.draw(in: NSRect(x: canvas.bounds.width - 72, y: 2, width: 66, height: 44), pose: pose)
+                    return true
+                }
+                if let tiff = image.tiffRepresentation { bitmap = NSBitmapImageRep(data: tiff) }
+            }
+            guard let cgImage = bitmap?.cgImage else { throw LexiconError.message("小猫预览帧绘制失败。") }
+            CGImageDestinationAddImage(destination, cgImage,
+                [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: pose == 0 ? 0.24 : 0.14]] as CFDictionary)
+        }
+        guard CGImageDestinationFinalize(destination) else { throw LexiconError.message("动画预览保存失败。") }
     }
 
     static func preview(dark: Bool) {

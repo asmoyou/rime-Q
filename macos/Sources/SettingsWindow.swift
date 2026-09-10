@@ -225,6 +225,11 @@ final class SettingsWindow: NSObject {
         settings.selectPage(.resources)
         try EngineSmoke.check(settings.resources.numberOfRows(in: NSTableView()) >= 8, "resource page is empty")
         try click("皮肤", in: settings.window!.contentView!)
+        try click("敲敲猫", in: settings.skins.view)
+        try EngineSmoke.check(preferences.skin == .typingCat, "animated skin selection was not saved")
+        try click("试敲一下", in: settings.skins.view)
+        try EngineSmoke.check(descendants(settings.skins.view).compactMap({ $0 as? CandidateCanvas }).contains(where: { $0.skin == .typingCat }),
+                              "animated skin preview did not update")
         try click("暮色", in: settings.skins.view)
         try EngineSmoke.check(preferences.skin == .midnight, "skin selection was not saved")
         try EngineSmoke.check(AppearancePreferences(defaults: defaults).skin == .midnight, "skin did not persist")

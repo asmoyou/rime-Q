@@ -115,7 +115,7 @@ final class DictionaryResources {
 
     init(root: URL, bundled: URL = Engine.bundledShared) {
         self.root = root
-        self.bundled = bundled
+        self.bundled = bundled.resolvingSymlinksInPath()
         let catalogURL = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/dictionaries.json")
         catalog = (try? JSONDecoder().decode([BundledDictionary].self, from: Data(contentsOf: catalogURL))) ?? []
         configuration = .init()

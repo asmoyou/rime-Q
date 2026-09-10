@@ -12,6 +12,8 @@ final class SkinChoiceButton: NSButton {
         setAccessibilityLabel("\(skin.name)皮肤")
         toolTip = skin.summary
         sample.skin = skin; sample.fontSize = 12
+        sample.decorationEnabled = false
+        sample.isHidden = skin.animated
         sample.composition.candidates = [.init(text: "你好世界", comment: ""), .init(text: "你好", comment: "")]
         addSubview(sample)
     }
@@ -22,24 +24,38 @@ final class SkinChoiceButton: NSButton {
         SettingsPalette.card.setFill(); outline.fill()
         (selected ? NSColor.controlAccentColor : SettingsPalette.border).setStroke()
         outline.lineWidth = selected ? 2 : 1; outline.stroke()
+        if skin.animated {
+            skin.background.setFill()
+            NSBezierPath(roundedRect: NSRect(x: 10, y: 10, width: 86, height: bounds.height - 20), xRadius: 8, yRadius: 8).fill()
+            TypingCatView.draw(in: NSRect(x: 20, y: 17, width: 66, height: 44), pose: 1)
+            (skin.name as NSString).draw(at: NSPoint(x: 112, y: 18),
+                withAttributes: [.font: NSFont.systemFont(ofSize: 14, weight: .medium), .foregroundColor: NSColor.labelColor])
+            ("随按键敲击 · 停止输入后静止" as NSString).draw(at: NSPoint(x: 112, y: 43),
+                withAttributes: [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.secondaryLabelColor])
+            if selected { drawCheck(at: NSPoint(x: bounds.width - 33, y: 31)) }
+            return
+        }
         let preview = NSBezierPath(roundedRect: NSRect(x: 12, y: 10, width: bounds.width - 24, height: 80), xRadius: 8, yRadius: 8)
         skin.background.setFill(); preview.fill()
         (skin.name as NSString).draw(at: NSPoint(x: 16, y: 102),
             withAttributes: [.font: NSFont.systemFont(ofSize: 13, weight: .medium), .foregroundColor: NSColor.labelColor])
         if selected {
-            let circle = NSRect(x: bounds.width - 33, y: 100, width: 17, height: 17)
+            drawCheck(at: NSPoint(x: bounds.width - 33, y: 100))
+        }
+    }
+    private func drawCheck(at point: NSPoint) {
+            let circle = NSRect(origin: point, size: NSSize(width: 17, height: 17))
             NSColor.controlAccentColor.setFill(); NSBezierPath(ovalIn: circle).fill()
             let check = NSBezierPath()
             check.move(to: NSPoint(x: circle.minX + 4, y: circle.minY + 8))
             check.line(to: NSPoint(x: circle.minX + 7, y: circle.minY + 11))
             check.line(to: NSPoint(x: circle.minX + 13, y: circle.minY + 5))
             NSColor.white.setStroke(); check.lineWidth = 1.8; check.lineCapStyle = .round; check.lineJoinStyle = .round; check.stroke()
-        }
     }
     override func layout() {
         super.layout()
         let size = sample.measuredSize()
-        sample.frame = NSRect(x: (bounds.width - size.width) / 2, y: 14, width: size.width, height: size.height)
+        sample.frame = NSRect(x: skin.animated ? 20 : (bounds.width - size.width) / 2, y: 14, width: size.width, height: size.height)
     }
 }
 
@@ -71,7 +87,8 @@ final class SkinGrid: NSView {
 
 final class SkinSettingsViewController: NSViewController {
     let preferences: AppearancePreferences
-    private let preview = CandidatePreviewView(rows: 3, height: 180)
+    private let preview = CandidatePreviewView(rows: 3, height: 200)
+    private let animateButton = NSButton(title: "试敲一下", target: nil, action: nil)
     private let selection = SettingsUI.label("", size: 12, secondary: true)
     private var choices: [SkinChoiceButton] = []
     init(preferences: AppearancePreferences = .shared) {
@@ -83,21 +100,27 @@ final class SkinSettingsViewController: NSViewController {
     deinit { NotificationCenter.default.removeObserver(self) }
     override func loadView() {
         view = SettingsBackgroundView()
+        animateButton.bezelStyle = .rounded; animateButton.target = self; animateButton.action = #selector(previewTap)
         choices = CandidateSkin.allCases.map { SkinChoiceButton(skin: $0, target: self, action: #selector(choose(_:))) }
+        let animated = choices.first { $0.skin.animated }!
+        animated.heightAnchor.constraint(equalToConstant: 80).isActive = true
         SettingsLayout.scrollPage([
-            SettingsLayout.heading("皮肤", subtitle: "为候选栏选一种舒服的颜色。"),
+            SettingsLayout.heading("皮肤", subtitle: "为候选栏选一种舒服的颜色。", action: animateButton),
             SettingsLayout.section("实时预览", content: preview),
-            SettingsLayout.section("内置皮肤", content: SkinGrid(choices: choices)), selection
+            SettingsLayout.section("内置皮肤", content: SettingsLayout.vertical([
+                animated, SkinGrid(choices: choices.filter { !$0.skin.animated })], spacing: 12)), selection
         ], in: view)
         refresh()
     }
     @objc func refresh() {
         guard isViewLoaded else { return }
         preview.skin = preferences.skin; preview.fontSize = preferences.fontSize
+        animateButton.isHidden = !preferences.skin.animated
         choices.forEach { $0.selected = $0.skin == preferences.skin }
         selection.stringValue = "\(preferences.skin.name) · \(preferences.skin.summary)。选择即保存，下一次输入时生效。"
     }
     @objc private func choose(_ sender: SkinChoiceButton) { preferences.skin = sender.skin }
+    @objc private func previewTap() { preview.surface.cat.tap() }
 }
 
 final class InputSettingsViewController: NSViewController {

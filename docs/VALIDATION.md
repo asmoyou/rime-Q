@@ -126,3 +126,17 @@ CI [34466898554](https://github.com/asmoyou/rime-Q/actions/runs/34466898554) 已
 完整回归的设置渲染阶段先暴露上述视口问题，修正后单独重跑安装、服务应答、设置渲染和候选窗口检查；未重复未受影响的引擎回归。最终通用包 `RimeQ-0.2.2-preview.pkg` 构建 `1789050137`，签名结构与包规则检查通过，SHA-256 `a487cb8c3a40d6a9bcd7a7ce6eda64137d6e74457622f002c2a8621c01916dad`。日志见本机忽略目录 `artifacts/install-0.2.1-diagnosis.txt`、`artifacts/build-0.2.2.log`、`artifacts/final-validation-0.2.2.log` 和 `artifacts/validation-0.2.2.json`。
 
 本轮未在用户系统安装 0.2.2；升级后无需注销的端到端行为仍需真实升级验收。CI 已增加安装及同版修复后的服务应答检查，尚未运行本次远端 CI。
+
+## 0.2.3 连接名、预览注册隔离与敲敲猫
+
+用户澄清 0.2.1 的问题为“菜单栏输入法列表没有 Rime Q”。追加读取注销前的 imklaunchagent 日志，21:54:46 与 21:55:10 有 `Refusing connection name for bundle: unrecognized 'InputMethodConnectionName' value`，21:55:33 有 `LaunchInputMethod() Error, status=-50`。该日志未公开被拒绝的 Bundle ID，不能把所有事件唯一归因于 Rime Q；但本项目配置确实仍使用旧短名 `RimeQ_Connection`。
+
+将应用元数据和运行时统一为 `com.asmoyou.inputmethod.RimeQ_Connection`，启用预检拒绝短连接名和缺失连接名。依据包括本机 IMK 实际使用 Bundle ID 派生连接名的观察，以及 [vChewing 维护者的说明](https://gist.github.com/ShikiSuen/73b7a55526c9fadd2da2a16d94ec5b49)。此变更需实际升级后的菜单与沙盒宿主验收，不把纯配置检查等同于故障已经消失。
+
+LaunchServices 只读审计发现正式标识下有 30 条路径记录，其中 29 个开发临时路径已不存在。按已核对的精确缺失路径执行取消注册，保留 `/Library/Input Methods/RimeQ.app`。后续 GUI smoke/预览使用独立 Bundle ID，移除输入源声明；生产构建模板和预览在结束时均按确切路径取消注册。新隔离环境中，共享资源路径先解析符号链接，再执行词库编译。
+
+“敲敲猫”是候选栏右上角的本地矢量装饰，直接响应现有按键事件，交替两只爪子敲键盘，160 ms 后归位；没有持续动画循环，不读取或保存输入文本。候选顶部独立预留装饰空间，测试保证装饰区不选词、首项编号和鼠标位置仍一致。隐藏候选时取消动画定时器，“减少动态效果”时保持静止。皮肤页提供选择和“试敲一下”。
+
+`python3 scripts/build_macos.py --universal --reuse-resources --smoke` 最终通过：元数据连接名、真实引擎与学习、资源编译、原生 UI、皮肤持久化、猫咪交替/闲置/隐藏/减少动态效果及命中测试；深浅模式下的候选窗口截图与设置渲染通过。动图预览在 `artifacts/candidates-0.2.3/typing-cat.gif`，构建记录在 `artifacts/build-0.2.3.log`。最终包构建 `1789051832`，SHA-256 `995c577a50f6c6bdaeff639a7e248660de04793c33f3c5d29eb7cc3e25837d65`。
+
+本轮已打开 0.2.3 安装器并进入安装步骤；截至记录时 macOS 日志仍为等待管理员认证，已安装版本仍是 0.2.1。尚未通过真实升级后的免注销菜单/输入验收，等待用户完成系统认证后继续。个人词库和当前输入进程未被排查动作移除。

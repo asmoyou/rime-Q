@@ -13,7 +13,8 @@ extension NSColor {
 }
 
 enum CandidateSkin: String, CaseIterable {
-    case system, paper, mist, jade, rose, midnight
+    case system, paper, mist, jade, rose, midnight, typingCat
+    var animated: Bool { self == .typingCat }
     var name: String {
         switch self {
         case .system: return "随系统"
@@ -22,6 +23,7 @@ enum CandidateSkin: String, CaseIterable {
         case .jade: return "青玉"
         case .rose: return "浅樱"
         case .midnight: return "暮色"
+        case .typingCat: return "敲敲猫"
         }
     }
     var summary: String {
@@ -32,6 +34,7 @@ enum CandidateSkin: String, CaseIterable {
         case .jade: return "淡绿底色，自然舒适"
         case .rose: return "暖粉与陶色，柔和明亮"
         case .midnight: return "深色背景，低光环境更舒适"
+        case .typingCat: return "你敲键盘，小猫也一起打字"
         }
     }
     var background: NSColor {
@@ -42,6 +45,7 @@ enum CandidateSkin: String, CaseIterable {
         case .jade: return .rgb(0xF0F6F2)
         case .rose: return .rgb(0xFCF2EF)
         case .midnight: return .rgb(0x252B38)
+        case .typingCat: return .adaptive(0xFBF7EF, 0x2D2D33)
         }
     }
     var text: NSColor {
@@ -52,6 +56,7 @@ enum CandidateSkin: String, CaseIterable {
         case .jade: return .rgb(0x244637)
         case .rose: return .rgb(0x62413B)
         case .midnight: return .rgb(0xEDF1F8)
+        case .typingCat: return .adaptive(0x493F36, 0xF2E9DC)
         }
     }
     var accent: NSColor {
@@ -62,6 +67,7 @@ enum CandidateSkin: String, CaseIterable {
         case .jade: return .rgb(0x317458)
         case .rose: return .rgb(0xA45B53)
         case .midnight: return .rgb(0xB5CFF5)
+        case .typingCat: return .adaptive(0xB67843, 0xE8BA83)
         }
     }
     var selection: NSColor {
@@ -72,6 +78,7 @@ enum CandidateSkin: String, CaseIterable {
         case .jade: return .rgb(0xD4E9DC)
         case .rose: return .rgb(0xF1DAD4)
         case .midnight: return .rgb(0x3A4B68)
+        case .typingCat: return .adaptive(0xF1E3CE, 0x514539)
         }
     }
     var border: NSColor { text.withAlphaComponent(self == .midnight ? 0.16 : 0.1) }

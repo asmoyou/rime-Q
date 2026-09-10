@@ -15,6 +15,7 @@
 
 - 发布安装路径固定为 `/Library/Input Methods/RimeQ.app`；开发安装可用 `~/Library/Input Methods/RimeQ.app`。同一标识只保留一个实际安装。
 - Bundle ID 为 `com.asmoyou.inputmethod.RimeQ`，简体模式为 `.Hans`。禁止残留旧 RIMES 标识。
+- `InputMethodConnectionName` 与运行时统一为 `com.asmoyou.inputmethod.RimeQ_Connection`。构建与启用预检必须拒绝旧的短连接名。GUI 预览使用独立 Bundle ID，移除输入源声明；生产构建模板和预览退出后均按确切路径取消临时 LaunchServices 注册，避免污染现用输入法。
 - PKG 必须禁用 `BundleIsRelocatable`。旧包曾被 Installer 安装到已移动的 `.payload` 排查目录，不能只相信安装器的成功提示。
 - 默认构建只保留 PKG；临时 `.app` 打包后删除。备份用 TAR 等归档，不能靠改后缀来隐藏应用；`.payload` 等目录仍可能被系统识别。
 - 使用递增的 `CFBundleVersion`，包含正确的名称、本地化、图标和 PkgInfo，并检查实际签名与打包结果。
@@ -31,6 +32,7 @@
 
 - 系统输入法菜单提供设置、个人数据文件夹、使用说明、检查更新和卸载入口，避免重复的成功提示和无意义的操作步骤。
 - 候选栏采用原生半透明材质，文字本身保持清晰，并遵循系统的减少透明度设置。按当前页编号、候选文字、实际注释和必要边距测量宽度，不给一两个字保留大块固定空白；长句限制宽度，注释不覆盖正文。
+- 动态皮肤仅响应已有输入事件，不新增全局键盘监听；闲置、候选隐藏及“减少动态效果”时停止动作。装饰不得覆盖候选或改变数字键、鼠标选词的索引。
 - InputMethodKit 菜单动作必须接收 sender 参数，实际控制器需要响应相同 selector；菜单显示后还要逐项验证点击行为。
 - 检查更新要区分存在新版本、没有新版本、尚无公开发布版本及请求失败，不把网络失败或没有 Releases 说成“已是最新”。
 - 随包提供可离线打开的说明页，包含使用方法、安装异常、更新、数据备份及手动卸载步骤。

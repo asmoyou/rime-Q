@@ -204,6 +204,9 @@ func installationFlowSmoke() throws {
         if !condition { throw NSError(domain: "RimeQ.InstallationTest", code: 1,
                                      userInfo: [NSLocalizedDescriptionKey: message]) }
     }
+    try require(InputSourceInstallRules.validConnectionName(Product.connection, bundleID: Product.identifier), "Runtime connection does not match bundle identifier")
+    try require(!InputSourceInstallRules.validConnectionName("RimeQ_Connection", bundleID: Product.identifier), "Legacy connection name accepted")
+    try require(!InputSourceInstallRules.validConnectionName(nil, bundleID: Product.identifier), "Missing connection name accepted")
     try require(try files.record(.pending, app: app, isLoginRetry: false), "Pending activation did not schedule a retry")
     let agent = try PropertyListSerialization.propertyList(from: Data(contentsOf: files.retryAgent), format: nil) as! [String: Any]
     try require(agent["ProgramArguments"] as? [String] == ["/usr/bin/open", "-n", "-g", app.path, "--args", "--retry-install"],

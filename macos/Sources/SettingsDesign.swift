@@ -167,7 +167,7 @@ final class CandidatePreviewView: NSView {
     private let preedit = SettingsUI.label("ni hao shi jie", size: 12, secondary: true)
     var skin: CandidateSkin = .system { didSet { refresh() } }
     var fontSize: CGFloat = 18 { didSet { refresh() } }
-    init(rows: Int = 2, height: CGFloat = 152) {
+    init(rows: Int = 2, height: CGFloat = 172) {
         super.init(frame: .zero)
         heightAnchor.constraint(equalToConstant: height).isActive = true
         surface.blendingMode = .withinWindow

@@ -45,7 +45,7 @@ jobs:
           key: mac-resources-${{ hashFiles('dependencies.lock.json') }}
       - run: python3 scripts/build_macos.py --universal --smoke
       - name: Install the actual PKG at its fixed system path
-        run: sudo installer -pkg dist/RimeQ-0.2.2-preview.pkg -target /
+        run: sudo installer -pkg dist/RimeQ-0.2.3-preview.pkg -target /
       - name: Verify activation result or explicit pending fallback
         run: |
           rimeq_status="$HOME/Library/Application Support/RimeQ/installation-status.plist"
@@ -93,7 +93,7 @@ jobs:
           touch "$rimeq_data/repair-retention-check"
           rm -f "$rimeq_status"
           sudo touch "$rimeq_app/Contents/Resources/rimeq-repair-probe"
-          sudo installer -pkg dist/RimeQ-0.2.2-preview.pkg -target /
+          sudo installer -pkg dist/RimeQ-0.2.3-preview.pkg -target /
           test ! -e "$rimeq_app/Contents/Resources/rimeq-repair-probe"
           test -f "$rimeq_data/repair-retention-check"
           codesign --verify --deep --strict "$rimeq_app"
@@ -121,7 +121,7 @@ jobs:
           }
           trap restore_rimeq_info EXIT
           sudo /usr/libexec/PlistBuddy -c 'Set :CFBundleShortVersionString 9.9.9' "$rimeq_info"
-          if sudo installer -pkg dist/RimeQ-0.2.2-preview.pkg -target /; then
+          if sudo installer -pkg dist/RimeQ-0.2.3-preview.pkg -target /; then
             echo '::error::An older package was accepted over a newer installed release.'
             exit 1
           fi

@@ -34,6 +34,9 @@ struct InputSourceInstallMetadata: Equatable {
 }
 
 enum InputSourceInstallRules {
+    static func validConnectionName(_ name: String?, bundleID: String) -> Bool {
+        name == bundleID + "_Connection"
+    }
     /// Roughly eleven seconds per convergence boundary. There is deliberately
     /// no claim that Apple completes TIS propagation within this interval: a
     /// timeout means "defer to login/session refresh", not "bundle install
@@ -103,6 +106,7 @@ private struct InputSourceInstallIdentity {
     static func load() -> InputSourceInstallIdentity? {
         guard let info = Bundle.main.infoDictionary,
               let bundleID = Bundle.main.bundleIdentifier,
+              InputSourceInstallRules.validConnectionName(info["InputMethodConnectionName"] as? String, bundleID: bundleID),
               info["TISInputSourceID"] as? String == bundleID,
               let component = info["ComponentInputModeDict"]
                 as? [String: Any],

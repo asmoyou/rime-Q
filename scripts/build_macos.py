@@ -8,11 +8,13 @@ import sys
 import tempfile
 import time
 import json
+from contextlib import contextmanager
+import uuid
 from dictionary_catalog import write_catalog
 
 ROOT = Path(__file__).resolve().parents[1]
 IDENTIFIER = "com.asmoyou.inputmethod.RimeQ"
-VERSION = "0.2.2"
+VERSION = "0.2.3"
 
 
 def run(*args):
@@ -57,7 +59,7 @@ def build_app(app, universal=False, resources=True):
         "CFBundleSupportedPlatforms": ["MacOSX"], "LSBackgroundOnly": False,
         "NSAppleEventsUsageDescription": "Rime Q asks its previous version to quit during an update. When you choose Log Out, it asks macOS to show the logout confirmation.",
         "LSMinimumSystemVersion": "13.0", "LSUIElement": True, "NSPrincipalClass": "NSApplication",
-        "InputMethodConnectionName": "RimeQ_Connection", "InputMethodServerControllerClass": "RimeQController",
+        "InputMethodConnectionName": IDENTIFIER + "_Connection", "InputMethodServerControllerClass": "RimeQController",
         "InputMethodServerDelegateClass": "RimeQController", "TISInputSourceID": IDENTIFIER,
         "TICapsLockLanguageSwitchCapable": True, "tsInputMethodIconFileKey": "menu.pdf",
         "ComponentInputModeDict": {"tsVisibleInputModeOrderedArrayKey": [mode], "tsInputModeListKey": {
@@ -112,6 +114,40 @@ def build_app(app, universal=False, resources=True):
     run("codesign", "--verify", "--deep", "--strict", app)
 
 
+@contextmanager
+def unregister_on_exit(app):
+    try:
+        yield
+    finally:
+        subprocess.run(["/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
+                        "-u", str(app)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+@contextmanager
+def isolated_smoke_app(app):
+    # AppKit windows register their bundle with LaunchServices even when TIS
+    # registration is never called. Never run GUI previews with the installed ID.
+    with tempfile.TemporaryDirectory(prefix="rimeq-preview-") as temporary:
+        preview = Path(temporary) / "RimeQPreview.app"
+        contents = preview / "Contents"
+        shutil.copytree(app / "Contents/MacOS", contents / "MacOS")
+        for name in ["Frameworks", "SharedSupport", "Resources"]:
+            (contents / name).symlink_to(app / "Contents" / name, target_is_directory=True)
+        metadata = plistlib.loads((app / "Contents/Info.plist").read_bytes())
+        preview_id = IDENTIFIER + ".Preview." + uuid.uuid4().hex
+        metadata["CFBundleIdentifier"] = preview_id
+        metadata["InputMethodConnectionName"] = preview_id + "_Connection"
+        metadata.pop("ComponentInputModeDict", None)
+        metadata.pop("TISInputSourceID", None)
+        (contents / "Info.plist").write_bytes(plistlib.dumps(metadata))
+        run("codesign", "--force", "--sign", "-", preview)
+        try:
+            yield preview
+        finally:
+            subprocess.run(["/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
+                            "-u", str(preview)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
 def build(universal=False, resources=True, keep_app=False, smoke=False):
     cache = ROOT / ".cache"
     cache.mkdir(exist_ok=True)
@@ -120,24 +156,22 @@ def build(universal=False, resources=True, keep_app=False, smoke=False):
     if retained.exists():
         raise RuntimeError("Move the previous dist/RimeQ.app with install_macos.py before building again")
     # Never leave a second discoverable app behind after producing an installer.
-    with tempfile.TemporaryDirectory(prefix="rimeq-macos-package-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="rimeq-macos-package-") as temporary, \
+            unregister_on_exit(Path(temporary) / "payload/RimeQ.app"):
         staging = Path(temporary)
         payload = staging / "payload"
         app = payload / "RimeQ.app"
         build_app(app, universal, resources)
         if smoke:
             run(sys.executable, ROOT / "scripts/test_macos_install_plan.py")
-            run(app / "Contents/MacOS/RimeQ", "--smoke")
-            run(app / "Contents/MacOS/RimeQ", "--installation-smoke")
-            run(app / "Contents/MacOS/RimeQ", "--runtime-smoke")
-            run(app / "Contents/MacOS/RimeQ", "--maintenance-smoke")
-            run(app / "Contents/MacOS/RimeQ", "--candidate-smoke")
-            run(app / "Contents/MacOS/RimeQ", "--controller-smoke")
-            run(app / "Contents/MacOS/RimeQ", "--personal-dictionary-smoke")
-            run(app / "Contents/MacOS/RimeQ", "--settings-ui-smoke")
-            run(app / "Contents/MacOS/RimeQ", "--dictionary-resources-smoke")
-            run(app / "Contents/MacOS/RimeQ", "--settings-render", ROOT / f"artifacts/settings-{VERSION}")
-            run(app / "Contents/MacOS/RimeQ", "--candidate-render", ROOT / f"artifacts/candidates-{VERSION}")
+            run(app / "Contents/MacOS/RimeQ", "--rimeq-tis-validate-bundle")
+            with isolated_smoke_app(app) as preview:
+                exe = preview / "Contents/MacOS/RimeQ"
+                for command in ["--smoke", "--installation-smoke", "--runtime-smoke", "--maintenance-smoke", "--candidate-smoke",
+                                "--controller-smoke", "--personal-dictionary-smoke", "--settings-ui-smoke", "--dictionary-resources-smoke"]:
+                    run(exe, command)
+                run(exe, "--settings-render", ROOT / f"artifacts/settings-{VERSION}")
+                run(exe, "--candidate-render", ROOT / f"artifacts/candidates-{VERSION}")
         component = staging / "RimeQ-component.pkg"
         package_scripts = staging / "Scripts"
         shutil.copytree(ROOT / "scripts/macos/package-scripts", package_scripts)

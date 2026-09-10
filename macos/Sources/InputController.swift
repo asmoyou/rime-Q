@@ -112,7 +112,7 @@ final class InputSession: NSObject {
         guard let key = Self.key(event) else { commitCurrent(client); return false }
         let mask: Int32 = event.modifierFlags.contains(.shift) ? 1 : 0
         let consumed = QRimeProcess(session, key, mask)
-        deliverAndRefresh(client)
+        deliverAndRefresh(client, keyActivity: consumed)
         return consumed
     }
 
@@ -151,7 +151,7 @@ final class InputSession: NSObject {
         client.insertText(text.isEmpty ? before.input : text, replacementRange: NSRange(location: NSNotFound, length: 0))
     }
 
-    private func deliverAndRefresh(_ client: IMKTextInput) {
+    private func deliverAndRefresh(_ client: IMKTextInput, keyActivity: Bool = false) {
         guard owns(client) else { return }
         let epoch = generation
         let committed = String(cString: QRimeTakeCommit(session))
@@ -176,7 +176,7 @@ final class InputSession: NSObject {
         var rect = NSRect.zero
         if composition.active { _ = client.attributes(forCharacterIndex: 0, lineHeightRectangle: &rect) }
         guard owns(client), generation == epoch else { return }
-        CandidatePanel.shared.show(composition, anchor: rect, owner: ObjectIdentifier(self)) { [weak self, weak clientObject = client as AnyObject] index in
+        CandidatePanel.shared.show(composition, anchor: rect, owner: ObjectIdentifier(self), keyActivity: keyActivity) { [weak self, weak clientObject = client as AnyObject] index in
             guard let self, let current = clientObject as? IMKTextInput,
                   self.owns(current), self.generation == epoch else { return }
             if QRimeSelect(self.session, index) { self.deliverAndRefresh(current) }
