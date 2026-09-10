@@ -81,3 +81,5 @@ CI [34466898554](https://github.com/asmoyou/rime-Q/actions/runs/34466898554) 已
 安装分类测试覆盖首次安装、旧版升级、同版修复、旧构建和旧版本拒绝、无效版本及不同 Bundle ID。原生 `installer -showChoicesXML` 对本机 0.1.4 的读取显示只选中“升级至 Rime Q 0.1.5”，未修改安装。成品包检查、引擎回归及控制器交互测试通过。
 
 候选栏移除 190 pt 最小宽度和固定大预留，按编号、文字、实际注释及边距测量；默认 18 pt 字号的测试中，单字 54 pt、双字 72 pt、带拼音注释 115 pt。验证了空列表、上下留白点击、首尾候选命中与长句宽度限制。浅色和深色原生材质预览保存在本机 `artifacts/candidates-compact-light.png`、`artifacts/candidates-compact-dark.png`；预览使用同窗背景展示材质，实际候选窗使用窗口后方背景。
+
+用户已完成本机升级。随后只读核对：已安装 `Rime Q 0.1.5 (1789042442)`，父输入法和 Hans 模式均已启用，独立模式核验通过。无需再次安装。CI [34475736471](https://github.com/asmoyou/rime-Q/actions/runs/34475736471) 全部通过，包含真实包安装、同版修复、拒绝降级及卸载保留个人数据的检查。
