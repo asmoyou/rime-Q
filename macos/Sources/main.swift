@@ -52,21 +52,19 @@ if arguments.count > 1 {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var server: IMKServer?
     func applicationDidFinishLaunching(_ notification: Notification) {
-        server = IMKServer(name: Product.connection, bundleIdentifier: Product.identifier)
-        guard server != nil else { NSApp.terminate(nil); return }
-        DispatchQueue(label: "com.asmoyou.rimeq.startup", qos: .userInitiated).async {
-            do {
-                try Engine.start(user: Product.userRoot.appendingPathComponent("rime"))
-                DispatchQueue.main.async { Engine.ready = true }
-            } catch {
-                DispatchQueue.main.async {
-                    Engine.failure = error.localizedDescription
-                    let alert = NSAlert()
-                    alert.messageText = "Rime Q 暂时无法启动"
-                    alert.informativeText = "输入资源未能加载，请重新安装。你的个人词库会保留。\n" + error.localizedDescription
-                    alert.runModal()
-                }
-            }
+        // Do not expose an input controller while ensureSession() still fails.
+        // IMK can finish connecting after launch instead of losing initial keys.
+        do {
+            try Engine.start(user: Product.userRoot.appendingPathComponent("rime"))
+            Engine.ready = true
+            server = IMKServer(name: Product.connection, bundleIdentifier: Product.identifier)
+            guard server != nil else { NSApp.terminate(nil); return }
+        } catch {
+            Engine.failure = error.localizedDescription
+            let alert = NSAlert()
+            alert.messageText = "Rime Q 暂时无法启动"
+            alert.informativeText = "输入资源未能加载，请重新安装。你的个人词库会保留。\n" + error.localizedDescription
+            alert.runModal()
         }
     }
     func applicationWillTerminate(_ notification: Notification) { if Engine.ready { QRimeStop() } }
