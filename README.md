@@ -96,7 +96,9 @@
 
 ## 从源码构建
 
-需要 macOS 13+、Xcode 工具链和 Python 3.10+。首次构建会下载并核验固定版本依赖。
+Windows 开发请先阅读 [开发交接与核心构建步骤](docs/WINDOWS.md)，包含环境准备、可复用模块及客户端的待实现范围。
+
+macOS 客户端构建需要 macOS 13+、Xcode 工具链和 Python 3.10+。首次构建会下载并核验固定版本依赖。
 
 ```sh
 git clone https://github.com/asmoyou/rime-Q.git

@@ -238,3 +238,14 @@ UI 目视复查后修正开关与帮助图标的约束，并让下载操作按�
 新增 `test_optional_model.py` 跨进程验证：使用独立 Bundle ID 和临时用户目录，首先以应用版本 0.3.1 下载小型模型夹具，再依次替换为测试版本 9.0.0、9.0.1。每次都实际移除并重建应用 Bundle，模型文件 inode、修改时间和内容保持一致；删除后的读取链接能恢复；启用偏好跨进程保留，关闭后再升级仍保留模型且不自动开启。服务端记录全程只有首次下载的一个请求，后续版本的恢复请求数为零。已有下载、取消、重试、校验失败、重启及文件保护回归也通过。
 
 本机 `swift build -c release`、安装版本规划测试、preinstall 语法与 README 链接检查通过。日志为 `artifacts/model-baseline-code.log`、`artifacts/model-baseline-reuse.log`。新增 CI 检查在实际 PKG 同版修复和卸载前后校验模型目录中的小型文件未变；该检查验证安装器的数据保留，与跨版本应用恢复/无网络测试分别覆盖不同边界。通用安装包构建与校验通过，确认无旧迁移脚本、模型迁移元数据或包内 .gram，日志为 `artifacts/model-baseline-package.log`。改动已推送至 `657b0f3c4ea7977eb051327c4486ed38558be7f9`，[CI 34550283791](https://github.com/asmoyou/rime-Q/actions/runs/34550283791) 四项任务全部通过，包含跨版本复用与无新增下载请求测试、实际 PKG 同版修复和卸载后的模型文件校验。CI 的启用结果仍按实际 ready 或明确 pending/login-retry 路径处理，不代表所有真实宿主已完成验收。验证未安装或卸载用户当前输入法，也未创建或删除用户的实际模型目录。此次仅推送清理和验证改动，保留已发布 v0.3.1 的原始附件。
+
+
+## Windows 开发交接与同步核验（2026-09-11）
+
+通过 `git fetch origin`、`git ls-remote` 和 GitHub API 核验，交接开始时本地与公开仓库 `asmoyou/rime-Q` 的 `main` 均为 `a9979e3410a21f7b495a9bb218a1b88baef06b16`，前后提交差为 0/0，工作区无未提交或未跟踪文件。仓库跟踪的文件名没有大小写冲突或 Windows 保留名称。
+
+重新读取 [CI 34550283791](https://github.com/asmoyou/rime-Q/actions/runs/34550283791) 的实际任务状态，Windows、Linux、macOS 核心及 macOS 安装包四项均为 success。CI 对应 `657b0f3`，到交接开始时的 `main` 只存在验证文档差异。Windows 任务验证的是核心构建与 CTest，没有 Windows 客户端或真实宿主输入结果。
+
+新增 [Windows 开发交接](WINDOWS.md)，给出新电脑拉取、Visual Studio/vcpkg 核心构建步骤、引擎与资源移植边界、首个输入里程碑及 Git 同步范围。README 和开发计划增加入口；开发计划的更新策略与当前实现及项目约定对齐。文档本地链接与代码围栏检查通过，构建参数已核对现有 CI 和官方工具文档；本轮没有在目标 Windows 电脑执行命令或重新进行客户端验收。
+
+本机下载缓存、构建产物、临时诊断脚本、原始验证日志与旧项目笔记未纳入 Git；当前源码和构建不引用原工作区的兄弟目录。可选历史 Windows 参考已确认能从文档所列上游固定提交访问，不依赖本机旧 fork。
