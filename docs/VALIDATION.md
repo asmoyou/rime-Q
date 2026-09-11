@@ -237,4 +237,4 @@ UI 目视复查后修正开关与帮助图标的约束，并让下载操作按�
 
 新增 `test_optional_model.py` 跨进程验证：使用独立 Bundle ID 和临时用户目录，首先以应用版本 0.3.1 下载小型模型夹具，再依次替换为测试版本 9.0.0、9.0.1。每次都实际移除并重建应用 Bundle，模型文件 inode、修改时间和内容保持一致；删除后的读取链接能恢复；启用偏好跨进程保留，关闭后再升级仍保留模型且不自动开启。服务端记录全程只有首次下载的一个请求，后续版本的恢复请求数为零。已有下载、取消、重试、校验失败、重启及文件保护回归也通过。
 
-本机 `swift build -c release`、安装版本规划测试、preinstall 语法与 README 链接检查通过。日志为 `artifacts/model-baseline-code.log`、`artifacts/model-baseline-reuse.log`。新增 CI 检查在实际 PKG 同版修复和卸载前后校验模型目录中的小型文件未变；该检查验证安装器的数据保留，与跨版本应用恢复/无网络测试分别覆盖不同边界。打包及远端 CI 结果完成后追加。验证未安装或卸载用户当前输入法，也未创建或删除用户的实际模型目录。
+本机 `swift build -c release`、安装版本规划测试、preinstall 语法与 README 链接检查通过。日志为 `artifacts/model-baseline-code.log`、`artifacts/model-baseline-reuse.log`。新增 CI 检查在实际 PKG 同版修复和卸载前后校验模型目录中的小型文件未变；该检查验证安装器的数据保留，与跨版本应用恢复/无网络测试分别覆盖不同边界。通用安装包构建与校验通过，确认无旧迁移脚本、模型迁移元数据或包内 .gram，日志为 `artifacts/model-baseline-package.log`。改动已推送至 `657b0f3c4ea7977eb051327c4486ed38558be7f9`，[CI 34550283791](https://github.com/asmoyou/rime-Q/actions/runs/34550283791) 四项任务全部通过，包含跨版本复用与无新增下载请求测试、实际 PKG 同版修复和卸载后的模型文件校验。CI 的启用结果仍按实际 ready 或明确 pending/login-retry 路径处理，不代表所有真实宿主已完成验收。验证未安装或卸载用户当前输入法，也未创建或删除用户的实际模型目录。此次仅推送清理和验证改动，保留已发布 v0.3.1 的原始附件。
