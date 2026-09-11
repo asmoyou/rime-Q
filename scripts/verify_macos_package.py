@@ -33,8 +33,8 @@ def verify(package):
         assert metadata["Version"] == info.get("version"), "Version guard differs from the packaged release"
         assert metadata["Build"] == bundles[0].get("CFBundleVersion"), "Version guard differs from the packaged build"
         assert (infos[0].parent / "Scripts/version-check.sh").exists(), "Missing preinstall downgrade protection"
-        assert (infos[0].parent / "Scripts/preserve-model.sh").exists(), "Missing enabled model preservation helper"
-        assert (infos[0].parent / "Scripts/model-info.plist").exists(), "Missing pinned model preservation metadata"
+        assert not (infos[0].parent / "Scripts/preserve-model.sh").exists(), "Obsolete bundled-model migration helper"
+        assert not (infos[0].parent / "Scripts/model-info.plist").exists(), "Obsolete bundled-model migration metadata"
         postinstall = infos[0].parent / "Scripts/postinstall"
         script = postinstall.read_text()
         assert '/usr/bin/open -n -g "$APP" --args --complete-install' in script, "Activation must use LaunchServices"

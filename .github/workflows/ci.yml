@@ -90,13 +90,20 @@ jobs:
           rimeq_app='/Library/Input Methods/RimeQ.app'
           rimeq_status="$HOME/Library/Application Support/RimeQ/installation-status.plist"
           rimeq_data="$HOME/Library/Application Support/RimeQ/rime"
+          rimeq_model="$HOME/Library/Application Support/RimeQ/models/wanxiang-lts-zh-hans.gram"
           mkdir -p "$rimeq_data"
+          mkdir -p "$(dirname "$rimeq_model")"
+          # A small sentinel tests installer file retention; model validation
+          # and reuse across app versions run separately in test_optional_model.py.
+          printf 'model retention fixture\n' > "$rimeq_model"
+          rimeq_model_hash="$(shasum -a 256 "$rimeq_model")"
           touch "$rimeq_data/repair-retention-check"
           rm -f "$rimeq_status"
           sudo touch "$rimeq_app/Contents/Resources/rimeq-repair-probe"
           sudo installer -pkg dist/RimeQ-*-macos-universal.pkg -target /
           test ! -e "$rimeq_app/Contents/Resources/rimeq-repair-probe"
           test -f "$rimeq_data/repair-retention-check"
+          test "$(shasum -a 256 "$rimeq_model")" = "$rimeq_model_hash"
           codesign --verify --deep --strict "$rimeq_app"
           for attempt in {1..45}; do
             if test -f "$rimeq_status"; then
@@ -141,11 +148,14 @@ jobs:
       - name: Verify uninstall retains personal data
         run: |
           rimeq_data="$HOME/Library/Application Support/RimeQ/rime"
+          rimeq_model="$HOME/Library/Application Support/RimeQ/models/wanxiang-lts-zh-hans.gram"
+          rimeq_model_hash="$(shasum -a 256 "$rimeq_model")"
           mkdir -p "$rimeq_data"
           touch "$rimeq_data/uninstall-retention-check"
           sudo bash '/Library/Input Methods/RimeQ.app/Contents/Resources/uninstall-system.sh'
           test ! -e '/Library/Input Methods/RimeQ.app'
           test -f "$rimeq_data/uninstall-retention-check"
+          test "$(shasum -a 256 "$rimeq_model")" = "$rimeq_model_hash"
       - uses: actions/upload-artifact@v4
         with:
           name: RimeQ-macOS

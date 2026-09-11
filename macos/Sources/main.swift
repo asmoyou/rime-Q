@@ -33,6 +33,8 @@ if arguments.count > 1 {
         case "--update-smoke": try UpdateSmoke.run()
         case "--optional-model-smoke" where arguments.count == 3:
             try ModelSmoke.run(server: URL(string: arguments[2])!)
+        case "--optional-model-reuse-smoke" where arguments.count == 5:
+            try ModelSmoke.reuse(root: URL(fileURLWithPath: arguments[2]), server: URL(string: arguments[3])!, phase: arguments[4])
         case "--optional-model-live-smoke": try ModelSmoke.live()
         case "--optional-model-engine-smoke" where arguments.count == 3:
             try ModelSmoke.live(localSource: URL(fileURLWithPath: arguments[2]))

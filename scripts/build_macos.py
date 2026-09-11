@@ -194,7 +194,6 @@ def build(universal=False, resources=True, keep_app=False, smoke=False):
         if smoke:
             run(sys.executable, ROOT / "scripts/test_macos_install_plan.py")
             run(sys.executable, ROOT / "scripts/test_resource_fetch.py")
-            run(sys.executable, ROOT / "scripts/test_model_preservation.py")
             run(app / "Contents/MacOS/RimeQ", "--rimeq-tis-validate-bundle")
             with isolated_smoke_app(app) as preview:
                 exe = preview / "Contents/MacOS/RimeQ"
@@ -209,8 +208,6 @@ def build(universal=False, resources=True, keep_app=False, smoke=False):
         shutil.copytree(ROOT / "scripts/macos/package-scripts", package_scripts)
         build_number = plistlib.loads((app / "Contents/Info.plist").read_bytes())["CFBundleVersion"]
         (package_scripts / "package-version.plist").write_bytes(plistlib.dumps({"Version": VERSION, "Build": build_number}))
-        model = json.loads((ROOT / "dependencies.lock.json").read_text())["wanxiang_model"]
-        (package_scripts / "model-info.plist").write_bytes(plistlib.dumps({"SHA256": model["sha256"]}))
         resources = staging / "Resources"
         shutil.copytree(ROOT / "scripts/macos/package-resources", resources)
         for resource in resources.glob("*.html"):

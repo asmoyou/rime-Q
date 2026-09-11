@@ -78,7 +78,9 @@
 
 **整句优化** 通过万象语法模型辅助连续输入中的同音字词选择，默认关闭。需要时进入“设置 → 输入与外观”，点击 **下载并开启**，下载约 420 MB 的模型。页面显示进度，支持取消与失败重试；文件校验通过后启用，之后可以离线使用。也可移除模型释放空间，基础组词和学习记录保留。
 
-开启与关闭共用雾凇词库和个人学习记录，效果取决于输入内容。升级时，如果旧版已开启整句优化且模型版本匹配，安装器会保留已有模型，避免重复下载。
+开启与关闭共用雾凇词库和个人学习记录，效果取决于输入内容。按 0.3.1 及后续版本下载的模型保存在个人数据目录，独立于应用安装包；升级或重装 Rime Q 会保留它，关闭整句优化也不会删除模型。同一模型版本只需下载一次，启动时在本地校验后复用。
+
+模型文件位于 `~/Library/Application Support/RimeQ/models/wanxiang-lts-zh-hans.gram`，`rime` 目录中的同名文件是指向它的链接，不是第二份模型。只有主动移除、文件缺失或损坏，或之后选择升级模型本身时，才需要重新下载；普通软件升级不会触发模型下载。
 
 ## 更新、备份与卸载
 
@@ -114,6 +116,6 @@ python3 scripts/build_macos.py --universal --smoke
 
 ## 致谢与许可
 
-感谢 [Rime](https://github.com/rime/librime)、[雾凇拼音](https://github.com/iDvel/rime-ice)、[万象](https://github.com/amzxyz/rime_wanxiang) 及相关资源作者。平台接入参考了 [RIMES](https://github.com/scholay/rimes) 的实现经验，Rime Q 使用独立的界面、标识与个人数据目录。
+感谢 [Rime](https://github.com/rime/librime)、[雾凇拼音](https://github.com/iDvel/rime-ice)、[万象](https://github.com/amzxyz/rime_wanxiang) 及相关资源作者。
 
 自有代码采用 [GPL-3.0-only](LICENSE)。第三方代码、词库和模型保留各自许可，来源、固定版本与校验信息见 [第三方声明](THIRD_PARTY_NOTICES.md) 和 [依赖锁定文件](dependencies.lock.json)。

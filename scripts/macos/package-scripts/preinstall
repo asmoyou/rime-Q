@@ -60,15 +60,5 @@ case "$console_user" in
         user_directory=$(/usr/bin/dscl . -read "/Users/$console_user" NFSHomeDirectory | /usr/bin/sed 's/^NFSHomeDirectory: //')
         [ -n "$user_directory" ] || exit 1
         check_duplicates "$user_directory/Library/Input Methods"
-        console_uid=$(/usr/bin/id -u "$console_user")
-        as_login_user() {
-            /bin/launchctl asuser "$console_uid" /usr/bin/sudo -H -u "$console_user" -- /usr/bin/env -i "$@"
-        }
-        if [ "$(as_login_user /usr/bin/defaults read "$IDENTIFIER" sentenceOptimization 2>/dev/null || true)" = 1 ]; then
-            . "$RIMEQ_SCRIPT_DIR/preserve-model.sh"
-            model_hash=$(/usr/libexec/PlistBuddy -c 'Print :SHA256' "$RIMEQ_SCRIPT_DIR/model-info.plist")
-            preserve_rimeq_model "$APP/Contents/SharedSupport/wanxiang-lts-zh-hans.gram" \
-                "$user_directory/Library/Application Support/RimeQ/models" "$model_hash"
-        fi
         ;;
 esac
