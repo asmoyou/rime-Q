@@ -22,3 +22,13 @@ Rime Q 自有代码按 GPL-3.0-only 发布，完整许可证见根目录 `LICENS
 [RIMES](https://github.com/scholay/rimes) 的输入源安装器已复用并适配：`macos/Sources/InputSourceInstaller.swift` 取自提交 `eba5185a3ed637b6df9ca9149fbfc49740bd58b2`，保留注册、父子输入源启用、独立进程验证与有限重试。修改了命令命名空间并使自动选择可选。原作者 scholay 的 MIT 许可证保留在 `third_party/rimes/LICENSE` 并随安装包分发。安装脚本也参考其单份应用与重复注册处理原则；没有复制其图标或整套产品。
 
 0.3.0 为首个公开版本。运行库保留 Squirrel 1.1.2 包内的第三方声明；所用 librime、Lua 与 octagram 的来源和许可如上。包内包含雾凇的固定版本源码。应用采用 ad-hoc 签名，Developer ID 签名、公证及更多目标系统验收仍待完成，范围见 `docs/VALIDATION.md`。
+
+## Windows 客户端
+
+Windows 使用 librime 1.17.0 官方 MSVC x64 分发包，固定源码基线 `33e78140250125871856cdc5b42ddc6a5fcd3cd4`。该 DLL 静态集成 Lua、octagram 和 predict；上游随包版本记录分别为 `ec52e48`、`dfcc151`、`920bd41`，保留在安装目录的 `licenses/windows-runtime-version-info.txt`。Rime Q 使用 Lua 和 octagram，不启用 predict 预测模块。二进制中的 Lua 版本标识为 5.4.8，其官方源码归档摘要记录在依赖锁中，原始包含 MIT 许可的 README 随包保留。
+
+基础 OpenCC 编译资源提取自 Weasel 0.17.4 官方安装包的 `data/opencc`；只使用数据，不安装、执行或复用其客户端、服务、注册代码和图标。OpenCC 采用 Apache-2.0。运行库包含的 glog、LevelDB、marisa-trie、yaml-cpp、Boost 与 predict 保留各自许可；原文在 `third_party/windows/licenses` 并复制到安装包。依赖锁中的 `windows_licenses` 记录许可文件的固定来源与摘要，不将许可来源标签误作二进制中未核验的依赖版本。
+
+Windows TSF、候选窗、设置及安装器为本项目新增实现，采用 GPL-3.0-only。Windows 同样随包保留雾凇完整固定源码和词典/Lua 中的原始声明。7-Zip 26.03 仅用于构建时解包，保留官方缓存包并核验摘要，不随客户端分发。所有 Windows 下载的地址、版本、大小及 SHA-256 见 `dependencies.lock.json`；尚未进行 Windows Authenticode 代码签名，公开发布与实际宿主验收状态见验证记录。
+
+Windows 首版模型独立锁定官方 LTS 资产 `558301149`（2026-09-12 更新），大小 `420343852` 字节，SHA-256 `9f80530f470033cfb6d4b44bb861b540f64100426f92dd0f87140883632a3d93`，仍为 amzxyz 的原始 CC-BY-4.0 模型。元数据位于 `windows_wanxiang_model`；下载与引擎使用均校验此摘要，未将同名资产替换视为可以跳过校验。macOS 的历史模型锁与已发布记录单独保留。

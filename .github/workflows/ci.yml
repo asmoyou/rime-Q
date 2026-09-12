@@ -34,6 +34,38 @@ jobs:
         if: runner.os == 'macOS'
         run: swift build -c release
 
+  windows-package:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Cache verified Windows dependency archives
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: windows-resources-${{ hashFiles('dependencies.lock.json') }}
+      - name: Build client and run isolated engine, TSF and UI regressions
+        run: python scripts/build_windows.py --smoke
+      - name: Install, repair, reject downgrade and retain personal data on uninstall
+        run: ./scripts/test_windows_install.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RimeQ-Windows-x64
+          path: |
+            dist/*-windows-*.exe
+            dist/*-windows-SHA256SUMS.txt
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: RimeQ-Windows-validation
+          path: |
+            artifacts/windows-ui/*.png
+            C:/Program Files/RimeQ/installation.log
+          retention-days: 7
+
   mac-package:
     runs-on: macos-14
     steps:

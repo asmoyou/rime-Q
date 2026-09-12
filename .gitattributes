@@ -1,0 +1,3 @@
+# Keep checksum-locked third-party license files byte-for-byte on Windows checkouts.
+third_party/windows/licenses/* -text
+windows/resources/*.ico binary

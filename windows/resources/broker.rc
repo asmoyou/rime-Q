@@ -1,0 +1,3 @@
+#define RIMEQ_FILETYPE VFT_APP
+#include "version.rcinc"
+101 ICON "RimeQ.ico"

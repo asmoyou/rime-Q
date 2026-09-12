@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rime Q 使用说明 · Windows</title>
+<style>body{max-width:780px;margin:60px auto;padding:0 24px 60px;font:16px/1.9 "Microsoft YaHei UI",sans-serif;color:#243d34;background:#f7f8f5}h1{font-size:36px}h2{margin-top:36px;font-size:22px}a{color:#17634d}code{background:#e8eee5;padding:3px 6px;border-radius:4px}table{border-collapse:collapse;width:100%;background:white}td,th{border-bottom:1px solid #dce5da;padding:10px 14px;text-align:left}.lead{font-size:20px;color:#637e6e}.note{border-left:3px solid #17634d;padding:12px 20px;background:#edf2e9}</style>
+<h1>Rime Q</h1><p class="lead">简洁、流畅、离线的中文输入法。</p>
+<p><a href="https://github.com/asmoyou/rime-Q">GitHub 项目</a> · <a href="https://github.com/asmoyou/rime-Q/releases">发布记录</a> · <a href="../licenses/THIRD_PARTY_NOTICES.md">第三方说明</a></p>
+<h2>安装与开始输入</h2>
+<p>适用于 Windows 10 22H2 / Windows 11 x64，包含 x64、x86 输入服务。双击安装包，完成 Windows 管理员认证，随后在任务栏输入法列表中选择 Rime Q。也可用系统的输入法切换快捷键。日常输入不需要管理员权限或联网。</p>
+<p>安装器的管理员认证用于写入 <code>C:\Program Files\RimeQ</code> 并注册系统输入服务，在点击安装、升级、修复或卸载后触发；取消认证时该操作不会完成。不要向任何程序提供自己的管理员密码，认证只在 Windows 的原生对话框中完成。</p>
+<p>首次启动或故障恢复期间，引擎尚未就绪时按键会交回应用。稍等片刻再切换到 Rime Q。注册和启用成功仍需要在实际输入框确认中文上屏。</p>
+<h2>常用按键</h2>
+<table><tr><th>按键</th><th>用途</th></tr><tr><td>空格</td><td>确认当前候选</td></tr><tr><td>数字键 / 鼠标</td><td>选取当前页的对应候选</td></tr><tr><td>单独按下并松开 Shift</td><td>切换中英文</td></tr><tr><td>− / =，Page Up / Page Down</td><td>翻页</td></tr><tr><td>Esc</td><td>取消当前组合</td></tr><tr><td>方向键、Home、End、Backspace、Delete</td><td>编辑组合文本</td></tr></table>
+<p>日期 <code>rq</code>、时间 <code>sj</code>、星期 <code>xq</code>、农历 <code>nl</code>、计算器 <code>cC1+2*3</code>、金额大写 <code>R123.45</code>、Unicode <code>U62fc</code>、UUID <code>uuid</code>。触发码区分大小写，选词后上屏。</p>
+<h2>设置与候选</h2>
+<p>输入法菜单、通知区域的 Q 图标和开始菜单都能打开设置。“输入与外观”提供 16、18、20、22 四档候选字号；独立的“皮肤”页提供六种简洁配色和敲敲猫高级皮肤。设置预览与实际候选栏共用同一绘制实现。随系统配色遵循 Windows 透明度和高对比度设置，候选文字保持清晰。敲敲猫位于候选栏上方，不增加候选尺寸、不拦截鼠标，只随输入活动；系统关闭动画效果时保持静止。</p>
+<h2>个人词库与备份</h2>
+<p>个人数据保存在 <code>%APPDATA%\RimeQ</code>，学习数据位于其 <code>rime</code> 子目录。与小狼毫、鼠须管和其他输入法的数据完全分开。</p>
+<p>在“个人词库”中读取、搜索、编辑、新增、删除或撤销未保存的修改。结束当前组合后保存。删除个人记录后，内置词库中的同名词仍可能出现。</p>
+<p>导入导出使用 UTF-8 TSV，每行依次是词语、用空格分隔的小写全拼、次数，以 TAB 分列。例如：<code>熹微岚序［TAB］xi wei lan xu［TAB］1</code>。支持最多 16 MB、10 万条；导入会合并学习记录，不支持直接导入 SCEL 或其他输入法的数据库。</p>
+<p>日常备份可用“导出备份”。备份整个目录前，请先切换到其他输入法并退出 Rime Q 服务，再复制 <code>%APPDATA%\RimeQ</code>；不要直接覆盖正在使用的 LevelDB 数据库。</p>
+<h2>万象模型</h2>
+<p>模型默认不下载。需要时在“输入与外观”点击“下载并开启”，大小约 420.3 MB，显示进度并支持取消和重试。文件大小与 SHA-256 校验通过后才启用。</p>
+<p>文件保存在 <code>%APPDATA%\RimeQ\models\wanxiang-lts-zh-hans.gram</code>；<code>rime</code> 中的同名项是 NTFS 硬链接，共用一份磁盘内容。使用硬链接不需要开发者模式或符号链接权限。模型目录与输入目录需位于同一支持硬链接的文件系统；无法建立链接时继续基础组词。</p>
+<p>切换和移除等所有当前组合结束后进行。关闭优化、升级、修复或卸载都保留模型。模型缺失、损坏或不可读取时使用基础组词，不影响个人学习。程序不会覆盖未知的同名用户文件；文件占用导致移除暂时失败时，会继续等待输入结束。</p>
+<h2>版本更新</h2>
+<p>默认每 24 小时在后台查询 GitHub 公开发布信息；重启保留上次尝试时间，失败也计入间隔。可在“版本与更新”关闭，也可随时手动检查。后台发现新版只更新提示，不弹窗、不抢焦点，不自动下载安装，不上传输入内容或个人词库。</p>
+<p>检查结果区分新版、没有更新、尚无 Windows 公开安装包和请求失败。网络失败不代表已经是最新版本。</p>
+<h2>安装异常</h2>
+<ol><li>先确认 <code>C:\Program Files\RimeQ</code> 下存在程序。不要反复安装或删除其他输入法。</li><li>开始菜单打开“Rime Q 设置”，稍等引擎准备。</li><li>若输入法列表没有 Rime Q，在 Windows“时间和语言 → 语言 → 中文 → 语言选项 → 添加键盘”中检查 Rime Q。</li><li>用同版本或更高版本安装包进行修复；安装器会读取实际文件版本并拒绝降级。</li><li>安装状态日志位于程序目录的 <code>installation.log</code>，引擎生命周期日志位于个人数据目录的 <code>logs</code>。反馈时只提供相关错误片段，不提交个人词库或包含输入内容的其他文件。</li></ol>
+<p class="note">系统注册成功、隔离文本上下文测试通过，与所有应用均可输入是不同的验证范围。浏览器、编辑器、Windows Store 应用、高权限窗口、远程桌面和不同 DPI 设备仍需分别验证。当前未提供 Windows ARM64 原生客户端。</p>
+<h2>卸载与手动处理</h2>
+<p>从 Rime Q 菜单或 Windows“已安装的应用”卸载。确认后会先切换到其他输入法、停用自己的输入源，再请求管理员认证。取消或失败时尝试恢复启用。默认保留全部个人数据。</p>
+<p>宿主仍加载的旧 DLL 可能暂时无法删除；输入法停用与磁盘文件清理是不同的状态，不应为清理文件强制结束正在编辑的应用。</p>
+<p>手动卸载时，先在 Windows 语言设置中移除 Rime Q，并关闭仍在使用它的应用；以管理员身份分别使用系统 64 位和 32 位 <code>regsvr32 /u</code> 注销实际版本目录内对应的 <code>x64\RimeQ.Tip.dll</code> 与 <code>x86\RimeQ.Tip.dll</code>。确认路径和产品标识后，只删除 Rime Q 自己的程序目录。保留 <code>%APPDATA%\RimeQ</code>，不要清理整个输入法目录或其他应用的数据。</p>
+</html>

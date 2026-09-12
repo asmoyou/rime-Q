@@ -26,7 +26,8 @@
 | 平台 | 当前支持情况 |
 | --- | --- |
 | macOS 13 及更新版本 | 已提供 PKG；同一安装包支持 Apple Silicon 与 Intel |
-| Windows / Linux | 客户端规划中，尚无可安装版本 |
+| Windows 10 22H2 / Windows 11 x64 | 已加入原生客户端和 EXE 构建，含 x64/x86 TSF；安装与宿主验收状态见 [Windows 说明](docs/WINDOWS.md) |
+| Linux | 客户端规划中 |
 
 1. 前往 [最新版本](https://github.com/asmoyou/rime-Q/releases/latest)，下载 `RimeQ-0.3.1-macos-universal.pkg`。
 2. 双击安装包，按 macOS 安装器的提示完成安装。应用会安装到系统输入法目录，并在后台完成启用。
@@ -96,7 +97,7 @@
 
 ## 从源码构建
 
-Windows 开发请先阅读 [开发交接与核心构建步骤](docs/WINDOWS.md)，包含环境准备、可复用模块及客户端的待实现范围。
+Windows 客户端构建：`python scripts/build_windows.py --smoke`，产物为 `dist/RimeQ-0.4.0-windows-x64.exe`。原生 TSF、独立引擎服务、WPF 设置、个人词库、可选模型及安装步骤见 [Windows 说明](docs/WINDOWS.md)。本文上方的产品截图和 macOS 安装说明对应已发布的 Mac 版；Windows 的功能与实际验证范围单独记录。
 
 macOS 客户端构建需要 macOS 13+、Xcode 工具链和 Python 3.10+。首次构建会下载并核验固定版本依赖。
 

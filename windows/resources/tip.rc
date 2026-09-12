@@ -1,0 +1,3 @@
+#define RIMEQ_FILETYPE VFT_DLL
+#include "version.rcinc"
+101 ICON "RimeQ.ico"

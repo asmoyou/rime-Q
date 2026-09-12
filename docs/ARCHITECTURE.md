@@ -53,3 +53,16 @@ Swift + AppKit + InputMethodKit；候选窗口使用不抢焦点的原生面板�
 - [librime C API](https://github.com/rime/librime/blob/master/src/rime_api.h)
 - [RIMES](https://github.com/scholay/rimes)，前期评估基线 `eba5185a3ed637b6df9ca9149fbfc49740bd58b2`
 - [SQLite 事务](https://www.sqlite.org/lang_transaction.html)
+
+## Windows 原生客户端（0.4.0 开发版）
+
+`windows/tsf` 是两个位数的原生 TSF DLL：管理按键、组合范围、显示属性、候选 UIElement 和语言栏菜单。写入前申请同步 TSF 写锁，测试按键回调不处理引擎事件；异步取消捕获原组合与原上下文，宿主修改文本时保留宿主内容。真实宿主验收独立于这些机制的隔离测试。
+
+`windows/broker` 在一个用户进程里串行管理 librime，文件锁防止同一用户的数据库出现第二个写入者，命名管道按用户 SID 隔离并拒绝远程连接。x86/x64 共用有界、带版本的字节协议，客户端读写有总超时。启动预备一个可复用会话，避免每次连接重复加载词库。基础字典已在构建时部署。
+
+`windows/settings` 使用 WPF 与 Windows 自带 .NET Framework，管理个人词库、可选模型、外观和更新。模型校验在后台进行，切换等所有组合结束后完成；文件独立存储，通过硬链接供引擎读取。`windows/installer` 使用单个嵌入 ZIP 的 EXE，逐文件验证摘要，版本化安装目录避免覆盖正在使用的 DLL；系统注册与原始用户会话中的启用分开执行。
+
+Windows 使用 librime 原生学习，未接入上述实验性核心。实现与验证范围见 [Windows 说明](WINDOWS.md) 和 [验证记录](VALIDATION.md)。
+
+
+Windows 候选和设置预览共享 `windows/visuals/render.cpp`。TSF 静态链接绘制模块，WPF 通过 `RimeQ.Visuals.dll` 取得同源位图；完整猫咪坐标与姿态来自 `macos/Sources/TypingCat.swift`。皮肤选择沿用现有 Theme/Cat/FontSize 偏好，修改绘制不重置个人设置。

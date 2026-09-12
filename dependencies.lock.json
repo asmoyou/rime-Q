@@ -40,5 +40,104 @@
     "revision": "a251145d3aafa33871824a40bbec04c966bd8b56",
     "url": "https://raw.githubusercontent.com/rime/librime/a251145d3aafa33871824a40bbec04c966bd8b56/src/rime_levers_api.h",
     "sha256": "b2ec30a89125f0fe5e91ea6cb209e8ae71e5f67fa87bc3d4a1dd3be3b5753b5a"
+  },
+  "windows_runtime": {
+    "version": "1.17.0",
+    "revision": "33e78140250125871856cdc5b42ddc6a5fcd3cd4",
+    "url": "https://github.com/rime/librime/releases/download/1.17.0/rime-33e7814-Windows-msvc-x64.7z",
+    "bytes": 7428809,
+    "sha256": "7478c7caa4ff6b37de86daba1f7ce4a994a4f5ba24872a820fb2b3a9b01fed15",
+    "plugins": {
+      "librime-lua": "ec52e48",
+      "librime-octagram": "dfcc151",
+      "librime-predict": "920bd41"
+    },
+    "license": "BSD-3-Clause; bundled dependencies retain their licenses"
+  },
+  "windows_opencc_resources": {
+    "version": "weasel-0.17.4",
+    "url": "https://github.com/rime/weasel/releases/download/0.17.4/weasel-0.17.4.0-installer.exe",
+    "bytes": 12431118,
+    "sha256": "cf509534a8f5f8af9c98ed7cbb8f135439f145a8cbe7e50ede42bb5b5ab45c29",
+    "scope": "data/opencc only; no Weasel program or registration",
+    "license": "Apache-2.0 (OpenCC)"
+  },
+  "windows_build_tools": {
+    "seven_zip": {
+      "version": "26.03",
+      "url": "https://github.com/ip7z/7zip/releases/download/26.03/7z2603-x64.exe",
+      "bytes": 1661239,
+      "sha256": "0859c524b8a63551848f0c246abddcb1d0b7b656b0fbfe879f8d85e61a9e6edd"
+    },
+    "seven_zip_bootstrap": {
+      "version": "26.03",
+      "url": "https://github.com/ip7z/7zip/releases/download/26.03/7zr.exe",
+      "bytes": 602624,
+      "sha256": "ad4c82fadcbdf93c03b4fc440f300509c7d60c5c2f4d183e35d9d70d6957037d"
+    }
+  },
+  "windows_licenses": {
+    "glog": {
+      "url": "https://raw.githubusercontent.com/google/glog/7b134a5c82c0c0b5698bb6bf7a835b230c5638e4/COPYING",
+      "revision": "7b134a5c82c0c0b5698bb6bf7a835b230c5638e4",
+      "bytes": 1479,
+      "sha256": "136d48dea7a681413691f3db3098f6cf5ffaa3119d96d97bb83b8cff3ce38c4a"
+    },
+    "leveldb": {
+      "url": "https://raw.githubusercontent.com/google/leveldb/99b3c03b3284f5886f9ef9a4ef703d57373e61be/LICENSE",
+      "revision": "99b3c03b3284f5886f9ef9a4ef703d57373e61be",
+      "bytes": 1484,
+      "sha256": "ccc19f1da0798ed666609b65a5b44dd8b3abe6fc08b9c0592eb76e82e174db19"
+    },
+    "marisa-trie": {
+      "url": "https://raw.githubusercontent.com/s-yata/marisa-trie/3e87d53b78e15f2f43783d5e376561a8c9722051/COPYING.md",
+      "revision": "3e87d53b78e15f2f43783d5e376561a8c9722051",
+      "bytes": 2275,
+      "sha256": "edf58dab34c3dc239ba4ba2d5d3d844d8c5b442aa4dd1149fac81b2d8c6cb8d1"
+    },
+    "OpenCC": {
+      "url": "https://raw.githubusercontent.com/BYVoid/OpenCC/556ed22496d650bd0b13b6c163be9814637970ae/LICENSE",
+      "revision": "556ed22496d650bd0b13b6c163be9814637970ae",
+      "bytes": 9165,
+      "sha256": "b534e465949558eec2597b04f5092b5e161236a68dfbfd04d547592ac3964308"
+    },
+    "yaml-cpp": {
+      "url": "https://raw.githubusercontent.com/jbeder/yaml-cpp/2f86d13775d119edbb69af52e5f566fd65c6953b/LICENSE",
+      "revision": "2f86d13775d119edbb69af52e5f566fd65c6953b",
+      "bytes": 1061,
+      "sha256": "aa6fcc27be034e41e21dd832f9175bfe694a48491d9e14ff0fa278e19ad14f1b"
+    },
+    "Boost": {
+      "url": "https://raw.githubusercontent.com/boostorg/boost/boost-1.87.0/LICENSE_1_0.txt",
+      "revision": "boost-1.87.0",
+      "bytes": 1338,
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566"
+    },
+    "librime-predict": {
+      "url": "https://raw.githubusercontent.com/rime/librime-predict/920bd41/LICENSE",
+      "revision": "920bd41",
+      "bytes": 1502,
+      "sha256": "9b1bbdf15a381884b47dfd9422e68f6382170b2841c476afc076f2d448c7a59f"
+    }
+  },
+  "windows_lua_source": {
+    "version": "5.4.8",
+    "url": "https://www.lua.org/ftp/lua-5.4.8.tar.gz",
+    "bytes": 374332,
+    "sha256": "4f18ddae154e793e46eeab727c59ef1c0c0c2b744e7b94219710d76f530629ae"
+  },
+  "windows_wanxiang_model": {
+    "release_id": 268075342,
+    "url": "https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hans.gram",
+    "filename": "wanxiang-lts-zh-hans.gram",
+    "bytes": 420343852,
+    "sha256": "9f80530f470033cfb6d4b44bb861b540f64100426f92dd0f87140883632a3d93",
+    "license_url": "https://raw.githubusercontent.com/amzxyz/RIME-LMDG/b47637d2b6db1721743543e2e54c9d3c41662ffb/LICENSE",
+    "license_sha256": "9e5f1b3c610b9c2da5c313bf81d577a7d1acec686bdb0384edefa6df0f90cd94",
+    "upstream_url": "https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hans.gram",
+    "mirrors": [],
+    "asset_id": 558301149,
+    "retrieved_at": "2026-09-12",
+    "version": "LTS asset 558301149"
   }
 }
