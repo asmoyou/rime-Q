@@ -76,7 +76,12 @@ int wmain(int argc, wchar_t** argv) {
             TF_INPUTPROCESSORPROFILE item{}; ULONG fetched = 0;
             stage = "next-profile";
             while ((hr = list->Next(1, &item, &fetched)) == S_OK && fetched) {
-                if (item.clsid == rq::clsid) { stage = "profile-remains"; hr = E_FAIL; break; }
+                if (item.clsid == rq::clsid) {
+                    wchar_t profile[40]{}; StringFromGUID2(item.guidProfile, profile, _countof(profile));
+                    std::wcout << L"tsf-profile type=" << std::dec << item.dwProfileType << L" lang=0x" << std::hex << item.langid
+                        << L" clsid=" << rq::clsidString << L" profile=" << profile << L" flags=0x" << item.dwFlags << L'\n';
+                    stage = "profile-remains"; hr = E_FAIL; break;
+                }
             }
             if (hr == S_FALSE) { stage = "absent"; hr = S_OK; }
         }

@@ -1,11 +1,27 @@
-# Destructive installer lifecycle tests are restricted to a disposable GitHub runner.
+# Destructive lifecycle tests require an explicitly selected disposable environment.
+param([switch]$WindowsSandbox, [switch]$DisposableWindowsVM, [switch]$WarnOnTsfProfileRemains)
 $ErrorActionPreference = 'Stop'
-if ($env:GITHUB_ACTIONS -ne 'true' -or $env:CI -ne 'true') { throw 'Run installation lifecycle tests only on a disposable GitHub Actions runner.' }
+if ($WindowsSandbox -and $DisposableWindowsVM) { throw 'Choose one disposable test environment.' }
+if ($WindowsSandbox) {
+    $computer = Get-CimInstance Win32_ComputerSystem
+    if ([Environment]::UserName -ne 'WDAGUtilityAccount' -or $computer.Manufacturer -ne 'Microsoft Corporation' -or $computer.Model -ne 'Virtual Machine') {
+        throw 'Windows Sandbox tests require its disposable WDAGUtilityAccount inside a Microsoft virtual machine.'
+    }
+} elseif ($DisposableWindowsVM) {
+    $computer = Get-CimInstance Win32_ComputerSystem
+    $markerPath = 'C:\RimeQ-Validation\disposable-vm.json'
+    if ($computer.Name -ne 'RIMEQ-CI-TEST' -or $computer.Manufacturer -ne 'Microsoft Corporation' -or $computer.Model -ne 'Virtual Machine' -or -not (Test-Path -LiteralPath $markerPath)) {
+        throw 'Disposable VM tests require the dedicated RIMEQ-CI-TEST virtual machine and its provisioned marker.'
+    }
+    $marker = Get-Content -LiteralPath $markerPath -Raw | ConvertFrom-Json
+    if ($marker.Purpose -ne 'Rime Q disposable installation lifecycle' -or $marker.ComputerName -ne $computer.Name) { throw 'Disposable VM marker does not match this test machine.' }
+} elseif ($env:GITHUB_ACTIONS -ne 'true' -or $env:CI -ne 'true') { throw 'Run installation lifecycle tests only in an explicitly selected disposable environment.' }
 $principal = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'The disposable runner must provide an administrator token.' }
 if (Test-Path 'HKLM:\Software\RimeQ') { throw 'Existing Rime Q installation found; refusing to replace it for a test.' }
 
 . "$PSScriptRoot/windows_lifecycle_process.ps1"
+$lifecycleTemp = if ($WindowsSandbox -or $DisposableWindowsVM) { $env:TEMP } else { $env:RUNNER_TEMP }
 
 $setup = (Resolve-Path 'dist/RimeQ-0.4.0-windows-x64.exe').Path
 Invoke-RimeQ $setup '--install-elevated --silent'
@@ -14,7 +30,7 @@ $programRoot = Join-Path $env:ProgramFiles 'RimeQ'
 if (-not $installed.StartsWith($programRoot + '\versions\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Unexpected installation path.' }
 Invoke-RimeQ (Join-Path $installed 'RimeQ.Control.exe') '--enable'
 Invoke-RimeQ (Join-Path $installed 'RimeQ.Control.exe') '--verify'
-$isolated = Join-Path $env:RUNNER_TEMP 'RimeQ-installed-engine-test'
+$isolated = Join-Path $lifecycleTemp 'RimeQ-installed-engine-test'
 Invoke-RimeQ (Join-Path $installed 'RimeQ.Broker.exe') ('--smoke "' + $installed + '" "' + $isolated + '"')
 
 $data = Join-Path $env:APPDATA 'RimeQ'
@@ -52,7 +68,7 @@ try {
     if ((Get-ItemProperty 'HKLM:\Software\RimeQ').ActiveDirectory -ne $repaired) { throw 'Downgrade changed registration.' }
 } finally { [IO.File]::WriteAllBytes($broker,$originalBytes) }
 
-$control = Join-Path $env:RUNNER_TEMP 'RimeQ-Control-check.exe'
+$control = Join-Path $lifecycleTemp 'RimeQ-Control-check.exe'
 Copy-Item -LiteralPath (Join-Path $repaired 'RimeQ.Control.exe') -Destination $control
 Invoke-RimeQ $control '--deactivate'
 Invoke-RimeQ $setup '--uninstall-elevated --silent'
@@ -73,8 +89,10 @@ foreach ($hive in @('LocalMachine', 'CurrentUser')) {
         } finally { $root.Dispose() }
     }
 }
-Invoke-RimeQ $control '--verify-absent'
+# Keep installation/registry/data failures blocking even when CI reports the
+# separate Windows TSF enumeration discrepancy as a warning.
 if ($remaining.Count -ne 0) { throw "Uninstall registration remains: $($remaining -join '; ')" }
 if (Test-Path 'HKLM:\Software\RimeQ') { throw 'Uninstall registration remains.' }
 if ((Get-FileHash $learning).Hash -ne $learningHash -or (Get-FileHash $model).Hash -ne $modelHash) { throw 'Uninstall changed personal data.' }
-Write-Output 'PASS actual EXE install, enabled profile, installed engine, repair, downgrade rejection, unregister and personal-data retention. External host typing is a separate acceptance test.'
+Write-Output 'PASS actual EXE install, enabled profile, installed engine, repair, downgrade rejection, uninstall registry cleanup and personal-data retention. External host typing is a separate acceptance test.'
+Invoke-RimeQ $control '--verify-absent' -WarnOnProfileRemains:$WarnOnTsfProfileRemains

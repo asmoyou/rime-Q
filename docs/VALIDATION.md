@@ -410,3 +410,39 @@ x64/x86 生产 TIP 测试新增组合 `Unicode << 16 | VK_PACKET` 的真实 TSF 
 Microsoft 的 [WOW64 注册表共享说明](https://learn.microsoft.com/en-us/windows/win32/winprog64/shared-registry-keys)明确列出 `HKLM\SOFTWARE\Microsoft\CTF\TIP` 为 Shared，`HKLM\SOFTWARE\Classes\CLSID` 为 Redirected。两个位数不应各自完整注销同一共享 Profile。当前 Windows 产品仅提供 x64 系统安装包，因此改由 x64 组件统一注册/注销共享 Profile、类别和 CTF 目录；x86 组件仅注册/注销自己的 32 位 COM 项，避免第二次注销已经由 x64 移除的共享对象。
 
 新增 `scripts/test_windows_registration.ps1`，在独立 Runner 中直接加载同一次构建的 x64/x86 生产 DLL，使用同一 Rime Q 标识注册两轮以覆盖修复，再启用、停用、依次注销两个组件、清理当前用户的测试 Profile，验证 TSF 枚举与两种 COM 视图都无残留。独立作业现在构建实际 DLL 和 Control，但仍不构建词库或安装包。两个原生组件、本机进程内回归及脚本语法检查通过；两组件全局回归和完整安装的最终结果待补充。
+
+### 停止推送试错，准备本地隔离复现（2026-09-13）
+
+[34741288705](https://github.com/asmoyou/rime-Q/actions/runs/34741288705)（`ef49f40685be64272ebadd86c7fcfe5f9568211d`）的实际双 DLL 注册测试和 Windows 打包通过，完整安装作业仍失败。卸载器记录 x64 Profile 注销、x64 CTF/COM 清理及 x86 COM 清理均为 `hr=0`；HKLM/HKCU 两种视图中的自身 CTF/COM 分支均不存在，但 `RimeQ-Control-check.exe --verify-absent` 报 `profile-remains / 0x80004005`。此前的修复没有完成全部验收，剩余原因尚未确定。
+
+独立注册测试在相同 DLL 路径连续注册两次，然后启用、停用和注销。完整安装在首次启用后执行引擎测试，再将同版修复安装到新的 GUID 目录，拒绝降级后通过复制改名的 Control 停用、卸载并检查。这些是待隔离的流程差异，不能直接归因于系统缓存或修复目录。
+
+重新读取微软 [TF_INPUTPROCESSORPROFILE](https://learn.microsoft.com/en-us/windows/win32/api/msctf/ns-msctf-tf_inputprocessorprofile)、[Next](https://learn.microsoft.com/en-us/windows/win32/api/msctf/nf-msctf-ienumtfinputprocessorprofiles-next) 和 [EnumProfiles](https://learn.microsoft.com/en-us/windows/win32/api/msctf/nf-msctf-itfinputprocessorprofilemgr-enumprofiles) 文档。本机只读探针对比复用结构与每次调用前填入非零 GUID 的枚举，均正确返回键盘布局的空 CLSID；没有复现“上一次条目的 CLSID 残留导致误判”。这仅排查了本机枚举行为，不构成线上失败的根因结论。
+
+已下载同次 CI 的原始安装包并验证其随包校验值：SHA-256 `c7d01f9639431acc29b8feb43a0de6bfa1e4a6ec2fc814de5e47c8fe1c27eb09`。本机为 Windows 10 Pro `10.0.19045`，管理员只读清单确认没有现成 Hyper-V 虚拟机，Windows Sandbox 功能最初未启用。隔离复现配置与探针放在忽略目录 `build-windows/profile-probe/`，仅映射安装包/脚本的只读目录及专用日志输出目录，禁用网络和剪贴板。用户随后明确允许启用和使用 Sandbox；已执行 `Enable-WindowsOptionalFeature -Online -FeatureName Containers-DisposableClientVM -All -NoRestart`，返回 `State=Enabled`、`RestartNeeded=true`、无错误。未自动重启，Sandbox 复现尚未执行。
+
+安装生命周期脚本增加显式 `-WindowsSandbox` 入口，要求 Sandbox 的 `WDAGUtilityAccount`、Microsoft 虚拟机、管理员令牌且无现有 Rime Q 安装；不伪造 CI 环境变量。脚本语法、现有子进程诊断测试以及开发机拒绝保护均通过。未停用、卸载或替换现用 9132，未修改生产注销逻辑，未新增提交或推送。
+
+重启后从 `build-windows/profile-probe/rimeq-lifecycle.wsb` 继续，结果写入同目录的 `sandbox-output/`。基线先运行完整安装生命周期，再记录卸载后即时和 5 秒后的 Profile 类型、CLSID、Profile GUID、启用标志，以及原复制 Control 和新路径 Control 的缺失验证结果；这些检查保持原来的失败断言，不将等待或注册表缺失直接记为修复。
+
+### 原始 CI 包在 Windows 10 沙盒中的实测
+
+用户完成重启后，在两个全新的 Sandbox 中测试原始 `ef49f40` 安装包，没有修改生产代码。第一轮交互会话通过实际安装、启用、引擎、同版修复、拒绝降级、停用、卸载、TSF 无残留以及个人文件哈希保留。第二轮使用 Sandbox 内同一临时账户的 S4U 计划任务，日志明确记录 Windows `10.0.19041`、`SessionId=0`、`Interactive=false`，相同完整生命周期也通过。两轮即时及 5 秒后的检查均无自身 Profile，复制到新路径的 Control 也返回 `absent / 0x0`。证据分别在 `build-windows/profile-probe/sandbox-output/` 与 `sandbox-session0-output/`。
+
+这些结果说明该失败尚未在 Windows 10 的上述环境中复现，不能据此宣布 Server 2022 CI 已修复，也不能确定操作系统或会话方式就是根因。接下来使用微软官方 Server 2022 评估 ISO 构建离线临时 Hyper-V 测试机；镜像、虚拟磁盘、配置和证据均限定于 `build-windows/server2022-probe/`，测试入口要求专用虚拟机名称与标记且拒绝现有 Rime Q 安装，不伪造 CI 环境变量。
+
+### 原始 CI 包在 Server 2022 初始镜像中的实测
+
+使用微软官方评估 ISO（5044094976 字节，SHA-256 `3e4fa6d8507b554856fc9ca6079cc402df11a8b79344871669f0251535255325`），经 Windows Setup 标准安装创建离线 Hyper-V 测试机 `RimeQ-CI-2022-Validation`，来宾为 Windows Server 2022 Datacenter Evaluation `20348.587`、英文环境。安装前保存独立快照；测试只针对来宾的专用虚拟磁盘，未安装、停用、卸载或替换宿主机 9132。
+
+同一 `ef49f40` 原始包分别在交互会话（Session 1）与恢复安装前快照后的非交互会话（Session 0）通过完整安装、启用、引擎、同版修复、拒绝降级、停用、卸载与个人数据哈希保留检查。即时与延后检查中 TSF 均不可枚举自身 Profile，原复制路径及新路径的 Control 都返回 `absent / 0x0`。证据为 `build-windows/server2022-probe/baseline-output/`、`session0-output/` 和 `vm-response-inspect-baseline-01.json`。卸载后仍能找到自身 SortOrder 引用，但当前系统的 Profile 枚举已不存在；这不能直接说明线上残留的成因，也没有据此增加注册表清理。
+
+失败 CI 的镜像版本是 `20260907.297.1`，其[公开软件清单](https://github.com/actions/runner-images/blob/win22/20260907.297/images/windows/Windows2022-Readme.md)明确 OS 为 `20348.5499`。当前本地两轮结果尚未覆盖这个补丁版本，不作为 CI 故障已修复的结论。已依据[微软 KB5120242 说明](https://support.microsoft.com/en-us/servicing/os/windows-server/2026/08/kb5120242-windows-server-2022-security-update)下载对应累积更新及前置 KB5030216，并验证 Update Catalog 提供的校验值。前置更新后确认来宾为 `20348.1970`；随后用户要求停止消耗时间对齐补丁，将此项 CI 判定改为告警。测试机已保存并暂停，保留安装前快照和调查证据，没有完成 `20348.5499` 的测试，也未确定系统补丁就是根因。
+
+### CI 中将卸载后的 TSF 枚举差异单独报告为告警
+
+按用户要求，`windows-install` 显式传入 `-WarnOnTsfProfileRemains`。实际安装、启用、引擎、修复、拒绝降级、停用、卸载退出码，HKLM/HKCU 两种视图的 CTF/COM 清理、安装项清理与个人数据哈希检查仍须全部通过；这些检查通过后，才运行最终的 TSF 枚举检查。只有 `--verify-absent` 返回 1 且诊断明确为 `profile-remains / 0x80004005` 时生成 GitHub warning，注明尚未确认 TSF Profile 不存在。接口创建或枚举失败、其他 HRESULT、异常退出码和不完整诊断仍阻止 CI。独立全局注册回归及默认的本地严格模式保持原有判定。
+
+Control 在发现自身 CLSID 时额外输出实际 Profile GUID、类型、语言和标志；日志过滤器只允许这些受限字段，不放开完整子进程输出。生产注册、停用和注销逻辑没有修改。此项是已知失败的 CI 报告策略调整，不是将原故障声明为已修复。
+
+本地通过子进程诊断及告警分类回归，覆盖已知枚举差异、其他命令失败、其他退出码、API/权限错误、不完整诊断和 Profile 字段过滤。x64/x86 Control 均编译通过。新编译的 x64 Control 使用现用 Profile 做只读查询：严格模式拒绝“仍存在”，告警模式正常返回明确 warning，保留 GUID/类型/标志，且不输出“缺失验证通过”。没有为此停用或卸载宿主机输入法。
