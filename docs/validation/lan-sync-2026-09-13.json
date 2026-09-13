@@ -1,0 +1,292 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-09-13",
+  "main_baseline": "d7080df49596311fbd7ce0a5d997935b3466f279",
+  "feature_commit": "0497a254c77c1d846b18fee4645ba94e9f5f6df0",
+  "branch": "codex/lan-dictionary-sync",
+  "pr": "https://github.com/asmoyou/rime-Q/pull/3",
+  "scope_note": "这些记录来自合成隔离测试。容器共享内核；Windows Sandbox 是一台 VM。尚无 Mac 原生同步适配及跨平台真机验收结论，五十节点未通过。",
+  "reports": [
+    {
+      "id": "six_services",
+      "original_windows_workspace_relative_path": "artifacts/lan-sync-process-report.json",
+      "original_report_sha256": "41d1cfc388ce979454f963069a6ff39ad2a05e54bb01bf3029b2dc931294d63e",
+      "result": {
+        "kind": "isolated_processes_real_tls",
+        "vm_test": false,
+        "nodes": 6,
+        "passed": [
+          "wrong_pairing_code_and_forged_peer_rejected",
+          "each_device_joins_once",
+          "multi_origin_encrypted_convergence",
+          "founder_offline_relay",
+          "restart_and_new_address_catchup",
+          "offline_delete_wins",
+          "causal_relearning",
+          "abrupt_termination_durable_recovery",
+          "member_removal_propagates",
+          "removed_device_notified_without_dictionary_transfer",
+          "leave_rotate_identity_and_rejoin_through_nonfounder"
+        ],
+        "seconds": 39.71
+      }
+    },
+    {
+      "id": "six_containers",
+      "original_windows_workspace_relative_path": "artifacts/lan-sync-sandbox-bridge-report.json",
+      "original_report_sha256": "00cffa0e6cd7ffc54b94367a001f23447c534864c3a7df536dd2b8eca9ebc954",
+      "result": {
+        "kind": "docker_network_and_storage_namespaces",
+        "separate_kernel_vms": false,
+        "nodes": 6,
+        "network": "dedicated Docker bridges with multicast and default outbound routing; no published ports; no host data mounts",
+        "image_id": "sha256:260dfb4cec6f5b8449d226f5df73032e86e0d0a8f132bd69fb39fdd9eee87805",
+        "passed": [
+          "one_enrollment_per_device",
+          "real_multicast_discovery",
+          "six_origin_tls_convergence",
+          "independent_network_partitions",
+          "partition_reunion_without_manual_addresses",
+          "no_required_master_device",
+          "sandbox_restart_and_catchup",
+          "late_offline_learning_after_delete_and_relearn",
+          "duplicate_transfer_is_idempotent"
+        ],
+        "failure": null,
+        "seconds": 65.09
+      }
+    },
+    {
+      "id": "twenty_containers_final",
+      "original_windows_workspace_relative_path": "artifacts/lan-sync-20-final-head-report.json",
+      "original_report_sha256": "4f5d6c5fec892fa51b3ca98c0257ca636af29c5ba6d53341ab3619213e1d5128",
+      "result": {
+        "kind": "docker_network_and_storage_namespaces",
+        "separate_kernel_vms": false,
+        "nodes": 20,
+        "network": "dedicated Docker bridges with multicast and default outbound routing; no published ports; no host data mounts",
+        "image_id": "sha256:7e1ed992c186dbd9de85d18fdfa02f0e1f3736ec385c28fd2e60b1a5032e4e16",
+        "passed": [
+          "one_enrollment_per_device",
+          "discovery_threads_bounded_after_all_enrollments",
+          "real_multicast_discovery",
+          "all_origin_tls_convergence",
+          "independent_network_partitions",
+          "partition_reunion_without_manual_addresses",
+          "no_required_master_device",
+          "sandbox_restart_and_catchup",
+          "late_offline_learning_after_delete_and_relearn",
+          "duplicate_transfer_is_idempotent"
+        ],
+        "failure": null,
+        "seconds": 148.07
+      }
+    },
+    {
+      "id": "windows_native",
+      "original_windows_workspace_relative_path": "artifacts/lan-sync-native-report.json",
+      "original_report_sha256": "a1ec9f98358b2ae9ed657a2edb2d8416435d354a51ce2bc5d119480575feaed1",
+      "result": {
+        "kind": "six_native_librime_processes_with_real_tls",
+        "nodes": 6,
+        "passed": [
+          "six_real_engines_import_capture_tls_apply_readback",
+          "every_device_receipt_confirms_real_engine_application",
+          "offline_engine_learning_does_not_resurrect_received_deletion",
+          "receive_during_composition_apply_after_cancel",
+          "six_actual_dictionary_restarts_preserve_synced_data"
+        ],
+        "failure": null,
+        "seconds": 29.99
+      }
+    },
+    {
+      "id": "windows_sandbox",
+      "original_windows_workspace_relative_path": "build-windows/sync-sandbox-c9121aab52/output/report.json",
+      "original_report_sha256": "c2272758c42017777b9d1a0f5c78c2333ee7b24680834c4ab33908fd0ba73c70",
+      "result": {
+        "failure": null,
+        "kind": "Windows Sandbox",
+        "separate_kernel_vm": true,
+        "passed": [
+          "six real librime stores: composition, stale snapshot, deletion, weight lowering, readback, backup, restart",
+          "actual x64 TSF context with isolated x64 engine",
+          "actual x86 TSF context with isolated x64 engine",
+          "six native engines with TLS, durable applied receipts, offline deletion, composition and restart"
+        ],
+        "os": "10.0.19041"
+      }
+    },
+    {
+      "id": "windows_sandbox_native",
+      "original_windows_workspace_relative_path": "build-windows/sync-sandbox-c9121aab52/output/end-to-end.json",
+      "original_report_sha256": "83332505e325d5ce7e97e96b46cc55f898ad55834f03465d82a455825e0c6ed3",
+      "result": {
+        "kind": "six_native_librime_processes_with_real_tls",
+        "nodes": 6,
+        "passed": [
+          "six_real_engines_import_capture_tls_apply_readback",
+          "every_device_receipt_confirms_real_engine_application",
+          "offline_engine_learning_does_not_resurrect_received_deletion",
+          "receive_during_composition_apply_after_cancel",
+          "six_actual_dictionary_restarts_preserve_synced_data"
+        ],
+        "failure": null,
+        "seconds": 24.96
+      }
+    },
+    {
+      "id": "fifty_containers_last_failure",
+      "original_windows_workspace_relative_path": "artifacts/lan-sync-50-sandbox-recovery-report.json",
+      "original_report_sha256": "363ae9990b7074fc8ba9da75e75196f7bfa070b00c2f86afc7fc3267783f32e3",
+      "result": {
+        "kind": "docker_network_and_storage_namespaces",
+        "separate_kernel_vms": false,
+        "nodes": 50,
+        "network": "dedicated Docker bridges with multicast and default outbound routing; no published ports; no host data mounts",
+        "image_id": "sha256:7e1ed992c186dbd9de85d18fdfa02f0e1f3736ec385c28fd2e60b1a5032e4e16",
+        "passed": [],
+        "failure": "Docker exec failed (exit 1): Rime Q Sync: deadline has elapsed\n",
+        "seconds": 262.27
+      }
+    }
+  ],
+  "fifty_node_loopback_diagnostic": {
+    "under_load_shared_network": {
+      "udp": "[Errno 22] Invalid argument",
+      "tcp": "timed out"
+    },
+    "under_load_new_network_none": {
+      "udp": "[Errno 22] Invalid argument",
+      "tcp": "timed out"
+    },
+    "after_stopping_fifty_nodes_new_network_none": {
+      "udp": true,
+      "tcp": true
+    },
+    "conclusion": "独立于 Rime Q 的回环探针在负载期间也失败，停止负载后恢复；内部根因未确定。"
+  },
+  "ci": [
+    {
+      "id": 34758135604,
+      "head": "0497a254c77c1d846b18fee4645ba94e9f5f6df0",
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "name": "sync-sandboxes",
+          "result": "success"
+        },
+        {
+          "name": "mac-package",
+          "result": "success"
+        },
+        {
+          "name": "sync-core (ubuntu-24.04)",
+          "result": "success"
+        },
+        {
+          "name": "windows-registration",
+          "result": "success"
+        },
+        {
+          "name": "sync-core (windows-2022)",
+          "result": "success"
+        },
+        {
+          "name": "core (macos-14)",
+          "result": "success"
+        },
+        {
+          "name": "windows-package",
+          "result": "success"
+        },
+        {
+          "name": "core (ubuntu-24.04)",
+          "result": "success"
+        },
+        {
+          "name": "client-parity",
+          "result": "success"
+        },
+        {
+          "name": "core (windows-2022)",
+          "result": "success"
+        },
+        {
+          "name": "sync-core (macos-14)",
+          "result": "success"
+        },
+        {
+          "name": "windows-install",
+          "result": "success"
+        }
+      ]
+    },
+    {
+      "id": 34758133390,
+      "head": "0497a254c77c1d846b18fee4645ba94e9f5f6df0",
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "name": "windows-registration",
+          "result": "success"
+        },
+        {
+          "name": "sync-core (macos-14)",
+          "result": "success"
+        },
+        {
+          "name": "client-parity",
+          "result": "success"
+        },
+        {
+          "name": "sync-core (ubuntu-24.04)",
+          "result": "success"
+        },
+        {
+          "name": "core (windows-2022)",
+          "result": "success"
+        },
+        {
+          "name": "windows-package",
+          "result": "success"
+        },
+        {
+          "name": "sync-sandboxes",
+          "result": "success"
+        },
+        {
+          "name": "mac-package",
+          "result": "success"
+        },
+        {
+          "name": "sync-core (windows-2022)",
+          "result": "success"
+        },
+        {
+          "name": "core (macos-14)",
+          "result": "success"
+        },
+        {
+          "name": "core (ubuntu-24.04)",
+          "result": "success"
+        },
+        {
+          "name": "windows-install",
+          "result": "success"
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "completed_windows_sandbox_closed": true,
+    "failed_pressure_containers_removed": 150,
+    "failed_pressure_networks_removed": 9,
+    "latest_twenty_node_run_cleaned_by_harness": true,
+    "host_input_method_replaced": false,
+    "docker_or_host_network_reset": false
+  },
+  "artifact_note": "原始日志、截图、安装包仍在 Windows 忽略目录，git 拉取不携带它们。本文件为已筛选的可携带摘要，CI 附件以指定运行的有效期为准。"
+}
