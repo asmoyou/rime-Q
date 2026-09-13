@@ -11,9 +11,12 @@ class Engine {
     fs::path root_;
     std::string shared_, user_, prebuilt_, staging_, logs_, generation_;
     std::map<uint64_t, RimeSessionId> sessions_;
+    std::map<uint64_t, bool> preservedAscii_;
+    uint64_t learningRevision_ = 1;
     std::vector<RimeSessionId> available_;
     RimeSessionId session(uint64_t client);
     State read(RimeSessionId id, bool handled);
+    State synchronize(Command command);
 public:
     ~Engine();
     void stop();

@@ -132,7 +132,7 @@ final class PersonalDictionary {
         try Engine.maintain { try readClosedDictionary() }
     }
 
-    private func readClosedDictionary() throws -> [LexiconEntry] {
+    func readClosedDictionary() throws -> [LexiconEntry] {
         let state = QRimePersonalDictionaryState()
         guard state >= 0 else { throw LexiconError.message("当前引擎未提供个人词库管理接口。") }
         if state == 0 { return [] }

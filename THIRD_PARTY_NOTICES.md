@@ -1,5 +1,7 @@
 # 第三方说明
 
+开发分支新增的附近设备同步服务使用 Rust 及 Cargo.lock 锁定的依赖。TLS/设备签名/一次性配对分别由 rustls、ring、ed25519-dalek、spake2、HMAC/SHA-256 等依赖提供；mdns-sd 用于发现，rusqlite/libsqlite3-sys 用于同步状态。完整依赖版本、crate 校验值、上游仓库和许可证原文由 `scripts/build_sync.py` 收集到随包 `licenses/sync`（Mac 为 `Contents/Resources/Licenses/sync`）。yasna crate 未含完整许可，按其 `.cargo_vcs_info.json` 的确切源码提交补充原文及校验值，保存在 `sync/notices`；WinAPI GNU 导入库与同仓库的 winapi 依赖共用上游许可原文，并记录来源。同步服务自有代码同样使用 GPL-3.0-only。
+
 Rime Q 自有代码按 GPL-3.0-only 发布，完整许可证见根目录 `LICENSE`。下列组件保留原许可证和作者信息；本项目的许可证不替代第三方许可。
 
 | 组件 | 用途与来源 | 许可 |

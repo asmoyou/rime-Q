@@ -1,4 +1,5 @@
 #include "engine.h"
+#include "sync_dictionary.h"
 #include "../../third_party/librime/rime_levers_api.h"
 #include "version.h"
 #include <bcrypt.h>
@@ -69,13 +70,13 @@ RimeSessionId Engine::session(uint64_t client) {
     auto& id = sessions_[client];
     if (id && api_->find_session(id)) return id;
     if (!available_.empty()) {
-        id = available_.back(); available_.pop_back(); api_->set_option(id, "ascii_mode", false); return id;
+        id = available_.back(); available_.pop_back(); api_->set_option(id, "ascii_mode", preservedAscii_[client]); return id;
     }
     id = api_->create_session();
     if (!id || !api_->select_schema(id, grammar_ ? "rime_q_grammar" : "rime_q")) {
         if (id) api_->destroy_session(id); id = 0; throw std::runtime_error("Cannot create input session");
     }
-    api_->set_option(id, "ascii_mode", false); return id;
+    api_->set_option(id, "ascii_mode", preservedAscii_[client]); return id;
 }
 State Engine::read(RimeSessionId id, bool handled) {
     State s; s.ready = true; s.handled = handled; s.ascii = api_->get_option(id, "ascii_mode") != 0;
@@ -98,13 +99,15 @@ State Engine::process(uint64_t client, const Request& request) {
     State s;
     if (!started_) { s.message = "引擎正在准备，请稍后切换到 Rime Q。"; return s; }
     if (request.command == Command::ping) { s.ready = true; s.message = std::string("RimeQ ") + RIMEQ_VERSION + " " + std::to_string(RIMEQ_BUILD); return s; }
+    if (request.command == Command::syncProbe) { s.ready=true;s.handled=idle();s.message=std::to_string(learningRevision_);return s; }
+    if (request.command == Command::syncExport || request.command == Command::syncApply) return synchronize(request.command);
     if (request.command == Command::exportDictionary || request.command == Command::importDictionary) {
         s.ready = true;
         if (!idle()) { s.message = "请先结束当前输入，再操作个人词库。"; return s; }
         auto module = api_->find_module("levers");
         auto manager = module && module->get_api ? reinterpret_cast<RimeLeversApi*>(module->get_api()) : nullptr;
         if (!manager || !RIME_API_AVAILABLE(manager, import_user_dict)) throw std::runtime_error("Dictionary API unavailable");
-        for (auto& item : sessions_) { api_->destroy_session(item.second); item.second = 0; }
+        for (auto& item : sessions_) { if(item.second){preservedAscii_[item.first]=api_->get_option(item.second,"ascii_mode")!=0;api_->destroy_session(item.second);} item.second = 0; }
         for (auto id : available_) api_->destroy_session(id); available_.clear();
         auto directory = root_ / L"dictionary"; fs::create_directories(directory);
         auto file = directory / (request.command == Command::exportDictionary ? L"export.tsv" : L"import.tsv");
@@ -124,6 +127,7 @@ State Engine::process(uint64_t client, const Request& request) {
             if (!found) { std::ofstream(file) << "# Rime Q personal dictionary\n"; count = 0; }
         }
         s.handled = count >= 0; s.message = s.handled ? "已处理 " + std::to_string(count) + " 条记录。" : "词库操作失败，原学习记录保留。";
+        if (request.command == Command::importDictionary) ++learningRevision_;
         return s;
     }
     auto id = session(client); bool handled = false;
@@ -140,7 +144,8 @@ State Engine::process(uint64_t client, const Request& request) {
         api_->process_key(id, 0xffe1, 0); api_->process_key(id, 0xffe1, 0x40000000); handled = true; break;
     default: break;
     }
-    return read(id, handled);
+    if(handled && request.command!=Command::hello) ++learningRevision_;
+    auto result=read(id, handled);preservedAscii_[client]=result.ascii;return result;
 }
 void Engine::disconnect(uint64_t client) {
     if (!started_) return;
@@ -150,7 +155,36 @@ void Engine::disconnect(uint64_t client) {
         RIME_STRUCT(RimeCommit, pending); if (api_->get_commit(it->second, &pending)) api_->free_commit(&pending);
         if (available_.size() < 8) available_.push_back(it->second); else api_->destroy_session(it->second);
     }
-    sessions_.erase(it);
+    sessions_.erase(it);preservedAscii_.erase(client);
+}
+State Engine::synchronize(Command command) {
+    State result;result.ready=true;
+    if (!idle()) {result.message="sync-busy";return result;}
+    auto module=api_->find_module("levers");
+    auto manager=module && module->get_api?reinterpret_cast<RimeLeversApi*>(module->get_api()):nullptr;
+    if (!manager || !RIME_API_AVAILABLE(manager,import_user_dict)) throw std::runtime_error("Dictionary API unavailable");
+    for (auto& item:sessions_) {if(item.second){preservedAscii_[item.first]=api_->get_option(item.second,"ascii_mode")!=0;api_->destroy_session(item.second);}item.second=0;}
+    for (auto id:available_) api_->destroy_session(id);available_.clear();
+    auto directory=root_/L"sync/engine";fs::create_directories(directory);auto current=directory/L"current.tsv";
+    auto exportCurrent=[&]{
+        int count=manager->export_user_dict("rime_q",utf8(current.wstring()).c_str());
+        if(count<0){RimeUserDictIterator it{};bool found=false;
+            if(manager->user_dict_iterator_init(&it)){while(auto name=manager->next_user_dict(&it)) if(std::string(name)=="rime_q")found=true;manager->user_dict_iterator_destroy(&it);}
+            if(found)throw std::runtime_error("Sync export failed");std::ofstream(current,std::ios::binary)<<"# Rime Q personal dictionary\n";
+        }
+    };
+    exportCurrent();
+    if(command==Command::syncApply){
+        const auto actual=syncRows(current),expected=syncRows(directory/L"before.tsv"),desired=syncRows(directory/L"after.tsv");
+        if(actual!=expected){result.message="sync-stale";return result;}
+        auto backups=root_/L"sync/backups";fs::create_directories(backups);
+        auto backup=backups/(L"before-"+std::to_wstring(std::time(nullptr))+L"-"+std::to_wstring(GetTickCount64())+L".tsv");
+        fs::copy_file(current,backup,fs::copy_options::none);
+        auto delta=directory/L"apply.tsv";syncDelta(delta,actual,desired);
+        int count=manager->import_user_dict("rime_q",utf8(delta.wstring()).c_str());++learningRevision_;exportCurrent();
+        if(count<0 || syncRows(current)!=desired){result.message="sync-readback-failed";return result;}
+    }
+    result.handled=true;result.message=std::to_string(learningRevision_);return result;
 }
 bool Engine::idle() {
     for (auto& item : sessions_) {

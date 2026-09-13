@@ -15,6 +15,7 @@ final class InputSession: NSObject {
     private var shiftAlone = false
     private var appliedSchema = ""
     private var generation: UInt = 0
+    private var preservedEnglish = false
 
     override init() {
         super.init()
@@ -29,7 +30,7 @@ final class InputSession: NSObject {
 
     @objc private func prepareMaintenance() {
         if let owner { commitCurrent(owner) }
-        if session != 0 { QRimeDestroySession(session) }
+        if session != 0 { preservedEnglish = QRimeGetOption(session, "ascii_mode"); QRimeDestroySession(session) }
         session = 0
         appliedSchema = ""
         marked = false
@@ -44,13 +45,15 @@ final class InputSession: NSObject {
 
     private func ensureSession() -> Bool {
         guard Engine.ready else { return false }
-        if session == 0 { session = QRimeCreateSession() }
+        let created = session == 0
+        if created { session = QRimeCreateSession() }
         guard session != 0 else { return false }
         if appliedSchema != Product.schema {
             QRimeClear(session)
             guard QRimeSchema(session, Product.schema) else { return false }
             appliedSchema = Product.schema
         }
+        if created { QRimeSetOption(session, "ascii_mode", preservedEnglish) }
         return true
     }
 

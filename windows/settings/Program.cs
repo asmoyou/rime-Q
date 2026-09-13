@@ -103,6 +103,7 @@ namespace RimeQ {
                             }
                             if (model.Valid && !File.Exists(Paths.Model) && !model.Busy) await model.Restore();
                             model.RefreshEngineStatus();
+                            await DeviceSync.Tick();
                         };
                         timer.Start();
                         app.Startup += async (s,e) => {
@@ -113,7 +114,7 @@ namespace RimeQ {
                             } catch(Exception error) { Paths.Set("DictionaryStatus","词库配置更新失败，继续使用原资源："+error.Message); }
                         };
                         if (action != "--background") Show(action == "--updates" ? 3 : (int?)null);
-                        app.Run(); tray.Dispose(); mutex.ReleaseMutex();
+                        app.Run(); DeviceSync.Stop(); tray.Dispose(); mutex.ReleaseMutex();
                     }
                 }
                 return 0;

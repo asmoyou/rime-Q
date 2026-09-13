@@ -113,6 +113,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DictionaryResources.shared.refreshBundledConfigurationIfNeeded()
             UpdateChecker.shared.start()
             OptionalModel.shared.restore()
+            DeviceSync.shared.startIfEnabled()
             if finishInstallationAsServer {
                 do {
                     _ = try InstallationFiles.current.record(.ready, app: Bundle.main.bundleURL,
@@ -135,6 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     func applicationWillTerminate(_ notification: Notification) {
+        DeviceSync.shared.stop()
         if Engine.ready { QRimeStop() }
         InstallationDiagnostics.append("input-server-stopped")
     }

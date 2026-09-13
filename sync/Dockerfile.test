@@ -1,0 +1,11 @@
+FROM rust:1.92.0-bookworm@sha256:e90e846de4124376164ddfbaab4b0774c7bdeef5e738866295e5a90a34a307a2 AS build
+WORKDIR /source
+COPY sync/Cargo.toml sync/Cargo.lock ./sync/
+COPY sync/src ./sync/src
+COPY sync/resources ./sync/resources
+WORKDIR /source/sync
+RUN cargo build --release --locked
+
+FROM debian:bookworm-slim@sha256:88200866dfff7ea7f5cbcb6ec7c8a701889efe6fe859fe64d6990e4b07ea4171
+COPY --from=build /source/sync/target/release/rimeq-sync /app/rimeq-sync
+ENTRYPOINT ["/app/rimeq-sync", "serve", "--root", "/state", "--port", "42437", "--isolated"]

@@ -103,6 +103,8 @@ def build(args):
         shutil.copy2(output / arch / 'Release/RimeQ.Tip.dll', stage / arch / 'RimeQ.Tip.dll')
     for name in ['RimeQ.Broker.exe', 'RimeQ.Control.exe', 'RimeQ.Visuals.dll']:
         if (output / 'x64/Release' / name).is_file(): shutil.copy2(output / 'x64/Release' / name, stage / name)
+    from build_sync import build as build_sync
+    build_sync(stage / 'RimeQ.Sync.exe', stage / 'licenses/sync')
     shutil.copy2(output / 'RimeQ.ico', stage / 'RimeQ.ico')
     csharp(stage / 'RimeQ.exe', sorted((ROOT / 'windows/settings').glob('*.cs')), args.build,
            [(ROOT / 'windows/settings/Shell.xaml', 'Shell.xaml')], main='RimeQ.Program')
@@ -113,6 +115,8 @@ def build(args):
     shutil.copytree(ROOT / 'third_party/windows/licenses', stage / 'licenses/windows', dirs_exist_ok=True)
     if args.smoke:
         import tempfile
+        with tempfile.TemporaryDirectory(prefix='rimeq-sync-engine-') as user:
+            run(output / 'x64/Release/rimeq_sync_engine_tests.exe', stage, user)
         with tempfile.TemporaryDirectory(prefix='rimeq-smoke-') as user:
             run(stage / 'RimeQ.Broker.exe', '--smoke', stage, user)
             run(stage / 'RimeQ.Broker.exe', '--learn-write', stage, user)

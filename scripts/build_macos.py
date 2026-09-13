@@ -60,6 +60,8 @@ def build_app(app, universal=False, resources=True):
         "CFBundleInfoDictionaryVersion": "6.0", "CFBundleSignature": "????",
         "CFBundleSupportedPlatforms": ["MacOSX"], "LSBackgroundOnly": False,
         "NSAppleEventsUsageDescription": "Rime Q asks its previous version to quit during an update. When you choose Log Out, it asks macOS to show the logout confirmation.",
+        "NSLocalNetworkUsageDescription": "Rime Q discovers and connects to your approved devices when you enable personal dictionary synchronization. Local typing still works if you deny access.",
+        "NSBonjourServices": ["_rimeq-sync._tcp"],
         "LSMinimumSystemVersion": "13.0", "LSUIElement": True, "NSPrincipalClass": "NSApplication",
         "InputMethodConnectionName": IDENTIFIER + "_Connection", "InputMethodServerControllerClass": "RimeQController",
         "InputMethodServerDelegateClass": "RimeQController", "TISInputSourceID": IDENTIFIER,
@@ -82,6 +84,8 @@ def build_app(app, universal=False, resources=True):
         strings = {key: "Rime Q" for key in ["CFBundleName", "CFBundleDisplayName", IDENTIFIER, mode]}
         strings["NSAppleEventsUsageDescription"] = metadata["NSAppleEventsUsageDescription"] if language == "en" else (
             "更新时用于退出仍在运行的旧版 Rime Q；仅当你选择注销账户时，才请求 macOS 显示注销确认。")
+        strings["NSLocalNetworkUsageDescription"] = metadata["NSLocalNetworkUsageDescription"] if language == "en" else (
+            "Rime Q 在你开启个人词库同步时发现并连接已授权的设备。拒绝后仍可正常打字及在本机学习。")
         (localized / "InfoPlist.strings").write_text(
             '\n'.join(f'"{key}" = "{value}";' for key, value in strings.items()) + '\n', encoding="utf-16")
     run("swift", ROOT / "scripts/create_icons.swift", contents / "Resources")
@@ -139,6 +143,9 @@ def build_app(app, universal=False, resources=True):
         shutil.copy2(ROOT / "third_party" / name / "LICENSE", notices / (name + "-LICENSE"))
     for library in (contents / "Frameworks").rglob("*.dylib"):
         run("codesign", "--force", "--sign", "-", library)
+    from build_sync import build as build_sync
+    build_sync(contents / "MacOS/RimeQ.Sync", notices / "sync", universal)
+    run("codesign", "--force", "--sign", "-", contents / "MacOS/RimeQ.Sync")
     run("codesign", "--force", "--sign", "-", app)
     run("codesign", "--verify", "--deep", "--strict", app)
 

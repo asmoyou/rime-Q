@@ -1,0 +1,7 @@
+{
+  "source": "iDvel/rime-ice cn_dicts/8105.dict.yaml",
+  "revision": "fbb516b2786e4d5444383706d13c31c2e4d10c08",
+  "source_sha256": "1f9a42b91dea6982baee2551981780271aeffd78876662b9c9f324e56b37b120",
+  "derived_sha256": "ac7fde05e161ec72138a0b195a87f3e527581a9a1af432730505a7836f0fcdcf",
+  "license": "Preserved in the bundled rime-ice source and notices"
+}
