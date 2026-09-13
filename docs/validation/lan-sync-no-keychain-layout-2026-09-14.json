@@ -1,0 +1,83 @@
+{
+  "date": "2026-09-14",
+  "code_commit": "d06ed198f1ea7fe846150a8b899d23092a2de79a",
+  "package": {
+    "file": "RimeQ-0.4.0-macos-universal-1789316865.pkg",
+    "version": "0.4.0",
+    "build": "1789316865",
+    "bytes": 75889156,
+    "sha256": "2a4289c1f70fa6e1c61b8f22d7c128dfc113dd954cdbc7db2614461ce9d0dd58",
+    "signature": "ad-hoc; extracted deep strict verification passed",
+    "keychain_checks": "No security-framework dependency and no imported SecKeychain/SecItem APIs"
+  },
+  "rust_passed": 15,
+  "clippy": "passed",
+  "native_before_summary_layout_fix": {
+    "code_commit": "c2876aa558c4e2b6ccc4c32904d0ba650d848dbe",
+    "report": {
+      "kind": "six_mac_swift_adapters_real_librime_tls_loopback",
+      "nodes": 6,
+      "os": "15.7.9",
+      "architecture": "x86_64",
+      "binary_sha256": "0448b3deb952543b4ef5a2a95410acd5d6cdc1684459b0aa0c367dcc2cd9fc5d",
+      "passed": [
+        "unrelated_parent_pid_rejected_before_state_access",
+        "default_off_no_helper_or_dictionary_scan",
+        "unused_page_no_identity_and_failed_start_requires_explicit_retry",
+        "six_swift_adapters_real_librime_tls_nonfounder_invitations",
+        "six_signed_readback_receipts",
+        "native_window_search_stable_rows_pause_resume_and_join_cancellation",
+        "synced_word_recalled_in_real_candidates",
+        "received_deletion_blocks_unapplied_old_learning",
+        "learning_after_applied_deletion_starts_new_generation",
+        "explicit_weight_reduction",
+        "active_composition_not_committed_or_overwritten",
+        "composition_started_during_capture_await_defers_write",
+        "learning_during_await_rejects_stale_snapshot_without_loss",
+        "ascii_mode_and_manual_undo_backup_preserved",
+        "manual_undo_remains_usable_after_background_sync",
+        "native_crash_before_import_resumes_pending_application",
+        "native_crash_after_engine_import_before_ack_resumes_idempotently",
+        "backup_write_failure_preserves_engine_and_retries_pending_job",
+        "conflicting_recovery_pauses_and_preserves_both_snapshots",
+        "swift_restarts_failed_helper_with_persisted_identity",
+        "helper_exits_after_native_parent_crash_and_restarts_cleanly",
+        "six_engine_restarts_preserve_dictionary_and_group",
+        "native_leave_preserves_dictionary_and_archives_sync_state"
+      ],
+      "failure": null,
+      "seconds": 196.02
+    }
+  },
+  "final_package_ui": {
+    "preview_count": 19,
+    "checks": "single-device short group, default and compact widths, light/dark, summary natural width and button gap; extracted final package rendered successfully"
+  },
+  "screenshots": {
+    "artifacts/sync-ui/approve-dark.png": "ff064dabcdab5754b3a0883ebec3bce97b93d5bf77533a3027b738c7dbc84fa3",
+    "artifacts/sync-ui/approve-light.png": "35028903ac1eb5a03f34c308f419d1ce9e0937e8f20799e88515beb85ede3ed4",
+    "artifacts/sync-ui/compact-dark.png": "ff16a0cd64717358ca292224b13b4ff353c1f4716705f0e3cacbdaccf089858a",
+    "artifacts/sync-ui/compact-light.png": "c673d886930c0c4030432deb0e0995c3a8760b0a562f240f8ded0835bb2fa358",
+    "artifacts/sync-ui/create-dark.png": "472fcd9dca24bc7b93290439d67e84479d95d60b9aeedd440c37d55e2c0680fe",
+    "artifacts/sync-ui/create-light.png": "7a9610b1bf87ac9a6047c332f31e85ba11c73446fabd9332167d21f3205d6e37",
+    "artifacts/sync-ui/devices-dark.png": "146e7067fc372fa54d6c181e9b10577d77f339014d0c90a18a29111395ff5561",
+    "artifacts/sync-ui/devices-light.png": "9a43e838ad78dccdb39e308cb31c5cd42e8459d6b6b0f2e8bb8f76430939bf37",
+    "artifacts/sync-ui/invite-dark.png": "2db4824888422be79675a8584f39aec61ea24abdcbdf65f0f848148ad8189159",
+    "artifacts/sync-ui/invite-light.png": "41d568c900787b287dd169bf313d69983a973bedd5698e7a475873b1e72064ad",
+    "artifacts/sync-ui/join-dark.png": "bc56d91bae31d17db951d10c48f8d26b1c674e678eaf4890541a5d439b2786d5",
+    "artifacts/sync-ui/join-light.png": "059847c7a2e01effb355ff3075bce9aa5daaf6f6140af79b480fdeefcaf82fb0",
+    "artifacts/sync-ui/single-device-compact-dark.png": "9783c351f1b4e58fd4eb72a5af99b067612d1c3b1bb1c94b613874a17bfd5403",
+    "artifacts/sync-ui/single-device-compact-light.png": "186c6760610cb5811d9651ed3c72b2f019648bda4ea15628e3c9f8e854039105",
+    "artifacts/sync-ui/single-device-dark.png": "e844ba1546ef40ec75737577308fb6a3f2bdab81f4a48dfe6e05610ce0ccad74",
+    "artifacts/sync-ui/single-device-light.png": "4d1ea0c170afa56e91b405ae721908ccf9535cb3593700d7c328439b47c6dd09",
+    "artifacts/sync-ui/twenty-devices.png": "0ab0527a91d71a609c365f250c60990a8402d7558613048629ce4fe2ad940189",
+    "artifacts/sync-ui/welcome-dark.png": "204bd3f77e87ffc40390367b0cfd1e20924315167e4d9e58d79a91810c68f8f4",
+    "artifacts/sync-ui/welcome-light.png": "0aa501d855d7989c36133f097d9032ebd32b4365e529f3e573c93780a9ac9a11"
+  },
+  "limits": [
+    "Task did not install or alter the working input method; installed build 1789316865 observed read-only after package delivery",
+    "No actual Keychain access; obsolete marker tested with synthetic state",
+    "Six engines are one x86_64 Mac with loopback TLS, not six physical devices",
+    "CI and merge outcome tracked in PR #3"
+  ]
+}
