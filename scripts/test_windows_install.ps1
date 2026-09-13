@@ -64,7 +64,7 @@ foreach ($hive in @('LocalMachine', 'CurrentUser')) {
             foreach ($path in @("Software\Microsoft\CTF\TIP\$class", "Software\Classes\CLSID\$class")) {
                 $key = $root.OpenSubKey($path)
                 Write-Output "Uninstall registration: $hive $view $path present=$($null -ne $key)"
-                if ($null -ne $key) { $key.Dispose() }
+                if ($null -ne $key) { $key.Dispose(); throw "Uninstall registration remains: $hive $view $path" }
             }
         } finally { $root.Dispose() }
     }

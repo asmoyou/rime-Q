@@ -378,3 +378,13 @@ x64/x86 生产 TIP 测试新增组合 `Unicode << 16 | VK_PACKET` 的真实 TSF 
 本机 `./scripts/test_windows_lifecycle_process.ps1` 通过：两路输出捕获、错误动作与退出码、预期失败码、日志过滤、两路大输出无死锁。重编译的 x64 Control 对本机现用 Rime Q 正确报告 `profile-remains / 0x80004005`，普通启用只读检查返回 `0x0`；未卸载或停用现用输入法。PowerShell 解析、CI YAML 解析和客户端契约检查通过。
 
 已查询 Microsoft Learn 的 [EnumProfiles](https://learn.microsoft.com/en-us/windows/win32/api/msctf/nf-msctf-itfinputprocessorprofilemgr-enumprofiles)、[Unregister](https://learn.microsoft.com/en-us/windows/win32/api/msctf/nf-msctf-itfinputprocessorprofiles-unregister)、[Next](https://learn.microsoft.com/en-us/windows/win32/api/msctf/nf-msctf-ienumtfinputprocessorprofiles-next)，并核对 [Microsoft SampleIME 注销示例](https://github.com/microsoft/Windows-classic-samples/blob/main/Samples/IME/cpp/SampleIME/Register.cpp)。本机独立只读探针枚举 `0`、`0x0804`、`0x0409`、`0x0411`、`0x4321` 均返回成功，迭代以 `S_FALSE` 结束，未支持“语言不存在导致枚举失败”的假设。官方示例使用 `UnregisterProfile`，当前实现使用 `Unregister`，这一差异尚不构成已确认根因。最终线上结果待补充。
+
+### 用户级 Profile 残留的直接证据与隔离回归
+
+[34738787957](https://github.com/asmoyou/rime-Q/actions/runs/34738787957) 的打包和其他平台作业全部通过，独立安装作业明确失败在 `RimeQ-Control-check.exe --verify-absent`，输出 `tsf-absence stage=profile-remains hr=0x80004005`。此前首次安装、启用、已装引擎、同版修复、拒绝降级、停用和卸载器均返回预期退出码。卸载后 Rime Q 的 HKLM CTF/COM 注册在 32/64 位视图中均不存在，HKCU 的 CTF TIP 分支在两种视图中仍存在。这确认了用户级 Profile 残留；没有将它归因于未经验证的系统缓存。
+
+[InstallLayoutOrTip 官方说明](https://learn.microsoft.com/en-us/windows/win32/tsf/installlayoutortip)明确 `ILOT_UNINSTALL` 等同于禁用。修复保留现有系统注销 API，仅在系统注销后删除当前用户的 `Software\Microsoft\CTF\TIP\{C13A9B62-413B-45B8-9EF1-884522319760}`，逐一处理两个注册表视图；失败继续报告并尝试恢复系统注册。原始非提权 GUI 在管理员卸载成功后也执行自身用户的清理，覆盖 UAC 使用另一管理员账号的路径，不遍历其他用户配置。个人设置、词库、模型与其他输入法注册不在清理范围。
+
+`windows/tests/InstallerRegistryTests.cs` 使用 `HKCU\Software\RimeQ.Tests\Uninstall-随机标识` 下的隔离子树模拟残留状态，不注册或激活输入法。未实现清理时返回 1，报 `Uninstall left the user's disabled CTF profile`；实现后通过禁用 Profile 清理、重复执行、两个用户上下文隔离、其他输入法和个人设置原值保留、只读权限错误上报，最后删除自己的测试子树。该回归加入 `build_windows.py --smoke` 的开头，也可单独运行 `build-windows/Installer.Tests.exe`。线上生命周期脚本进一步要求 32/64 位 HKLM/HKCU 的 Rime Q CTF/COM 分支不存在，并继续要求真实 TSF 枚举无残留及个人文件哈希不变。完整线上验收结果仍待补充。
+
+独立编译并运行命令为 `python scripts/build_windows.py --installer-tests-only`，本机通过；该模式不构建引擎、词库或安装包，也不安装、停用或卸载现用客户端。

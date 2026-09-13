@@ -74,6 +74,11 @@ def build(args):
     if args.build < 1 or args.build > 65535: raise ValueError('Windows build must be 1..65535')
     if args.smoke: run('python', ROOT / 'scripts/test_windows_resources.py')
     output = ROOT / 'build-windows'; output.mkdir(exist_ok=True); icon(output / 'RimeQ.ico')
+    if args.smoke or args.installer_tests_only:
+        csharp(output / 'Installer.Tests.exe', [ROOT / 'windows/installer/Setup.cs', ROOT / 'windows/tests/InstallerRegistryTests.cs'],
+               args.build, main='RimeQ.InstallerRegistryTests', console=True)
+        run(output / 'Installer.Tests.exe')
+    if args.installer_tests_only: return
     for arch, platform in [('x64', 'x64'), ('x86', 'Win32')]:
         run('cmake', '-S', 'windows', '-B', output / arch, '-G', 'Visual Studio 17 2022', '-A', platform,
             '-DRIMEQ_BUILD_TSF=ON', '-DRIMEQ_BUILD_NUMBER=' + str(args.build))
@@ -146,4 +151,5 @@ if __name__ == '__main__':
     parser.add_argument('--reuse-resources', action='store_true')
     parser.add_argument('--smoke', action='store_true')
     parser.add_argument('--no-package', action='store_true')
+    parser.add_argument('--installer-tests-only', action='store_true', help='Compile and run isolated installer registry tests without installing the client')
     build(parser.parse_args())

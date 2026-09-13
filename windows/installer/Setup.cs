@@ -218,9 +218,19 @@ namespace RimeQ {
                 Log("install-failed-" + phase); throw;
             }
         }
+        internal static void RemoveUserRegistration(RegistryKey user) {
+            // EnableLanguageProfile/InstallLayoutOrTip can leave a disabled HKCU
+            // profile after Unregister removes the machine registration. Remove
+            // only our own CTF identity; personal data and other TIPs are unrelated.
+            user.DeleteSubKeyTree(@"Software\Microsoft\CTF\TIP\{C13A9B62-413B-45B8-9EF1-884522319760}", false);
+        }
+        static void RemoveCurrentUserRegistration() {
+            foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 })
+                using (var user = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, view)) RemoveUserRegistration(user);
+        }
         static void Remove() {
             SafePath(Root); var installed = Installed(); if (installed == null) return; Log("uninstall-start");
-            try { Register(installed, true); }
+            try { Register(installed, true); RemoveCurrentUserRegistration(); Log("user-profile-removed"); }
             catch { try { Register(installed, false); } catch { } throw; }
             Shortcuts(installed, true);
             using (var machine = Machine) { machine.DeleteSubKeyTree(UninstallPath, false); machine.DeleteSubKeyTree(RegistryPath, false); }
@@ -326,7 +336,12 @@ namespace RimeQ {
                         // versioned TIP loaded must never win the shared engine lock during this gap.
                         int enabled = await EnableAfterReady(() => StartUserApplication(current), () => Run(Path.Combine(current, "RimeQ.Control.exe"), "--enable"));
                         status.Text = enabled != 0 ? "程序已安装，输入源尚待启用。请在 Windows 语言设置中添加 Rime Q。" : "安装完成。可从 Windows 输入法列表选择 Rime Q。";
-                    } else status.Text = "Rime Q 已停用并卸载。个人数据保留；宿主仍加载的旧文件会保留至关闭对应应用后清理。";
+                    } else {
+                        // UAC can run under a different administrator account. The
+                        // original unelevated GUI must also clean its own user profile.
+                        RemoveCurrentUserRegistration();
+                        status.Text = "Rime Q 已停用并卸载。个人数据保留；宿主仍加载的旧文件会保留至关闭对应应用后清理。";
+                    }
                     primary.Visibility = Visibility.Collapsed; close.Content = "完成";
                 } catch (Exception error) {
                     status.Text = error is System.ComponentModel.Win32Exception ? "已取消管理员认证，操作未完成。" : error.Message;
