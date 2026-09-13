@@ -69,12 +69,18 @@ int wmain(int argc, wchar_t** argv) {
     else if (action == L"--verify-absent") {
         ComPtr<ITfInputProcessorProfileMgr> profiles;
         hr = CoCreateInstance(CLSID_TF_InputProcessorProfiles, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&profiles));
+        const char* stage = "create-manager";
         ComPtr<IEnumTfInputProcessorProfiles> list;
-        if (SUCCEEDED(hr)) hr = profiles->EnumProfiles(rq::language, &list);
+        if (SUCCEEDED(hr)) { stage = "enum-profiles"; hr = profiles->EnumProfiles(rq::language, &list); }
         if (SUCCEEDED(hr)) {
             TF_INPUTPROCESSORPROFILE item{}; ULONG fetched = 0;
-            while (list->Next(1, &item, &fetched) == S_OK && fetched) if (item.clsid == rq::clsid) { hr = E_FAIL; break; }
+            stage = "next-profile";
+            while ((hr = list->Next(1, &item, &fetched)) == S_OK && fetched) {
+                if (item.clsid == rq::clsid) { stage = "profile-remains"; hr = E_FAIL; break; }
+            }
+            if (hr == S_FALSE) { stage = "absent"; hr = S_OK; }
         }
+        std::cout << "tsf-absence stage=" << stage << " hr=0x" << std::hex << static_cast<unsigned long>(hr) << '\n';
     }
     CoUninitialize();
     std::cout << (SUCCEEDED(hr) ? "enabled-or-completed" : "pending-or-failed") << " hr=0x" << std::hex << static_cast<unsigned long>(hr) << '\n';

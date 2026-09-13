@@ -363,3 +363,18 @@ x64/x86 生产 TIP 测试新增组合 `Unicode << 16 | VK_PACKET` 的真实 TSF 
 用户确认已能看到白色模式图标，但偶尔变回蓝底黑字。读取所有可访问进程模块发现：ChatGPT PID 23332、设置与 Sublime 已加载 9132，Explorer PID 15960 仍加载带蓝底绘制代码的 9131。此时确有新旧版本混用；不能仅凭模块路径将用户看到的每次变色都判定为同一原因。确认没有 Explorer 文件窗口后重启该 Shell 进程，新的 Explorer PID 24232 已加载 9132。随后复查 ChatGPT、Explorer、设置、Sublime 与新记事本均加载 9132，没有发现旧 TIP；刷新后的图标稳定性仍待用户实际观察反馈。
 
 9132 已在本机独立 RichEdit50W 实际宿主中通过 x64/x86 各六组物理按键验收：首键及空格上屏、数字选词、取消、Shift 中英文切换、焦点变化、切换输入法后的首键。报告均记录实际加载 `0.4.0.9132`，证据为 `artifacts/windows-host-9132-x64.json` 和 `artifacts/windows-host-9132-x86-retry.json`。x86 首次因焦点变化在首键前停止，未向其他窗口输入；单独重试后通过。Windows Computer Use 文本模式也确认新建空白记事本正文有焦点，按 n 出现 Rime Q 候选，Esc 隐藏候选。截图模式返回 `SetIsBorderRequired failed: 不支持此接口 (0x80004002)`，因此没有将任务栏截图验收或用户远程工具的实际 Unicode 输入记为通过。
+
+## Windows CI 安装生命周期排查（2026-09-13）
+
+此前多轮 push 没有一次完成全部线上验证，不能作为客户端交付成功的证据：
+
+- `34736866118` 在 Windows Runner 的 tar 解压路径校验失败；`df244ab` 规范化路径并补充 3 项资源回归。
+- `34737208541`、`34737499548` 在安装快捷方式阶段失败；阶段日志确认资源与输入服务注册已完成，`06957d2` 改用原生 `IShellLinkW`。
+- `34737916802` 已通过首次安装与同版修复，随后 PowerShell 将未加括号的 `-or` 当作 `Test-Path` 参数；`56fb11d` 修正表达式。
+- `34738164317` 的构建、x64/x86 协议与生产 TIP、librime、学习、设置和 30 张 WPF 渲染通过，安装/修复/拒绝降级后执行到卸载。日志记录 `unregistered-personal-data-retained`，后续命令返回 1；原测试未捕获子进程输出，不能仅凭安装器成功日志断言注销已完成。
+
+为隔离失败，CI 将 `windows-install` 从 `windows-package` 拆出，下载同次运行的安装包并验证 SHA-256；失败时可只重跑安装作业，复用构建产物。命令封装同时捕获 stdout/stderr，只输出允许的状态行，失败信息包含程序、动作和退出码。注销检查记录 TSF 创建、枚举、枚举迭代及残留 Profile 的具体阶段，并传播迭代错误；安装测试只读核对 Rime Q 自己的 HKLM/HKCU、32/64 位 CTF/COM 注册键。
+
+本机 `./scripts/test_windows_lifecycle_process.ps1` 通过：两路输出捕获、错误动作与退出码、预期失败码、日志过滤、两路大输出无死锁。重编译的 x64 Control 对本机现用 Rime Q 正确报告 `profile-remains / 0x80004005`，普通启用只读检查返回 `0x0`；未卸载或停用现用输入法。PowerShell 解析、CI YAML 解析和客户端契约检查通过。
+
+已查询 Microsoft Learn 的 [EnumProfiles](https://learn.microsoft.com/en-us/windows/win32/api/msctf/nf-msctf-itfinputprocessorprofilemgr-enumprofiles)、[Unregister](https://learn.microsoft.com/en-us/windows/win32/api/msctf/nf-msctf-itfinputprocessorprofiles-unregister)、[Next](https://learn.microsoft.com/en-us/windows/win32/api/msctf/nf-msctf-ienumtfinputprocessorprofiles-next)，并核对 [Microsoft SampleIME 注销示例](https://github.com/microsoft/Windows-classic-samples/blob/main/Samples/IME/cpp/SampleIME/Register.cpp)。本机独立只读探针枚举 `0`、`0x0804`、`0x0409`、`0x0411`、`0x4321` 均返回成功，迭代以 `S_FALSE` 结束，未支持“语言不存在导致枚举失败”的假设。官方示例使用 `UnregisterProfile`，当前实现使用 `Unregister`，这一差异尚不构成已确认根因。最终线上结果待补充。

@@ -5,26 +5,7 @@ $principal = [Security.Principal.WindowsPrincipal]::new([Security.Principal.Wind
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'The disposable runner must provide an administrator token.' }
 if (Test-Path 'HKLM:\Software\RimeQ') { throw 'Existing Rime Q installation found; refusing to replace it for a test.' }
 
-function Invoke-RimeQ([string]$File, [string]$Arguments, [int]$Expected = 0) {
-    $info = [Diagnostics.ProcessStartInfo]::new($File, $Arguments)
-    $info.UseShellExecute = $false
-    $info.CreateNoWindow = $true
-    $info.Environment.Clear()
-    foreach ($name in @('APPDATA','LOCALAPPDATA','SystemRoot','WINDIR','TEMP','TMP','USERPROFILE')) {
-        $value = [Environment]::GetEnvironmentVariable($name)
-        if ($null -ne $value) { $info.Environment[$name] = $value }
-    }
-    $process = [Diagnostics.Process]::Start($info)
-    if (-not $process.WaitForExit(60000)) { throw 'Rime Q lifecycle command timed out.' }
-    if ($process.ExitCode -ne $Expected) {
-        $log = Join-Path $env:ProgramFiles 'RimeQ\installation.log'
-        if (Test-Path -LiteralPath $log) {
-            Get-Content -LiteralPath $log -Tail 20 | Where-Object { $_ -match '^[^ ]+ build=[0-9.]+ pid=[0-9]+ state=[a-z0-9-]+$' } | ForEach-Object { Write-Output $_ }
-        }
-        throw "Unexpected Rime Q exit code: $($process.ExitCode), expected $Expected"
-    }
-    $process.Dispose()
-}
+. "$PSScriptRoot/windows_lifecycle_process.ps1"
 
 $setup = (Resolve-Path 'dist/RimeQ-0.4.0-windows-x64.exe').Path
 Invoke-RimeQ $setup '--install-elevated --silent'
@@ -75,6 +56,19 @@ $control = Join-Path $env:RUNNER_TEMP 'RimeQ-Control-check.exe'
 Copy-Item -LiteralPath (Join-Path $repaired 'RimeQ.Control.exe') -Destination $control
 Invoke-RimeQ $control '--deactivate'
 Invoke-RimeQ $setup '--uninstall-elevated --silent'
+$class = '{C13A9B62-413B-45B8-9EF1-884522319760}'
+foreach ($hive in @('LocalMachine', 'CurrentUser')) {
+    foreach ($view in @('Registry64', 'Registry32')) {
+        $root = [Microsoft.Win32.RegistryKey]::OpenBaseKey($hive, $view)
+        try {
+            foreach ($path in @("Software\Microsoft\CTF\TIP\$class", "Software\Classes\CLSID\$class")) {
+                $key = $root.OpenSubKey($path)
+                Write-Output "Uninstall registration: $hive $view $path present=$($null -ne $key)"
+                if ($null -ne $key) { $key.Dispose() }
+            }
+        } finally { $root.Dispose() }
+    }
+}
 Invoke-RimeQ $control '--verify-absent'
 if (Test-Path 'HKLM:\Software\RimeQ') { throw 'Uninstall registration remains.' }
 if ((Get-FileHash $learning).Hash -ne $learningHash -or (Get-FileHash $model).Hash -ne $modelHash) { throw 'Uninstall changed personal data.' }

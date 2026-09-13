@@ -54,17 +54,6 @@ jobs:
           key: windows-resources-${{ hashFiles('dependencies.lock.json') }}
       - name: Build client and run isolated engine, TSF and UI regressions
         run: python scripts/build_windows.py --smoke
-      - name: Install, repair, reject downgrade and retain personal data on uninstall
-        run: ./scripts/test_windows_install.ps1
-      - name: Collect Windows installation log
-        if: always()
-        shell: pwsh
-        run: |
-          $source = 'C:\Program Files\RimeQ\installation.log'
-          if (Test-Path -LiteralPath $source) {
-            New-Item -ItemType Directory -Force artifacts | Out-Null
-            Copy-Item -LiteralPath $source -Destination artifacts/windows-installation.log
-          }
       - uses: actions/upload-artifact@v4
         with:
           name: RimeQ-Windows-x64
@@ -78,7 +67,41 @@ jobs:
           name: RimeQ-Windows-validation
           path: |
             artifacts/windows-ui/*.png
-            artifacts/windows-installation.log
+          retention-days: 7
+
+  windows-install:
+    needs: windows-package
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: RimeQ-Windows-x64
+          path: dist
+      - name: Verify the package built by this workflow
+        shell: pwsh
+        run: |
+          $expected = (Get-Content 'dist/RimeQ-0.4.0-windows-SHA256SUMS.txt').Split(' ')[0]
+          $actual = (Get-FileHash 'dist/RimeQ-0.4.0-windows-x64.exe' -Algorithm SHA256).Hash
+          if ($actual -ne $expected) { throw 'Windows artifact checksum mismatch.' }
+      - name: Verify lifecycle command diagnostics in isolation
+        run: ./scripts/test_windows_lifecycle_process.ps1
+      - name: Install, repair, reject downgrade and retain personal data on uninstall
+        run: ./scripts/test_windows_install.ps1
+      - name: Collect Windows installation log
+        if: always()
+        shell: pwsh
+        run: |
+          $source = 'C:\Program Files\RimeQ\installation.log'
+          if (Test-Path -LiteralPath $source) {
+            New-Item -ItemType Directory -Force artifacts | Out-Null
+            Copy-Item -LiteralPath $source -Destination artifacts/windows-installation.log
+          }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: RimeQ-Windows-installation-validation
+          path: artifacts/windows-installation.log
           retention-days: 7
 
   mac-package:
