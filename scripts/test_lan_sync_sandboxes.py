@@ -66,7 +66,11 @@ def pair(inviter, guest, network):
     invitation = inviter.call("invite")
     with ThreadPoolExecutor(1) as executor:
         joining = executor.submit(guest.call, "join", address=inviter.address(network), invite=invitation["invite"], code=invitation["code"], name=guest.name)
-        wait_for(lambda: bool(inviter.call("status")["pending"]), "pairing did not request local approval", 25)
+        def awaiting_approval():
+            if joining.done():
+                joining.result()
+            return bool(inviter.call("status")["pending"])
+        wait_for(awaiting_approval, "pairing did not request local approval", 25)
         pending = inviter.call("status")["pending"][0]
         inviter.call("approve", id=pending["id"])
         joining.result(timeout=30)

@@ -88,6 +88,9 @@ class Node:
                     self.call("shutdown")
                 except OSError:
                     pass
+                except RuntimeError as error:
+                    if str(error) != "sync service is restarting":
+                        raise
             try:
                 self.process.wait(timeout=8)
             except subprocess.TimeoutExpired:
@@ -129,7 +132,8 @@ def main():
     with tempfile.TemporaryDirectory(prefix="rimeq-lan-process-") as temporary:
         nodes = []
         try:
-            nodes = [Node(args.binary.resolve(), Path(temporary) / f"node-{i}", f"Test device {i}") for i in range(args.nodes)]
+            for i in range(args.nodes):
+                nodes.append(Node(args.binary.resolve(), Path(temporary) / f"node-{i}", f"Test device {i}"))
             nodes[0].call("create", group="Isolated test group", name=nodes[0].name)
             nodes[0].address()
             for node in nodes[1:]:

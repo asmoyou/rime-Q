@@ -1104,6 +1104,7 @@ pub async fn run(
                 match result {
                     Ok(Ok(id)) => {
                         state.peers.remove(&key);
+                        state.peers.retain(|_, p| p.address != address);
                         state.peers.insert(
                             id,
                             Peer {
@@ -1204,12 +1205,14 @@ fn discover(shared: Shared, port: u16) -> Result<mdns_sd::ServiceDaemon> {
                     }
                     let address = SocketAddr::new(ip, info.get_port());
                     let key = format!("address:{address}");
-                    s.peers.entry(key.clone()).or_insert(Peer {
-                        address,
-                        last_seen: 0,
-                        next_attempt: Instant::now(),
-                        failures: 0,
-                    });
+                    if !s.peers.values().any(|p| p.address == address) {
+                        s.peers.entry(key.clone()).or_insert(Peer {
+                            address,
+                            last_seen: 0,
+                            next_attempt: Instant::now(),
+                            failures: 0,
+                        });
+                    }
                     s.discovered.insert(key,json!({"address":address.to_string(),"invite":info.get_property_val_str("invite").unwrap_or(""),"name":info.get_property_val_str("name").filter(|n|!n.is_empty()).unwrap_or_else(||info.get_fullname().split('.').next().unwrap_or("Rime Q")).chars().filter(|c|!c.is_control()).take(128).collect::<String>()}));
                     break;
                 }
