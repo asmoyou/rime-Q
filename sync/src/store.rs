@@ -101,6 +101,34 @@ pub fn name(value: &str) -> Result<()> {
 }
 
 impl Store {
+    /// The caller holds the service lock before loading persistent sync state.
+    pub fn load(root: &Path, isolated: bool) -> Result<Self> {
+        #[cfg(target_os = "macos")]
+        let obsolete_identity = !isolated
+            && std::fs::read(root.join("identity.key")).ok().as_deref() == Some(b"keychain-v1")
+            && !root.join("isolated-test-only").exists();
+        #[cfg(not(target_os = "macos"))]
+        let obsolete_identity = false;
+        let identity = if obsolete_identity {
+            Identity::generate()
+        } else {
+            Identity::load(root, isolated)?
+        };
+        let mut store = Self::open(&root.join("state.sqlite"), identity)?;
+        if obsolete_identity {
+            // Unreleased Keychain identities are abandoned without accessing Keychain.
+            // Archive only sync state; the native personal dictionary is independent.
+            let archives = root.join("archives");
+            identity::private_directory(&archives)?;
+            store.leave(&archives.join(format!("state-{}.sqlite", identity::random())))?;
+        }
+        if store.get::<bool>("reset_identity")?.unwrap_or(false) {
+            store.identity = Identity::replace(root, isolated)?;
+            store.clear("reset_identity")?;
+        }
+        Ok(store)
+    }
+
     pub fn open(path: &Path, identity: Identity) -> Result<Self> {
         Self::init(Connection::open(path)?, identity)
     }

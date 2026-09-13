@@ -209,7 +209,7 @@ final class InputSession: NSObject {
         return menu
     }
 
-    @objc fileprivate func toggleEnglish(_ sender: Any? = nil) {
+    @objc func toggleEnglish(_ sender: Any? = nil) {
         if let owner { commitCurrent(owner) }
         if ensureSession() { QRimeSetOption(session, "ascii_mode", !QRimeGetOption(session, "ascii_mode")) }
     }

@@ -1,0 +1,158 @@
+{
+  "date": "2026-09-13",
+  "scope": "Mac LAN sync UI and pairing interaction; local isolated validation only",
+  "base_commit": "e37f4dcba2fda18f1a36beabbd7236c86e792499",
+  "machine": {
+    "model": "MacBookPro15,1",
+    "cpu": "Intel i7-8850H",
+    "memory_gib": 16,
+    "macos": "15.7.9",
+    "executed_architecture": "x86_64",
+    "compiled_architectures": [
+      "x86_64",
+      "arm64"
+    ]
+  },
+  "package": {
+    "file": "RimeQ-0.4.0-macos-universal.pkg",
+    "version": "0.4.0",
+    "build": "1789314142",
+    "bytes": 75869248,
+    "sha256": "692fdc7c809a26a1c70b993a7aabe127717829cc38d58c8bb013df6336c1ba06",
+    "signature": "ad-hoc; deep strict verification after PKG extraction passed"
+  },
+  "native": {
+    "kind": "six_mac_swift_adapters_real_librime_tls_loopback",
+    "nodes": 6,
+    "os": "15.7.9",
+    "architecture": "x86_64",
+    "binary_sha256": "f22e2ddd68a2fbe167e7c656134b56cba6e192b4eb8c4eecf76316a2cc600b9a",
+    "passed": [
+      "unrelated_parent_pid_rejected_before_state_access",
+      "default_off_no_helper_or_dictionary_scan",
+      "six_swift_adapters_real_librime_tls_nonfounder_invitations",
+      "six_signed_readback_receipts",
+      "native_window_search_stable_rows_pause_resume_and_join_cancellation",
+      "synced_word_recalled_in_real_candidates",
+      "received_deletion_blocks_unapplied_old_learning",
+      "learning_after_applied_deletion_starts_new_generation",
+      "explicit_weight_reduction",
+      "active_composition_not_committed_or_overwritten",
+      "composition_started_during_capture_await_defers_write",
+      "learning_during_await_rejects_stale_snapshot_without_loss",
+      "ascii_mode_and_manual_undo_backup_preserved",
+      "manual_undo_remains_usable_after_background_sync",
+      "native_crash_before_import_resumes_pending_application",
+      "native_crash_after_engine_import_before_ack_resumes_idempotently",
+      "backup_write_failure_preserves_engine_and_retries_pending_job",
+      "conflicting_recovery_pauses_and_preserves_both_snapshots",
+      "swift_restarts_failed_helper_with_persisted_identity",
+      "helper_exits_after_native_parent_crash_and_restarts_cleanly",
+      "six_engine_restarts_preserve_dictionary_and_group",
+      "native_leave_preserves_dictionary_and_archives_sync_state"
+    ],
+    "failure": null,
+    "seconds": 207.07
+  },
+  "protocol": {
+    "kind": "isolated_processes_real_tls",
+    "vm_test": false,
+    "nodes": 6,
+    "passed": [
+      "wrong_pairing_code_and_forged_peer_rejected",
+      "cancel_join_clears_remote_approval_and_allows_retry",
+      "each_device_joins_once",
+      "multi_origin_encrypted_convergence",
+      "founder_offline_relay",
+      "restart_and_new_address_catchup",
+      "offline_delete_wins",
+      "causal_relearning",
+      "abrupt_termination_durable_recovery",
+      "member_removal_propagates",
+      "removed_device_notified_without_dictionary_transfer",
+      "leave_rotate_identity_and_rejoin_through_nonfounder"
+    ],
+    "seconds": 34.15
+  },
+  "core_tests": 11,
+  "clippy": "passed with -D warnings",
+  "ui_validation": [
+    "real pause/resume button callbacks and fresh state before re-enabling",
+    "stable device rows during polling",
+    "device search and empty results",
+    "invalid pairing code disables Join",
+    "real join-sheet button reaches TLS approval",
+    "Cancel Join closes sheet without enrolling and clears remote approval"
+  ],
+  "screenshots": [
+    {
+      "file": "artifacts/sync-ui/approve-dark.png",
+      "sha256": "ff064dabcdab5754b3a0883ebec3bce97b93d5bf77533a3027b738c7dbc84fa3"
+    },
+    {
+      "file": "artifacts/sync-ui/approve-light.png",
+      "sha256": "35028903ac1eb5a03f34c308f419d1ce9e0937e8f20799e88515beb85ede3ed4"
+    },
+    {
+      "file": "artifacts/sync-ui/compact-dark.png",
+      "sha256": "43dbfda6255f34339aa4cb8e43127a2cb882f08d6dc7b276404888d30145e408"
+    },
+    {
+      "file": "artifacts/sync-ui/compact-light.png",
+      "sha256": "f09e1e57d6b0d4c739a2f0d426a39967cd059d2bf2cbe2643836d4b1dd6d52f5"
+    },
+    {
+      "file": "artifacts/sync-ui/create-dark.png",
+      "sha256": "472fcd9dca24bc7b93290439d67e84479d95d60b9aeedd440c37d55e2c0680fe"
+    },
+    {
+      "file": "artifacts/sync-ui/create-light.png",
+      "sha256": "7a9610b1bf87ac9a6047c332f31e85ba11c73446fabd9332167d21f3205d6e37"
+    },
+    {
+      "file": "artifacts/sync-ui/devices-dark.png",
+      "sha256": "ac8f761d9fb232cd36398765b10ae914ffce71c1ebfbf65d8e912540858b901d"
+    },
+    {
+      "file": "artifacts/sync-ui/devices-light.png",
+      "sha256": "a6e9d1e086ff6e1cccb7a00f822ed2de0ad8c2b3bd372423d513a937103915b1"
+    },
+    {
+      "file": "artifacts/sync-ui/invite-dark.png",
+      "sha256": "2db4824888422be79675a8584f39aec61ea24abdcbdf65f0f848148ad8189159"
+    },
+    {
+      "file": "artifacts/sync-ui/invite-light.png",
+      "sha256": "41d568c900787b287dd169bf313d69983a973bedd5698e7a475873b1e72064ad"
+    },
+    {
+      "file": "artifacts/sync-ui/join-dark.png",
+      "sha256": "bc56d91bae31d17db951d10c48f8d26b1c674e678eaf4890541a5d439b2786d5"
+    },
+    {
+      "file": "artifacts/sync-ui/join-light.png",
+      "sha256": "059847c7a2e01effb355ff3075bce9aa5daaf6f6140af79b480fdeefcaf82fb0"
+    },
+    {
+      "file": "artifacts/sync-ui/twenty-devices.png",
+      "sha256": "0ab0527a91d71a609c365f250c60990a8402d7558613048629ce4fe2ad940189"
+    },
+    {
+      "file": "artifacts/sync-ui/welcome-dark.png",
+      "sha256": "204bd3f77e87ffc40390367b0cfd1e20924315167e4d9e58d79a91810c68f8f4"
+    },
+    {
+      "file": "artifacts/sync-ui/welcome-light.png",
+      "sha256": "0aa501d855d7989c36133f097d9032ebd32b4365e529f3e573c93780a9ac9a11"
+    }
+  ],
+  "limits": [
+    "one Mac; six real librime processes, plus one transient guest helper for UI cancellation",
+    "loopback TLS; mDNS disabled in isolation",
+    "native binary hash refers to independently signed preview",
+    "no real codes or personal words in screenshots",
+    "clipboard copy actions not invoked by automation",
+    "no installed-app network permission/Keychain or real-host typing acceptance",
+    "no new remote CI run or public release"
+  ]
+}

@@ -27,12 +27,12 @@ pub struct Identity {
 impl Identity {
     pub fn replace(root: &Path, isolated: bool) -> Result<Self> {
         let identity = Self::generate();
-        let mut secret = identity.key.to_bytes();
-        let saved = if isolated {
+        let mut secret = zeroize::Zeroizing::new(identity.key.to_bytes());
+        let saved = zeroize::Zeroizing::new(if isolated {
             secret.to_vec()
         } else {
-            protect(root, &secret)?
-        };
+            protect(root, secret.as_ref())?
+        });
         atomic_write(&root.join("identity.key"), &saved)?;
         secret.zeroize();
         Ok(identity)
@@ -66,23 +66,23 @@ impl Identity {
                 "test identities cannot be used for production sync"
             );
         }
-        let mut secret = if path.exists() {
-            let saved = fs::read(&path)?;
+        let mut secret = zeroize::Zeroizing::new(if path.exists() {
+            let saved = zeroize::Zeroizing::new(fs::read(&path)?);
             if isolated {
-                saved
+                saved.to_vec()
             } else {
                 unprotect(root, &saved)?
             }
         } else {
-            let key = Self::generate().key.to_bytes().to_vec();
-            let saved = if isolated {
-                key.clone()
+            let key = zeroize::Zeroizing::new(Self::generate().key.to_bytes().to_vec());
+            let saved = zeroize::Zeroizing::new(if isolated {
+                key.to_vec()
             } else {
                 protect(root, &key)?
-            };
+            });
             atomic_write(&path, &saved)?;
-            key
-        };
+            key.to_vec()
+        });
         ensure!(secret.len() == 32, "invalid device identity");
         let key = SigningKey::from_bytes(secret.as_slice().try_into()?);
         secret.zeroize();
@@ -241,21 +241,21 @@ fn unprotect(_: &Path, b: &[u8]) -> Result<Vec<u8>> {
 }
 
 #[cfg(target_os = "macos")]
-fn protect(root: &Path, b: &[u8]) -> Result<Vec<u8>> {
-    security_framework::passwords::set_generic_password(
-        "com.asmoyou.inputmethod.RimeQ.sync",
-        &digest(root.as_os_str().as_encoded_bytes()),
-        b,
-    )?;
-    Ok(b"keychain-v1".to_vec())
+fn protect(_: &Path, b: &[u8]) -> Result<Vec<u8>> {
+    ensure!(b.len() == 32, "invalid device identity");
+    let mut saved = b"private-file-v1\n".to_vec();
+    saved.extend_from_slice(b);
+    Ok(saved)
 }
 #[cfg(target_os = "macos")]
 fn unprotect(root: &Path, b: &[u8]) -> Result<Vec<u8>> {
-    ensure!(b == b"keychain-v1", "invalid key storage version");
-    Ok(security_framework::passwords::get_generic_password(
-        "com.asmoyou.inputmethod.RimeQ.sync",
-        &digest(root.as_os_str().as_encoded_bytes()),
-    )?)
+    use std::os::unix::fs::PermissionsExt;
+    let secret = b
+        .strip_prefix(b"private-file-v1\n")
+        .context("invalid key storage version")?;
+    ensure!(secret.len() == 32, "invalid device identity");
+    fs::set_permissions(root.join("identity.key"), fs::Permissions::from_mode(0o600))?;
+    Ok(secret.to_vec())
 }
 #[cfg(not(any(windows, target_os = "macos")))]
 fn protect(_: &Path, _: &[u8]) -> Result<Vec<u8>> {
@@ -264,4 +264,47 @@ fn protect(_: &Path, _: &[u8]) -> Result<Vec<u8>> {
 #[cfg(not(any(windows, target_os = "macos")))]
 fn unprotect(_: &Path, _: &[u8]) -> Result<Vec<u8>> {
     anyhow::bail!("native Linux key storage is not implemented")
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod mac_storage_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn private_file_identity_survives_restart_and_rotation() -> Result<()> {
+        let temporary = tempfile::tempdir()?;
+        let root = temporary.path().join("sync");
+        let identity = Identity::load(&root, false)?;
+        let signature = identity.sign(b"restart proof");
+        let reloaded = Identity::load(&root, false)?;
+        ensure!(
+            identity.id() == reloaded.id(),
+            "identity changed on restart"
+        );
+        verify(&reloaded.id(), b"restart proof", &signature)?;
+        ensure!(fs::metadata(&root)?.permissions().mode() & 0o777 == 0o700);
+        ensure!(
+            fs::metadata(root.join("identity.key"))?
+                .permissions()
+                .mode()
+                & 0o777
+                == 0o600
+        );
+        let replaced = Identity::replace(&root, false)?;
+        ensure!(identity.id() != replaced.id());
+        ensure!(Identity::load(&root, false)?.id() == replaced.id());
+        ensure!(Identity::load(&root, true).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn corrupt_private_identity_is_not_replaced() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        let path = root.path().join("identity.key");
+        atomic_write(&path, b"private-file-v1\ninvalid")?;
+        ensure!(Identity::load(root.path(), false).is_err());
+        ensure!(fs::read(path)? == b"private-file-v1\ninvalid");
+        Ok(())
+    }
 }

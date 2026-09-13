@@ -5,7 +5,20 @@ import subprocess
 import sys
 import tempfile
 import plistlib
+import hashlib
+import json
+from contextlib import contextmanager
 import xml.etree.ElementTree as ET
+
+
+@contextmanager
+def unregister_extracted_app(root):
+    try:
+        yield
+    finally:
+        for app in root.glob("*/Payload/RimeQ.app"):
+            subprocess.run(["/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
+                            "-u", str(app)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def verify(package):
@@ -16,9 +29,11 @@ def verify(package):
     for name in ["rime-ice-source.tar.gz", "rime-ice-GPL-3.0.txt", "wanxiang-CC-BY-4.0.txt",
                  "librime-BSD-3-Clause.txt", "runtime/Resources/LICENSE.txt"]:
         assert "RimeQ.app/Contents/Resources/Licenses/" + name in files, f"Missing dependency source/notice: {name}"
-    with tempfile.TemporaryDirectory(prefix="rimeq-pkg-check-") as temporary:
+    for name in ["MacOS/RimeQ.Sync", "Resources/Licenses/sync/Cargo.lock", "Resources/Licenses/sync/dependencies.json", "Resources/Licenses/sync/build.json"]:
+        assert "RimeQ.app/Contents/" + name in files, f"Missing sync component/provenance: {name}"
+    with tempfile.TemporaryDirectory(prefix="rimeq-pkg-check-") as temporary, unregister_extracted_app(Path(temporary) / "package"):
         expanded = Path(temporary) / "package"
-        subprocess.run(["pkgutil", "--expand", str(package), str(expanded)], check=True)
+        subprocess.run(["pkgutil", "--expand-full", str(package), str(expanded)], check=True)
         infos = list(expanded.rglob("PackageInfo"))
         assert len(infos) == 1, "Expected exactly one Rime Q payload"
         info = ET.parse(infos[0]).getroot()
@@ -35,6 +50,19 @@ def verify(package):
         assert (infos[0].parent / "Scripts/version-check.sh").exists(), "Missing preinstall downgrade protection"
         assert not (infos[0].parent / "Scripts/preserve-model.sh").exists(), "Obsolete bundled-model migration helper"
         assert not (infos[0].parent / "Scripts/model-info.plist").exists(), "Obsolete bundled-model migration metadata"
+        contents = infos[0].parent / "Payload/RimeQ.app/Contents"
+        bundle = plistlib.loads((contents / "Info.plist").read_bytes())
+        assert bundle["NSBonjourServices"] == ["_rimeq-sync._tcp"]
+        assert "Local typing" in bundle["NSLocalNetworkUsageDescription"]
+        for language in ["en", "zh-Hans", "zh-Hant"]:
+            strings = (contents / "Resources" / (language + ".lproj") / "InfoPlist.strings").read_text(encoding="utf-16")
+            assert '"NSLocalNetworkUsageDescription"' in strings, "Missing localized LAN permission purpose"
+        native_arches = set(subprocess.check_output(["lipo", "-archs", str(contents / "MacOS/RimeQ")], text=True).split())
+        sync_arches = set(subprocess.check_output(["lipo", "-archs", str(contents / "MacOS/RimeQ.Sync")], text=True).split())
+        assert native_arches == sync_arches, "Sync helper architectures differ from the native client"
+        sync_build = json.loads((contents / "Resources/Licenses/sync/build.json").read_text())
+        assert sync_build["binary_sha256"] == hashlib.sha256((contents / "MacOS/RimeQ.Sync").read_bytes()).hexdigest(), "Signed sync helper checksum differs from its provenance"
+        subprocess.run(["codesign", "--verify", "--deep", "--strict", str(contents.parent)], check=True)
         postinstall = infos[0].parent / "Scripts/postinstall"
         script = postinstall.read_text()
         assert '/usr/bin/open -n -g "$APP" --args --complete-install' in script, "Activation must use LaunchServices"

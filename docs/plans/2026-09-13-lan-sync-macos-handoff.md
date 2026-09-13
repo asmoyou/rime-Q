@@ -4,7 +4,9 @@
 
 **架构：** Rust 辅助进程负责发现、配对、签名增量和持久状态；Swift/AppKit 客户端在空闲时通过官方 librime 维护接口导出、备份、应用与回读。Mac 与 Windows 使用同一协议，每台设备加入一次，数据传播不依赖创建者常开。
 
-**技术栈：** Swift/AppKit/InputMethodKit、librime 桥接、Rust 1.92.0、SQLite、TLS 1.3、mDNS、macOS Keychain；Windows 对端为 C#/WPF 与 TSF/Broker。
+**技术栈：** Swift/AppKit/InputMethodKit、librime 桥接、Rust 1.92.0、SQLite、TLS 1.3、mDNS、macOS 私有密钥文件（不访问 Keychain）；Windows 对端为 C#/WPF 与 TSF/Broker。
+
+本文件保留阶段验收清单。2026-09-13 Mac 续作会话中，用户明确本轮范围为“先完成本机实现和隔离验证”；M2–M4 的已装应用授权、跨机器和长期实测继续作为后续事项，不能据此发布正式版本。
 
 本文件是下一阶段的执行入口。用户已要求在 Mac 继续开发、修复及真机实测，必要的构建和验证继续执行，不重复询问相同开发许可。系统原生认证由用户本人完成。先读仓库 [AGENTS.md](../../AGENTS.md)，每项取得实际证据后再勾选；本文件的未勾选项都不是通过结论。
 
@@ -58,7 +60,7 @@ git merge-base --is-ancestor 0497a254c77c1d846b18fee4645ba94e9f5f6df0 HEAD
 
 | 路径 | 用途与接手重点 |
 | --- | --- |
-| `macos/Sources/DeviceSync.swift` | 辅助进程、轮询、快照、应用、回执及恢复；`@MainActor`，跨 await 后重新核对组合输入；目前依赖共享实例与正式目录 |
+| `macos/Sources/DeviceSync.swift` | 辅助进程、轮询、快照、应用、回执及恢复；`@MainActor`，跨 await 后重新核对组合输入；已支持独立根目录、偏好、词库实例和辅助程序路径 |
 | `macos/Sources/DeviceSyncWindow.swift` | 创建/加入、发现、邀请/确认、成员状态、暂停、移除、退出、恢复；需实际操作与视觉验收 |
 | `macos/Sources/Engine.swift` | `Product.userRoot`、引擎启动与 `Engine.maintain`；维护调用在主线程，需测量对真实输入的影响 |
 | `macos/Sources/PersonalDictionary.swift` | 官方导出、解析、手动词库操作和撤销；后台同步不能覆盖手动撤销备份 |
@@ -67,7 +69,7 @@ git merge-base --is-ancestor 0497a254c77c1d846b18fee4645ba94e9f5f6df0 HEAD
 | `macos/Sources/DictionarySmoke.swift`、`ControllerSmoke.swift` | 现有隔离引擎/模拟客户端测试写法，供新增同步测试复用 |
 | `scripts/build_macos.py`、`scripts/build_sync.py` | 生成 Info.plist、本地化权限用途、辅助程序通用构建及签名、依赖许可打包；Info.plist 由脚本生成 |
 | `sync/src/service.rs` | 发现/邀请、TLS 会话、本机控制、调度及回执；发现代码在本文件，没有独立 `discovery.rs` |
-| `sync/src/store.rs`、`model.rs`、`identity.rs`、`network.rs`、`backups.rs` | 因果合并、删除屏障、成员权限、Keychain/DPAPI、地址过滤及快照保留 |
+| `sync/src/store.rs`、`model.rs`、`identity.rs`、`network.rs`、`backups.rs` | 因果合并、删除屏障、成员权限、Mac 私有密钥文件/Windows DPAPI、地址过滤及快照保留 |
 | `scripts/test_lan_sync.py`、`test_lan_sync_sandboxes.py` | 可在 Mac 重跑的共用服务/容器测试；不测试 Swift 原生适配层 |
 | `scripts/test_lan_sync_native.py`、`windows/tests/sync_engine_node.cpp` | 现有 Windows 六引擎链路；Python 使用 Windows 专用进程选项，不能直接当成 Mac 测试 |
 | `.github/workflows/ci.yml` | 三平台核心与同步、六容器、Mac 包、Windows 包/安装；新增 Mac 同步测试需接入这里或 Mac 构建 smoke |
@@ -101,24 +103,24 @@ python3 scripts/test_lan_sync_sandboxes.py --nodes 20 --output artifacts/lan-syn
 
 ### M1：补原生同步适配层测试
 
-- [ ] 先让 `DeviceSync` 可以注入测试根目录、偏好设置、词库实例和辅助程序路径；正式入口保持现有默认值。参考 `DictionarySmoke.personal()` 的临时目录及引擎初始化，不修改全局 HOME 或用户正式偏好。
-- [ ] 新增 `macos/Sources/DeviceSyncSmoke.swift` 及必要的独立引擎测试入口，接入 `main.swift` 与 `build_macos.py`。这是待新增文件；当前没有 `--sync-smoke` 命令。
-- [ ] 新增 `scripts/test_macos_sync_native.py` 或将现有原生测试适配为跨平台驱动，实际运行 Swift 同步代码和真实 librime。先固定可复现的失败/缺失覆盖，再修复，保持测试根目录和进程清理有边界。
-- [ ] 覆盖导出 → 真实 TLS → 待应用 → 官方导入 → 回读 → 签名回执；每台引擎必须实际写回，不能用直接写辅助进程 SQLite 替代。
-- [ ] 覆盖组合未结束时等待、await 期间开始新组合、await 期间新增学习、旧快照拒绝、中英文保持、降权/删除、重复操作、异常退出后的继续/恢复、重启保留及手动撤销备份保留。
-- [ ] 专项复现关键时序：辅助进程收到远端删除，但引擎尚未应用；此时导出的旧学习不得被视为用户主动重新学入。只有引擎已应用删除后产生的新学习才能进入新代次。
-- [ ] 将测试接入 Mac CI 并记录真实执行节点数。若先做单个 Mac 引擎加五个辅助进程，明确该覆盖范围，继续补齐原生落地验证。
+- [x] 先让 `DeviceSync` 可以注入测试根目录、偏好设置、词库实例和辅助程序路径；正式入口保持现有默认值。参考 `DictionarySmoke.personal()` 的临时目录及引擎初始化，不修改全局 HOME 或用户正式偏好。
+- [x] 新增 `macos/Sources/DeviceSyncSmoke.swift` 及必要的独立引擎测试入口，接入 `main.swift` 与 `build_macos.py`。入口为 `--sync-test-node`，构建支持 `--sync-smoke`，完整 `--smoke` 自动包含此测试。
+- [x] 新增 `scripts/test_macos_sync_native.py` 或将现有原生测试适配为跨平台驱动，实际运行 Swift 同步代码和真实 librime。先固定可复现的失败/缺失覆盖，再修复，保持测试根目录和进程清理有边界。
+- [x] 覆盖导出 → 真实 TLS → 待应用 → 官方导入 → 回读 → 签名回执；每台引擎必须实际写回，不能用直接写辅助进程 SQLite 替代。
+- [x] 覆盖组合未结束时等待、await 期间开始新组合、await 期间新增学习、旧快照拒绝、中英文保持、降权/删除、重复操作、异常退出后的继续/恢复、重启保留及手动撤销备份保留。
+- [x] 专项复现关键时序：辅助进程收到远端删除，但引擎尚未应用；此时导出的旧学习不得被视为用户主动重新学入。只有引擎已应用删除后产生的新学习才能进入新代次。
+- [x] 将测试接入 Mac CI 并记录真实执行节点数。若先做单个 Mac 引擎加五个辅助进程，明确该覆盖范围，继续补齐原生落地验证。
 
 验收：自动化测试确实执行 Mac 适配层；输入中不提前上屏、不吞键、不错误确认“已应用”；故障恢复后与预期词库一致，证据写入 `VALIDATION.md`。
 
-### M2：真实安装、本地网络和 Keychain 授权
+### M2：真实安装、本地网络和身份保留
 
 - [ ] 记录 Mac 型号/架构、系统版本、构建号、包摘要、已装位置和当前输入源。先用官方词库导出或引擎正常退出后的归档保留个人数据；不能在线复制 LevelDB 作为一致性备份。
 - [ ] 使用此分支 PKG 的正常安装路径验证 `/Library/Input Methods/RimeQ.app`、Bundle ID、父输入法/子模式、辅助程序存在及实际签名。分开记录落盘、注册、启用和真实文本框输入，不把 API 返回 0 当成全部通过。
 - [ ] 在已装应用中操作“个人词库 → 附近设备同步”，验证默认关闭时不进行 LAN 发现/监听；打开页面与启用/发现的权限触发时机按实际观察记录。
 - [ ] 检查生成并安装后的 `NSLocalNetworkUsageDescription`、`NSBonjourServices`、中文/英文用途说明；实际核对系统将访问归属到 Rime Q 还是辅助进程，必要时修正打包/启动方式。独立 CLI 或开发预览的权限结果不替代已装应用。
 - [ ] 覆盖首次允许、拒绝、之后在系统设置恢复；拒绝时保留本机输入/学习，界面能解释失败并恢复操作。不绕过 TCC/SIP，不使用全局权限重置。
-- [ ] 使用正式模式验证 Keychain 服务 `com.asmoyou.inputmethod.RimeQ.sync` 的首次创建、应用重启后读取、拒绝/暂不可用时的错误处理及升级后身份保留。隔离测试不经过同一密钥存储，不能代替此项。
+- [ ] 验证已安装应用的私有文件身份在重启和更新后保留。按用户最新要求，不提供未发布的 Keychain 身份迁移，不访问钥匙串；旧同步状态归档后重新生成身份并配对。
 - [ ] 同步开启状态下验证升级/同版修复与登录重启：正常退出旧辅助进程、不重复启动、持续保持身份/组成员及词库。卸载保留数据、强制结束和故障注入放到专用测试账户/VM，不为回归卸载用户现用输入法。
 
 验收：普通用户通过原生流程可完成安装和组网；权限拒绝不影响离线输入。真实签名、授权主体、首次启动/重启结果均有证据。当前构建采用 ad-hoc 签名，不能声称已具备 Developer ID 公证分发体验。

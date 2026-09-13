@@ -174,6 +174,19 @@ def main():
             nodes[0].address()
             reject_unauthorized(nodes[0], nodes[1])
             cases.append("wrong_pairing_code_and_forged_peer_rejected")
+            invite = nodes[0].call("invite")
+            with concurrent.futures.ThreadPoolExecutor(1) as executor:
+                waiting = executor.submit(nodes[1].call, "join", address=nodes[0].address(), invite=invite["invite"], code=invite["code"], name=nodes[1].name)
+                until(lambda: nodes[0].call("status")["pending"], "cancel test never requested approval")
+                assert nodes[1].call("cancel_join")["cancelled"]
+                try:
+                    waiting.result(timeout=5)
+                    raise AssertionError("cancelled guest still joined")
+                except RuntimeError as error:
+                    assert "pairing cancelled" in str(error)
+            until(lambda: not nodes[0].call("status")["pending"], "cancelled approval remained on inviter", 5)
+            assert nodes[1].call("status")["group"] is None
+            cases.append("cancel_join_clears_remote_approval_and_allows_retry")
             for node in nodes[1:]:
                 pair(nodes[0], node)
             cases.append("each_device_joins_once")

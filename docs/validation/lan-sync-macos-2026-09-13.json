@@ -1,0 +1,95 @@
+{
+  "date": "2026-09-13",
+  "scope": "Mac implementation and isolated local validation; no installed input source or personal dictionary replacement",
+  "base_commit": "e37f4dcba2fda18f1a36beabbd7236c86e792499",
+  "machine": {
+    "model": "MacBookPro15,1",
+    "cpu": "Intel Core i7-8850H 2.60 GHz",
+    "memory_gib": 16,
+    "macos": "15.7.9",
+    "executed_architecture": "x86_64",
+    "compiled_architectures": [
+      "arm64",
+      "x86_64"
+    ]
+  },
+  "package": {
+    "file": "RimeQ-0.4.0-macos-universal.pkg",
+    "version": "0.4.0",
+    "build": "1789310613",
+    "bytes": 75735755,
+    "sha256": "7dd5670b2a20818c55d0f2fa68372a27c840f730bd156ae44c83579ece5c311b",
+    "signature": "ad-hoc, extracted app codesign --verify --deep --strict passed",
+    "sync_signed_checksum_verified": true
+  },
+  "core": {
+    "tests_passed": 11,
+    "clippy": "passed with -D warnings",
+    "toolchain": "1.92.0"
+  },
+  "protocol": {
+    "kind": "isolated_processes_real_tls",
+    "vm_test": false,
+    "nodes": 6,
+    "passed": [
+      "wrong_pairing_code_and_forged_peer_rejected",
+      "each_device_joins_once",
+      "multi_origin_encrypted_convergence",
+      "founder_offline_relay",
+      "restart_and_new_address_catchup",
+      "offline_delete_wins",
+      "causal_relearning",
+      "abrupt_termination_durable_recovery",
+      "member_removal_propagates",
+      "removed_device_notified_without_dictionary_transfer",
+      "leave_rotate_identity_and_rejoin_through_nonfounder"
+    ],
+    "seconds": 38.53
+  },
+  "native": {
+    "kind": "six_mac_swift_adapters_real_librime_tls_loopback",
+    "nodes": 6,
+    "os": "15.7.9",
+    "architecture": "x86_64",
+    "binary_sha256": "81c20180ddaac2dfbdbd0055732a4bc3af5de993da3f330dbc848d932a75b989",
+    "passed": [
+      "unrelated_parent_pid_rejected_before_state_access",
+      "default_off_no_helper_or_dictionary_scan",
+      "six_swift_adapters_real_librime_tls_nonfounder_invitations",
+      "six_signed_readback_receipts",
+      "native_six_member_window_minimum_size_pause_resume_selectors",
+      "synced_word_recalled_in_real_candidates",
+      "received_deletion_blocks_unapplied_old_learning",
+      "learning_after_applied_deletion_starts_new_generation",
+      "explicit_weight_reduction",
+      "active_composition_not_committed_or_overwritten",
+      "composition_started_during_capture_await_defers_write",
+      "learning_during_await_rejects_stale_snapshot_without_loss",
+      "ascii_mode_and_manual_undo_backup_preserved",
+      "manual_undo_remains_usable_after_background_sync",
+      "native_crash_before_import_resumes_pending_application",
+      "native_crash_after_engine_import_before_ack_resumes_idempotently",
+      "backup_write_failure_preserves_engine_and_retries_pending_job",
+      "conflicting_recovery_pauses_and_preserves_both_snapshots",
+      "swift_restarts_failed_helper_with_persisted_identity",
+      "helper_exits_after_native_parent_crash_and_restarts_cleanly",
+      "six_engine_restarts_preserve_dictionary_and_group",
+      "native_leave_preserves_dictionary_and_archives_sync_state"
+    ],
+    "failure": null,
+    "seconds": 196.14
+  },
+  "preview_hash_note": "native.binary_sha256 identifies the independently signed preview executable, not the installed or packaged executable",
+  "screenshots": [
+    "artifacts/macos-sync-window.png"
+  ],
+  "network": "Six same-host loopback TLS nodes, mDNS disabled; driver explicitly refreshes peer addresses after listener restarts",
+  "not_validated": [
+    "independent physical machines",
+    "installed app local-network permission and Keychain UI",
+    "real host typing with LAN sync",
+    "Wi-Fi/VPN and sleep/wake transitions",
+    "eight-hour usage",
+    "new remote CI runs"
+  ]
+}

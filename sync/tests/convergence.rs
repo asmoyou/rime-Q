@@ -285,3 +285,64 @@ fn native_capture_must_not_treat_received_deletion_as_engine_observed() {
     converge(&mut nodes);
     assert_eq!(nodes[2].rows().unwrap(), relearned);
 }
+
+#[cfg(target_os = "macos")]
+#[test]
+fn obsolete_identity_resets_pairing_without_touching_personal_data() {
+    use rimeq_sync::identity::atomic_write;
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("sync");
+    std::fs::create_dir(&root).unwrap();
+    let personal = directory.path().join("personal-dictionary-sentinel");
+    std::fs::write(&personal, b"native dictionary stays intact").unwrap();
+    let original = Store::open(&root.join("state.sqlite"), Identity::generate()).unwrap();
+    let old_id = original.id();
+    let old_group = original
+        .create_group("unreleased group", "old device")
+        .unwrap();
+    original.change(vec![change("旧同步词", Some(8))]).unwrap();
+    atomic_write(&root.join("identity.key"), b"keychain-v1").unwrap();
+    drop(original);
+    let reset = Store::load(&root, false).unwrap();
+    assert_ne!(reset.id(), old_id);
+    assert!(reset.group().is_err());
+    assert!(!reset.enabled());
+    assert!(reset.rows().unwrap().is_empty());
+    let new_id = reset.id();
+    drop(reset);
+    let reloaded = Store::load(&root, false).unwrap();
+    assert_eq!(reloaded.id(), new_id);
+    let archive = std::fs::read_dir(root.join("archives"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let saved = Store::open(&archive, Identity::generate()).unwrap();
+    assert_eq!(saved.group().unwrap().id, old_group.id);
+    assert_eq!(saved.rows().unwrap().len(), 1);
+    assert_eq!(
+        std::fs::read(personal).unwrap(),
+        b"native dictionary stays intact"
+    );
+    reloaded.create_group("new group", "new device").unwrap();
+}
+
+#[test]
+fn interrupted_identity_reset_finishes_before_sync_can_resume() {
+    let root = tempfile::tempdir().unwrap();
+    let store = Store::load(root.path(), true).unwrap();
+    let old_id = store.id();
+    store.create_group("test", "test").unwrap();
+    store
+        .leave(&root.path().join("before-reset.sqlite"))
+        .unwrap();
+    drop(store);
+    let store = Store::load(root.path(), true).unwrap();
+    assert_ne!(store.id(), old_id);
+    assert!(store.group().is_err());
+    assert!(store.get::<bool>("reset_identity").unwrap().is_none());
+    let new_id = store.id();
+    drop(store);
+    assert_eq!(Store::load(root.path(), true).unwrap().id(), new_id);
+}

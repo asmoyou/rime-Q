@@ -30,6 +30,9 @@ enum Command {
         isolated: bool,
         #[arg(long)]
         no_discovery: bool,
+        /// Exit with the native input process; never leave a background orphan.
+        #[arg(long)]
+        parent_pid: Option<u32>,
     },
     /// Read one authenticated local command from standard input. Never use command-line secrets.
     Control {
@@ -52,7 +55,8 @@ async fn run() -> Result<()> {
             port,
             isolated,
             no_discovery,
-        } => rimeq_sync::service::run(root, bind, port, isolated, no_discovery).await,
+            parent_pid,
+        } => rimeq_sync::service::run(root, bind, port, isolated, no_discovery, parent_pid).await,
         Command::Control { root } => {
             let mut input = Vec::new();
             std::io::stdin()

@@ -9,6 +9,7 @@ import sys
 import tempfile
 import time
 import json
+import os
 from contextlib import contextmanager
 import uuid
 from dictionary_catalog import write_catalog
@@ -21,6 +22,11 @@ VERSION = "0.4.0"
 
 def run(*args):
     subprocess.run([str(arg) for arg in args], cwd=ROOT, check=True)
+
+
+def run_preview(executable, *arguments):
+    environment = {key: value for key, value in os.environ.items() if key in {"HOME", "USER", "LOGNAME", "TMPDIR", "PATH", "LANG"}}
+    subprocess.run([str(executable), *map(str, arguments)], cwd=ROOT, env=environment, check=True)
 
 
 def icon(path):
@@ -146,6 +152,11 @@ def build_app(app, universal=False, resources=True):
     from build_sync import build as build_sync
     build_sync(contents / "MacOS/RimeQ.Sync", notices / "sync", universal)
     run("codesign", "--force", "--sign", "-", contents / "MacOS/RimeQ.Sync")
+    sync_build_file = notices / "sync/build.json"
+    sync_build = json.loads(sync_build_file.read_text())
+    sync_build["unsigned_binary_sha256"] = sync_build["binary_sha256"]
+    sync_build["binary_sha256"] = digest(contents / "MacOS/RimeQ.Sync")
+    sync_build_file.write_text(json.dumps(sync_build, indent=2) + "\n")
     run("codesign", "--force", "--sign", "-", app)
     run("codesign", "--verify", "--deep", "--strict", app)
 
@@ -184,7 +195,7 @@ def isolated_smoke_app(app):
                             "-u", str(preview)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def build(universal=False, resources=True, keep_app=False, smoke=False):
+def build(universal=False, resources=True, keep_app=False, smoke=False, sync_smoke=False):
     cache = ROOT / ".cache"
     cache.mkdir(exist_ok=True)
     (ROOT / "dist").mkdir(exist_ok=True)
@@ -210,6 +221,10 @@ def build(universal=False, resources=True, keep_app=False, smoke=False):
                     run(exe, command)
                 run(exe, "--settings-render", ROOT / f"artifacts/settings-{VERSION}")
                 run(exe, "--candidate-render", ROOT / f"artifacts/candidates-{VERSION}")
+        if smoke or sync_smoke:
+            run(sys.executable, ROOT / "scripts/test_macos_sync_native.py", "--app", app)
+            with isolated_smoke_app(app) as preview:
+                run_preview(preview / "Contents/MacOS/RimeQ", "--sync-ui-render", ROOT / "artifacts/sync-ui")
         component = staging / "RimeQ-component.pkg"
         package_scripts = staging / "Scripts"
         shutil.copytree(ROOT / "scripts/macos/package-scripts", package_scripts)
@@ -265,5 +280,6 @@ if __name__ == "__main__":
     parser.add_argument("--reuse-resources", action="store_true", help="Rebuild code using previously prepared data")
     parser.add_argument("--keep-app", action="store_true", help="Keep dist/RimeQ.app for the development installer only")
     parser.add_argument("--smoke", action="store_true", help="Verify the bundled engine before packaging")
+    parser.add_argument("--sync-smoke", action="store_true", help="Run six isolated native sync engines before packaging")
     options = parser.parse_args()
-    build(options.universal, not options.reuse_resources, options.keep_app, options.smoke)
+    build(options.universal, not options.reuse_resources, options.keep_app, options.smoke, options.sync_smoke)

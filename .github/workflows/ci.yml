@@ -182,6 +182,15 @@ jobs:
           path: .cache
           key: mac-resources-${{ hashFiles('dependencies.lock.json') }}
       - run: python3 scripts/build_macos.py --universal --smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: RimeQ-macOS-sync-validation
+          path: |
+            artifacts/lan-sync-macos-native-report.json
+            artifacts/macos-sync-window.png
+            artifacts/sync-ui/
+          retention-days: 7
       - name: Install the actual PKG at its fixed system path
         run: sudo installer -pkg dist/RimeQ-*-macos-universal.pkg -target /
       - name: Verify activation result or explicit pending fallback

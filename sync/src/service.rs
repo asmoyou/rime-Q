@@ -1,5 +1,5 @@
 use crate::{
-    identity::{self, Identity},
+    identity,
     model::*,
     network,
     store::{ApplyJob, Group, Member, Revocation, Store},
@@ -80,6 +80,7 @@ struct State {
     bind: std::net::IpAddr,
     invite: Option<Invite>,
     pending: BTreeMap<String, Pending>,
+    joining: Option<(String, oneshot::Sender<()>)>,
     peers: BTreeMap<String, Peer>,
     seen: BTreeMap<String, u64>,
     seen_saved: u64,
@@ -89,6 +90,21 @@ struct State {
     stop: bool,
     network_error: Option<String>,
 }
+// A timed-out/aborted local control request must not leave joining locked.
+struct JoinAttempt {
+    shared: Shared,
+    id: String,
+}
+impl Drop for JoinAttempt {
+    fn drop(&mut self) {
+        if let Ok(mut state) = self.shared.lock() {
+            if state.joining.as_ref().is_some_and(|(id, _)| id == &self.id) {
+                state.joining = None;
+            }
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Hello {
@@ -383,14 +399,17 @@ async fn serve_peer(
                 s.invite = None;
                 receiver
             };
-            let accepted = tokio::time::timeout(Duration::from_secs(120), receiver).await;
+            // Dropping the guest connection cancels its pending approval too.
+            // No further application bytes are expected before enrollment.
+            let mut unexpected = [0u8; 1];
+            let accepted = tokio::select! {
+                accepted = tokio::time::timeout(Duration::from_secs(120), receiver) => accepted.ok().and_then(Result::ok).unwrap_or(false),
+                _ = tokio::io::AsyncReadExt::read(&mut stream, &mut unexpected) => false,
+            };
             {
                 shared.lock().unwrap().pending.remove(&id);
             }
-            ensure!(
-                accepted.ok().and_then(Result::ok).unwrap_or(false),
-                "pairing was not approved"
-            );
+            ensure!(accepted, "pairing was not approved");
             let enrollment = {
                 let s = shared.lock().unwrap();
                 ensure!(
@@ -666,14 +685,27 @@ async fn control(shared: Shared, value: Value) -> Result<Value> {
             let s = shared.lock().unwrap();
             network::address(string("address")?, s.isolated)?
         };
-        return join(
-            shared,
-            address,
-            string("invite")?,
-            string("code")?,
-            string("name")?,
-        )
-        .await;
+        let (invite, code, name) = (string("invite")?, string("code")?, string("name")?);
+        let id = identity::random();
+        let (cancel, cancelled) = oneshot::channel();
+        {
+            let mut s = shared.lock().unwrap();
+            ensure!(s.joining.is_none(), "another join is in progress");
+            ensure!(
+                s.store.get::<Group>("group")?.is_none(),
+                "already in a group"
+            );
+            s.joining = Some((id.clone(), cancel));
+        }
+        let _attempt = JoinAttempt {
+            shared: shared.clone(),
+            id,
+        };
+        return tokio::select! {
+            biased;
+            _ = cancelled => Err(anyhow::anyhow!("pairing cancelled")),
+            result = join(shared.clone(), address, invite, code, name) => result,
+        };
     }
     if action == "invite" {
         // A configured fixed port does not prove that the listener is ready.
@@ -697,6 +729,13 @@ async fn control(shared: Shared, value: Value) -> Result<Value> {
     ensure!(!s.stop, "sync service is restarting");
     match action {
         "status" => status(&s),
+        "cancel_join" => {
+            let cancelled = s
+                .joining
+                .take()
+                .is_some_and(|(_, cancel)| cancel.send(()).is_ok());
+            Ok(json!({"cancelled":cancelled,"joined":s.store.get::<Group>("group")?.is_some()}))
+        }
         "discover" => {
             s.discover_until = Some(Instant::now() + Duration::from_secs(120));
             status(&s)
@@ -909,7 +948,18 @@ pub async fn run(
     port: u16,
     isolated: bool,
     no_discovery: bool,
+    parent_pid: Option<u32>,
 ) -> Result<()> {
+    #[cfg(unix)]
+    ensure!(
+        parent_pid.is_none_or(|pid| pid > 1 && pid == unsafe { libc::getppid() } as u32),
+        "invalid native parent process"
+    );
+    #[cfg(not(unix))]
+    ensure!(
+        parent_pid.is_none(),
+        "native parent monitoring is unavailable on this platform"
+    );
     identity::private_directory(&root)?;
     let lock = std::fs::OpenOptions::new()
         .read(true)
@@ -918,12 +968,7 @@ pub async fn run(
         .truncate(false)
         .open(root.join("service.lock"))?;
     fs2::FileExt::try_lock_exclusive(&lock).context("sync service is already running")?;
-    let identity = Identity::load(&root, isolated)?;
-    let mut store = Store::open(&root.join("state.sqlite"), identity)?;
-    if store.get::<bool>("reset_identity")?.unwrap_or(false) {
-        store.identity = Identity::replace(&root, isolated)?;
-        store.clear("reset_identity")?;
-    }
+    let store = Store::load(&root, isolated)?;
     let addresses: BTreeMap<String, String> = store.get("addresses")?.unwrap_or_default();
     let mut peers = BTreeMap::new();
     for (id, address) in addresses {
@@ -961,6 +1006,7 @@ pub async fn run(
         bind,
         invite: None,
         pending: BTreeMap::new(),
+        joining: None,
         peers,
         seen,
         seen_saved: now(),
@@ -1015,6 +1061,10 @@ pub async fn run(
     let mut tick = tokio::time::interval(Duration::from_millis(500));
     loop {
         tick.tick().await;
+        #[cfg(unix)]
+        if parent_pid.is_some_and(|pid| pid != unsafe { libc::getppid() } as u32) {
+            break;
+        }
         let (enabled, browsing, stop) = {
             let s = shared.lock().unwrap();
             (

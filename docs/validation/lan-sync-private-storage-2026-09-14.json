@@ -1,0 +1,75 @@
+{
+  "date": "2026-09-14",
+  "scope": "Mac private device identity storage and permission interaction; local isolated validation only",
+  "package": {
+    "file": "RimeQ-0.4.0-macos-universal.pkg",
+    "version": "0.4.0",
+    "build": "1789315494",
+    "bytes": 75892006,
+    "sha256": "ba685f28322acad6e0850e446e58894038210ce4d11386145444c4b208481d2f",
+    "signature": "ad-hoc; extracted deep strict verification passed"
+  },
+  "rust": {
+    "passed": 15,
+    "mac_storage_cases": 4,
+    "clippy_all_targets_deny_warnings": "passed",
+    "legacy_keychain_reader": "injected synthetic success, denial and invalid data; no real Keychain access"
+  },
+  "native": {
+    "kind": "six_mac_swift_adapters_real_librime_tls_loopback",
+    "nodes": 6,
+    "os": "15.7.9",
+    "architecture": "x86_64",
+    "binary_sha256": "02cbf9b67e951d2de80f9e5fe142eeca95a680ec47bd8798299c76b89d355174",
+    "passed": [
+      "unrelated_parent_pid_rejected_before_state_access",
+      "default_off_no_helper_or_dictionary_scan",
+      "unused_page_no_identity_and_failed_start_requires_explicit_retry",
+      "six_swift_adapters_real_librime_tls_nonfounder_invitations",
+      "six_signed_readback_receipts",
+      "native_window_search_stable_rows_pause_resume_and_join_cancellation",
+      "synced_word_recalled_in_real_candidates",
+      "received_deletion_blocks_unapplied_old_learning",
+      "learning_after_applied_deletion_starts_new_generation",
+      "explicit_weight_reduction",
+      "active_composition_not_committed_or_overwritten",
+      "composition_started_during_capture_await_defers_write",
+      "learning_during_await_rejects_stale_snapshot_without_loss",
+      "ascii_mode_and_manual_undo_backup_preserved",
+      "manual_undo_remains_usable_after_background_sync",
+      "native_crash_before_import_resumes_pending_application",
+      "native_crash_after_engine_import_before_ack_resumes_idempotently",
+      "backup_write_failure_preserves_engine_and_retries_pending_job",
+      "conflicting_recovery_pauses_and_preserves_both_snapshots",
+      "swift_restarts_failed_helper_with_persisted_identity",
+      "helper_exits_after_native_parent_crash_and_restarts_cleanly",
+      "six_engine_restarts_preserve_dictionary_and_group",
+      "native_leave_preserves_dictionary_and_archives_sync_state"
+    ],
+    "failure": null,
+    "seconds": 200.71
+  },
+  "screenshots": {
+    "artifacts/sync-ui/approve-dark.png": "ff064dabcdab5754b3a0883ebec3bce97b93d5bf77533a3027b738c7dbc84fa3",
+    "artifacts/sync-ui/approve-light.png": "35028903ac1eb5a03f34c308f419d1ce9e0937e8f20799e88515beb85ede3ed4",
+    "artifacts/sync-ui/compact-dark.png": "43dbfda6255f34339aa4cb8e43127a2cb882f08d6dc7b276404888d30145e408",
+    "artifacts/sync-ui/compact-light.png": "f09e1e57d6b0d4c739a2f0d426a39967cd059d2bf2cbe2643836d4b1dd6d52f5",
+    "artifacts/sync-ui/create-dark.png": "472fcd9dca24bc7b93290439d67e84479d95d60b9aeedd440c37d55e2c0680fe",
+    "artifacts/sync-ui/create-light.png": "7a9610b1bf87ac9a6047c332f31e85ba11c73446fabd9332167d21f3205d6e37",
+    "artifacts/sync-ui/devices-dark.png": "ac8f761d9fb232cd36398765b10ae914ffce71c1ebfbf65d8e912540858b901d",
+    "artifacts/sync-ui/devices-light.png": "a6e9d1e086ff6e1cccb7a00f822ed2de0ad8c2b3bd372423d513a937103915b1",
+    "artifacts/sync-ui/invite-dark.png": "2db4824888422be79675a8584f39aec61ea24abdcbdf65f0f848148ad8189159",
+    "artifacts/sync-ui/invite-light.png": "41d568c900787b287dd169bf313d69983a973bedd5698e7a475873b1e72064ad",
+    "artifacts/sync-ui/join-dark.png": "bc56d91bae31d17db951d10c48f8d26b1c674e678eaf4890541a5d439b2786d5",
+    "artifacts/sync-ui/join-light.png": "059847c7a2e01effb355ff3075bce9aa5daaf6f6140af79b480fdeefcaf82fb0",
+    "artifacts/sync-ui/twenty-devices.png": "0ab0527a91d71a609c365f250c60990a8402d7558613048629ce4fe2ad940189",
+    "artifacts/sync-ui/welcome-dark.png": "204bd3f77e87ffc40390367b0cfd1e20924315167e4d9e58d79a91810c68f8f4",
+    "artifacts/sync-ui/welcome-light.png": "0aa501d855d7989c36133f097d9032ebd32b4365e529f3e573c93780a9ac9a11"
+  },
+  "limitations": [
+    "No installed-app migration or real Keychain authorization exercised",
+    "No installed input method or personal dictionary changed",
+    "Six native engines on one x86_64 Mac; arm64 compiled only; loopback with mDNS disabled",
+    "No cross-device acceptance, commit, push or release"
+  ]
+}
