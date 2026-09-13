@@ -1,0 +1,10 @@
+**
+!sync
+!sync/Cargo.toml
+!sync/Cargo.lock
+!sync/rust-toolchain.toml
+!sync/Dockerfile.test
+!sync/src
+!sync/src/**
+!sync/resources
+!sync/resources/**

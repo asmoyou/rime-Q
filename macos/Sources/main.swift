@@ -15,6 +15,11 @@ if arguments.count > 1 {
             try DictionaryResources.compileHelper(URL(fileURLWithPath: arguments[2]))
         case "--settings-render" where arguments.count == 3:
             try SettingsWindow.render(to: URL(fileURLWithPath: arguments[2]))
+        case "--sync-ui-render" where arguments.count == 3:
+            _ = NSApplication.shared; NSApp.setActivationPolicy(.accessory)
+            try MainActor.assumeIsolated { try DeviceSyncWindow.renderPreviews(to: URL(fileURLWithPath: arguments[2])) }
+        case "--sync-test-node" where arguments.count == 3:
+            try MainActor.assumeIsolated { try DeviceSyncSmoke.node(root: URL(fileURLWithPath: arguments[2])) }
         case "--personal-dictionary-smoke": try DictionarySmoke.personal()
         case "--dictionary-resources-smoke": try DictionarySmoke.resources()
         case "--settings-ui-smoke": try SettingsWindow.smoke()
@@ -113,6 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DictionaryResources.shared.refreshBundledConfigurationIfNeeded()
             UpdateChecker.shared.start()
             OptionalModel.shared.restore()
+            DeviceSync.shared.startIfEnabled()
             if finishInstallationAsServer {
                 do {
                     _ = try InstallationFiles.current.record(.ready, app: Bundle.main.bundleURL,
@@ -135,6 +141,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     func applicationWillTerminate(_ notification: Notification) {
+        DeviceSync.shared.stop()
         if Engine.ready { QRimeStop() }
         InstallationDiagnostics.append("input-server-stopped")
     }

@@ -11,6 +11,7 @@ bool QRimeStart(const char* frameworks, const char* shared, const char* user, bo
 void QRimeStop(void);
 const char* QRimeError(void);
 const char* QRimeVersion(void);
+uint64_t QRimeLearningRevision(void);
 uintptr_t QRimeCreateSession(void);
 void QRimeDestroySession(uintptr_t session);
 bool QRimeProcess(uintptr_t session, int key, int modifiers);

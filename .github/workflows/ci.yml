@@ -8,6 +8,48 @@ permissions:
   contents: read
 
 jobs:
+  sync-core:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify shared sync core
+        working-directory: sync
+        run: cargo test --locked
+      - name: Build sync service for isolated networking
+        working-directory: sync
+        run: cargo build --locked
+      - name: Six isolated services with real TLS
+        shell: bash
+        run: |
+          binary=sync/target/debug/rimeq-sync
+          if [ "$RUNNER_OS" = Windows ]; then binary="$binary.exe"; fi
+          python scripts/test_lan_sync.py --binary "$binary"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: RimeQ-sync-${{ matrix.os }}
+          path: artifacts/lan-sync-process-report.json
+
+  sync-sandboxes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f sync/Dockerfile.test -t rimeq-lan-sync:test .
+      - run: python3 scripts/test_lan_sync_sandboxes.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: RimeQ-sync-sandboxes
+          path: artifacts/lan-sync-sandbox-report.json
+
   client-parity:
     runs-on: ubuntu-24.04
     steps:
@@ -92,6 +134,7 @@ jobs:
           name: RimeQ-Windows-validation
           path: |
             artifacts/windows-ui/*.png
+            artifacts/lan-sync-native-report.json
           retention-days: 7
 
   windows-install:
@@ -139,6 +182,15 @@ jobs:
           path: .cache
           key: mac-resources-${{ hashFiles('dependencies.lock.json') }}
       - run: python3 scripts/build_macos.py --universal --smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: RimeQ-macOS-sync-validation
+          path: |
+            artifacts/lan-sync-macos-native-report.json
+            artifacts/macos-sync-window.png
+            artifacts/sync-ui/
+          retention-days: 7
       - name: Install the actual PKG at its fixed system path
         run: sudo installer -pkg dist/RimeQ-*-macos-universal.pkg -target /
       - name: Verify activation result or explicit pending fallback

@@ -17,6 +17,7 @@ std::string dictionary_name, dictionary_version, dictionary_columns;
 std::vector<std::string> texts, comments;
 int cursor = 0, highlighted = 0, page = 0;
 bool last_page = true;
+uint64_t learning_revision = 1;
 
 bool load(const std::string& path) {
     void* library = dlopen(path.c_str(), RTLD_NOW | RTLD_GLOBAL);
@@ -91,10 +92,11 @@ void QRimeStop(void) {
 }
 const char* QRimeError(void) { return error_message.c_str(); }
 const char* QRimeVersion(void) { return api ? api->get_version() : "unavailable"; }
+uint64_t QRimeLearningRevision(void) { return learning_revision; }
 uintptr_t QRimeCreateSession(void) { return started ? api->create_session() : 0; }
 void QRimeDestroySession(uintptr_t session) { if (started && session) api->destroy_session(session); }
-bool QRimeProcess(uintptr_t session, int key, int modifiers) { return started && session && api->process_key(session, key, modifiers); }
-bool QRimeSelect(uintptr_t session, size_t index) { return started && session && api->select_candidate_on_current_page(session, index); }
+bool QRimeProcess(uintptr_t session, int key, int modifiers) { bool handled=started && session && api->process_key(session, key, modifiers); if(handled)++learning_revision; return handled; }
+bool QRimeSelect(uintptr_t session, size_t index) { bool handled=started && session && api->select_candidate_on_current_page(session, index); if(handled)++learning_revision; return handled; }
 bool QRimeSchema(uintptr_t session, const char* schema) { return started && session && schema && api->select_schema(session, schema); }
 void QRimeClear(uintptr_t session) { if (started && session) api->clear_composition(session); }
 bool QRimeCommitComposition(uintptr_t session) { return started && session && api->commit_composition(session); }
@@ -124,7 +126,7 @@ int QRimeImportPersonalDictionary(const char* file) {
     auto manager = levers();
     if (!manager || !file || !*file) return -1;
     api->cleanup_all_sessions();
-    return manager->import_user_dict("rime_q", file);
+    ++learning_revision; return manager->import_user_dict("rime_q", file);
 }
 
 bool QRimeParseDictionaryHeader(const char* yaml) {

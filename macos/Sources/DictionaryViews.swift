@@ -95,6 +95,7 @@ final class PersonalDictionaryViewController: NSViewController, NSTableViewDataS
     private let emptyTitle = SettingsUI.label("还没有学习记录", size: 15)
     private let emptyNote = SettingsUI.label("日常选词后会逐渐积累，也可以手动新增。", size: 12, secondary: true)
     private var emptyView: NSView?
+    private var syncWindow: DeviceSyncWindow?
 
     init(store: PersonalDictionary = .shared) { self.store = store; super.init(nibName: nil, bundle: nil) }
     required init?(coder: NSCoder) { fatalError() }
@@ -107,7 +108,7 @@ final class PersonalDictionaryViewController: NSViewController, NSTableViewDataS
         sort.addItems(withTitles: ["按学习权重", "按词条", "按拼音"])
         sort.target = self; sort.action = #selector(filterRows)
         let refresh = SettingsUI.button("刷新", target: self, action: #selector(refresh))
-        let tools = SettingsUI.row([search, sort, refresh])
+        let tools = SettingsUI.row([search, sort, refresh, SettingsUI.button("附近设备同步…", target: self, action: #selector(showDeviceSync))])
         search.setContentHuggingPriority(.defaultLow, for: .horizontal)
         table.delegate = self; table.dataSource = self; table.allowsMultipleSelection = true
         table.target = self; table.doubleAction = #selector(editEntry)
@@ -132,6 +133,10 @@ final class PersonalDictionaryViewController: NSViewController, NSTableViewDataS
         updateActions()
     }
     func activate() { if !previewOnly { refresh() } }
+    @objc private func showDeviceSync() {
+        if syncWindow == nil { syncWindow = DeviceSyncWindow() }
+        syncWindow?.showWindow(nil); syncWindow?.window?.makeKeyAndOrderFront(nil)
+    }
     @objc func refresh() {
         do { all = try store.entries(); loaded = true; filterRows() }
         catch { status.stringValue = error.localizedDescription; updateActions() }
