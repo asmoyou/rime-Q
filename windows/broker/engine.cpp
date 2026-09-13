@@ -2,14 +2,41 @@
 #include "../../third_party/librime/rime_levers_api.h"
 #include "version.h"
 #include <bcrypt.h>
+#include <cctype>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
 
 namespace rq {
-namespace { const char* safe(const char* s) { return s ? s : ""; } }
+namespace {
+const char* safe(const char* s) { return s ? s : ""; }
+bool generationName(const std::string& value) {
+    if (value.size() != 36) return false;
+    for (size_t i = 0; i < value.size(); ++i) {
+        if (i == 8 || i == 13 || i == 18 || i == 23) { if (value[i] != '-') return false; }
+        else if (!std::isxdigit(static_cast<unsigned char>(value[i]))) return false;
+    }
+    return true;
+}
+}
+fs::path activeResources(const fs::path& application, const fs::path& data) {
+    auto fallback = application / L"data";
+    auto pointer = data / L"dictionaries/active.txt";
+    std::ifstream input(pointer, std::ios::binary); std::string id;
+    if (!input || !std::getline(input, id)) return fallback;
+    if (!id.empty() && id.back() == '\r') id.pop_back();
+    if (!generationName(id)) return fallback;
+    std::error_code error;
+    auto generations = fs::weakly_canonical(data / L"dictionaries/generations", error); if (error) return fallback;
+    auto root = fs::weakly_canonical(generations / wide(id), error); if (error || root.parent_path() != generations) return fallback;
+    auto shared = root / L"data";
+    for (auto required : {root / L".rimeq-generation", shared / L"build/rime_ice.table.bin",
+            shared / L"build/rime_q.schema.yaml", shared / L"build/rime_q_grammar.schema.yaml"})
+        if (!fs::is_regular_file(required, error) || error) return fallback;
+    return shared;
+}
 Engine::~Engine() { stop(); /* Static plugin registrations live until process exit. */ }
-void Engine::stop() { if (started_) { api_->finalize(); started_ = false; sessions_.clear(); available_.clear(); } }
+void Engine::stop() { if (started_) { api_->finalize(); started_ = false; sessions_.clear(); available_.clear(); generation_.clear(); } }
 void Engine::start(const fs::path& application, const fs::path& data, bool deploy) {
     root_ = data; fs::create_directories(data / L"rime"); fs::create_directories(data / L"logs");
     library_ = LoadLibraryExW((application / L"runtime/rime.dll").c_str(), nullptr,
@@ -18,8 +45,10 @@ void Engine::start(const fs::path& application, const fs::path& data, bool deplo
     auto getApi = reinterpret_cast<RimeApi* (*)()>(GetProcAddress(library_, "rime_get_api"));
     if (!getApi || !(api_ = getApi()) || !RIME_API_AVAILABLE(api_, select_candidate_on_current_page))
         throw std::runtime_error("Incompatible librime API");
-    shared_ = utf8((application / L"data").wstring()); user_ = utf8((data / L"rime").wstring());
-    prebuilt_ = utf8((application / L"data/build").wstring()); staging_ = utf8((data / L"rime/build").wstring());
+    auto resources = activeResources(application, data);
+    generation_ = resources == application / L"data" ? "" : utf8(resources.parent_path().filename().wstring());
+    shared_ = utf8(resources.wstring()); user_ = utf8((data / L"rime").wstring());
+    prebuilt_ = utf8((resources / L"build").wstring()); staging_ = utf8((data / L"rime/build").wstring());
     logs_ = utf8((data / L"logs").wstring());
     static const char* modules[] = {"default", "levers", "lua", "octagram", nullptr};
     RIME_STRUCT(RimeTraits, traits);
@@ -79,8 +108,8 @@ State Engine::process(uint64_t client, const Request& request) {
         for (auto id : available_) api_->destroy_session(id); available_.clear();
         auto directory = root_ / L"dictionary"; fs::create_directories(directory);
         auto file = directory / (request.command == Command::exportDictionary ? L"export.tsv" : L"import.tsv");
-        if (request.command == Command::importDictionary && (!fs::is_regular_file(file) || fs::file_size(file) > 16 * 1024 * 1024)) {
-            s.message = "导入文件不存在或超过 16 MB。"; return s;
+        if (request.command == Command::importDictionary && (!fs::is_regular_file(file) || fs::file_size(file) > 32 * 1024 * 1024)) {
+            s.message = "导入文件不存在或超过 32 MB。"; return s;
         }
         auto path = utf8(file.wstring());
         int count = request.command == Command::exportDictionary ? manager->export_user_dict("rime_q", path.c_str())

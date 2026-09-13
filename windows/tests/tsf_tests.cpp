@@ -4,6 +4,8 @@
 #include "identity.h"
 #include "../broker/engine.h"
 #include <msctf.h>
+#include <ctffunc.h>
+#include <ctfutb.h>
 #include <textstor.h>
 #include <olectl.h>
 #include <wrl/client.h>
@@ -179,44 +181,65 @@ int wmain(int argc, wchar_t** argv) {
         HWND window = CreateWindowExW(0, L"STATIC", L"Rime Q 隔离 TSF 验证", WS_OVERLAPPEDWINDOW, 0, 0, 800, 600, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
         Fixture first(manager.Get(), id, window), second(manager.Get(), id, window);
         check(manager->SetFocus(first.document.Get()), "Focus first TSF document");
-        ComPtr<ITfCategoryMgr> categories; check(CoCreateInstance(CLSID_TF_CategoryMgr, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&categories)), "Category manager");
-        TfGuidAtom tipId; check(categories->RegisterGUID(rq::clsid, &tipId), "TIP client identity");
         ComPtr<TestThreadManager> testManager; testManager.Attach(new TestThreadManager(manager.Get()));
-        check(tip->ActivateEx(testManager.Get(), tipId, 0), "Activate production TIP");
+        check(tip->ActivateEx(testManager.Get(), id, 0), "Activate production TIP");
         ComPtr<ITfKeyEventSink> keys; check(tip.As(&keys), "Key sink");
-        auto key = [&](Fixture& field, unsigned vk, bool expected = true) {
+        ComPtr<ITfLangBarItemMgr> bar;check(CoCreateInstance(CLSID_TF_LangBarItemMgr,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(&bar)),"Language bar manager");ComPtr<ITfLangBarItem> modeItem;
+        check(bar->GetItem(GUID_LBI_INPUTMODE,&modeItem),"Rime Q system input-mode item");
+        TF_LANGBARITEMINFO modeInfo{};check(modeItem->GetInfo(&modeInfo),"Mode bar info");
+        require(modeInfo.guidItem==GUID_LBI_INPUTMODE&&(modeInfo.dwStyle&TF_LBI_STYLE_SHOWNINTRAY),"Mode bar must use the Windows taskbar identity");
+        ComPtr<ITfLangBarItemButton> modeButton;check(modeItem.As(&modeButton),"Mode bar button");
+        auto modeText=[&](){BSTR raw=nullptr;check(modeButton->GetText(&raw),"Mode bar text");std::wstring value(raw,SysStringLen(raw));SysFreeString(raw);return value;};
+        HICON modeIcon=nullptr;check(modeButton->GetIcon(&modeIcon),"Mode bar icon");require(modeIcon!=nullptr&&modeText()==L"中","Initial mode bar presentation");DestroyIcon(modeIcon);
+        ComPtr<ITfCompartmentMgr> compartmentManager;check(manager.As(&compartmentManager),"Compartment manager");
+        ComPtr<ITfCompartment> openClose,conversionMode;check(compartmentManager->GetCompartment(GUID_COMPARTMENT_KEYBOARD_OPENCLOSE,&openClose),"Open/close compartment");
+        check(compartmentManager->GetCompartment(GUID_COMPARTMENT_KEYBOARD_INPUTMODE_CONVERSION,&conversionMode),"Conversion compartment");
+        auto compartment=[&](ITfCompartment* item){VARIANT value;VariantInit(&value);check(item->GetValue(&value),"Read mode compartment");require(value.vt==VT_I4,"Mode compartment type");auto result=value.lVal;VariantClear(&value);return result;};
+        require(compartment(openClose.Get())==1&&(compartment(conversionMode.Get())&TF_CONVERSIONMODE_NATIVE),"Initial Chinese mode compartments");
+        auto key = [&](Fixture& field, WPARAM vk, bool expected = true, LPARAM lparam = 0) {
             BOOL test = FALSE, repeated = FALSE, eaten = FALSE;
             auto before = field.store->text;
-            check(keys->OnTestKeyDown(field.context.Get(), vk, 0, &test), "Test key");
-            check(keys->OnTestKeyDown(field.context.Get(), vk, 0, &repeated), "Repeated test key");
+            check(keys->OnTestKeyDown(field.context.Get(), vk, lparam, &test), "Test key");
+            check(keys->OnTestKeyDown(field.context.Get(), vk, lparam, &repeated), "Repeated test key");
             require(field.store->text == before && test == repeated, "Test-key callback changed document");
-            if (test) check(keys->OnKeyDown(field.context.Get(), vk, 0, &eaten), "Key down");
-            if (expected != (eaten != FALSE)) { std::cerr << "vk=" << vk << " test=" << test << " eaten=" << eaten << '\n'; throw std::runtime_error("Unexpected key handling"); }
+            if (test) check(keys->OnKeyDown(field.context.Get(), vk, lparam, &eaten), "Key down");
+            if (expected != (eaten != FALSE)) { std::cerr << "vk=" << LOWORD(vk) << " test=" << test << " eaten=" << eaten << '\n'; throw std::runtime_error("Unexpected key handling"); }
             pump();
+        };
+        auto packet = [&](Fixture& field, wchar_t value, bool expected = true) {
+            key(field, (static_cast<WPARAM>(value) << 16) | VK_PACKET, expected);
         };
         BYTE keyboard[256]{}; SetKeyboardState(keyboard);
         for (char c : std::string("NIHAO")) key(first, c);
         require(first.store->text == L"ni hao", "TSF preedit mismatch");
         require(first.store->selection.acpStart == static_cast<LONG>(first.store->text.size()), "Preedit caret not at end");
         key(first, VK_SPACE); require(first.store->text == L"你好", "TSF space commit failed");
-        key(first, 'N'); key(first, 'I'); key(first, VK_ESCAPE); require(first.store->text == L"你好", "Escape left preedit");
+        for (auto value : std::wstring(L"nihao")) packet(first,value);
+        packet(first,L' ');require(first.store->text==L"你好你好","Remote Unicode packet input failed");
+        key(first, 'N'); key(first, 'I'); key(first, VK_ESCAPE); require(first.store->text == L"你好你好", "Escape left preedit");
         key(first, 'N'); key(first, 'I');
         check(manager->SetFocus(second.document.Get()), "Switch TSF focus"); pump();
         ComPtr<ITfThreadMgrEventSink> focusEvents; check(tip.As(&focusEvents), "Focus event sink");
         check(focusEvents->OnSetFocus(second.document.Get(), first.document.Get()), "Deliver focus event for unregistered fixture"); pump();
-        require(first.store->text == L"你好", "Focus change did not cancel old composition");
+        require(first.store->text == L"你好你好", "Focus change did not cancel old composition");
         for (char c : std::string("HAO")) key(second, c);
         key(second, '1'); require(second.store->text == L"好", "Number selection or first key after focus failed");
         second.store->denyWrite = true; key(second, 'N', false); second.store->denyWrite = false;
         key(second, 'H'); key(second, 'A'); key(second, 'O'); key(second, VK_SPACE); require(second.store->text == L"好好", "Write-lock failure advanced engine");
         key(second, VK_SHIFT); BOOL shiftEaten = FALSE; keys->OnKeyUp(second.context.Get(), VK_SHIFT, 0, &shiftEaten);
-        key(second, 'A', false); require(second.store->text == L"好好", "English key swallowed");
-        key(second, VK_SHIFT); keys->OnKeyUp(second.context.Get(), VK_SHIFT, 0, &shiftEaten);
+        key(second, 'A', false); require(second.store->text == L"好好"&&compartment(openClose.Get())==0&&modeText()==L"英","English key or mode presentation mismatch");
+        BOOL preservedEaten=FALSE;check(keys->OnPreservedKey(second.context.Get(),rq::modeToggleKey,&preservedEaten),"Ctrl+Space mode toggle");
+        require(preservedEaten&&compartment(openClose.Get())==1&&(compartment(conversionMode.Get())&TF_CONVERSIONMODE_NATIVE)&&modeText()==L"中","Preserved key did not restore Chinese mode");
+        POINT point{};RECT rect{};check(modeButton->OnClick(TF_LBI_CLK_LEFT,point,&rect),"Mode bar click to English");
+        require(compartment(openClose.Get())==0&&modeText()==L"英","Mode bar click did not select English");
+        check(modeButton->OnClick(TF_LBI_CLK_LEFT,point,&rect),"Mode bar click to Chinese");require(compartment(openClose.Get())==1&&modeText()==L"中","Mode bar click did not select Chinese");
         key(second, 'N'); key(second, 'I'); key(second, VK_ESCAPE);
+        VARIANT mode;VariantInit(&mode);mode.vt=VT_I4;mode.lVal=0;check(openClose->SetValue(id,&mode),"Set external English mode");pump();key(second,'A',false);
+        mode.lVal=1;check(openClose->SetValue(id,&mode),"Set external Chinese mode");pump();key(second,'N');key(second,'I');key(second,VK_ESCAPE);VariantClear(&mode);
         tip->Deactivate(); keys.Reset(); tip.Reset(); factory.Reset(); pump();
         check(manager->SetFocus(nullptr), "Clear TSF focus");
         stop = true; if (server.joinable()) server.join(); DestroyWindow(window); manager->Deactivate();
-        std::cout << "PASS real TSF context/write locks + production TIP (key/focus events driven by fixture): composition, commit, cancel, focus, key probing, lock denial, Shift, isolated librime\n";
+        std::cout << "PASS real TSF context/write locks + production TIP: composition, remote Unicode packets, cancel, focus, Shift/Ctrl+Space, mode compartments, taskbar item and isolated librime\n";
         return 0;
     } catch (const std::exception& error) {
         stop = true; if (server.joinable()) server.join(); std::cerr << error.what() << '\n'; return 1;

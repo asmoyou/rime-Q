@@ -104,8 +104,11 @@
       <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
       <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="28,28,28,24">
         <StackPanel>
-          <TextBlock x:Name="PageTitle" FontSize="25" FontWeight="SemiBold"/>
-          <TextBlock x:Name="PageSubtitle" FontSize="13" Foreground="{DynamicResource SecondaryColor}" Margin="0,7,0,24" TextWrapping="Wrap"/>
+          <Grid Margin="0,0,0,24">
+            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <StackPanel><TextBlock x:Name="PageTitle" FontSize="25" FontWeight="SemiBold"/><TextBlock x:Name="PageSubtitle" FontSize="13" Foreground="{DynamicResource SecondaryColor}" Margin="0,7,18,0" TextWrapping="Wrap"/></StackPanel>
+            <StackPanel x:Name="PageAction" Grid.Column="1" VerticalAlignment="Top" Margin="0,2,0,0"/>
+          </Grid>
           <StackPanel x:Name="Page"/>
         </StackPanel>
       </ScrollViewer>

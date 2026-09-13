@@ -45,6 +45,8 @@ Swift + AppKit + InputMethodKit；候选窗口使用不抢焦点的原生面板�
 
 前端掌握候选窗布局与皮肤。输入方案包不得直接覆盖用户的界面设置。
 
+各原生客户端共用产品层的页面、操作、状态机、数据格式和失败恢复规则；输入框架、系统菜单、安装权限与原生控件属于平台适配层。具体契约与例外见 [客户端功能一致性](CLIENT_PARITY.md)，架构取舍见 [跨平台客户端共用产品契约 ADR](plans/2026-09-12-cross-platform-client-parity-adr.md)。
+
 雾凇、万象作为可选方案包管理，专业词库作为经适配的叠加资源管理。安装多个完整方案不等于在一个会话里混跑多套规则；共享文件、Lua 名称、编码和模型依赖需要在资源管理阶段隔离、校验。
 
 ## 参考
@@ -60,7 +62,7 @@ Swift + AppKit + InputMethodKit；候选窗口使用不抢焦点的原生面板�
 
 `windows/broker` 在一个用户进程里串行管理 librime，文件锁防止同一用户的数据库出现第二个写入者，命名管道按用户 SID 隔离并拒绝远程连接。x86/x64 共用有界、带版本的字节协议，客户端读写有总超时。启动预备一个可复用会话，避免每次连接重复加载词库。基础字典已在构建时部署。
 
-`windows/settings` 使用 WPF 与 Windows 自带 .NET Framework，管理个人词库、可选模型、外观和更新。模型校验在后台进行，切换等所有组合结束后完成；文件独立存储，通过硬链接供引擎读取。`windows/installer` 使用单个嵌入 ZIP 的 EXE，逐文件验证摘要，版本化安装目录避免覆盖正在使用的 DLL；系统注册与原始用户会话中的启用分开执行。
+`windows/settings` 使用 WPF 与 Windows 自带 .NET Framework，实现与 macOS 相同的个人学习库和词库资源管理。个人词库通过 Broker 调用 librime levers API，修改前比较快照并保存完整备份。第三方词库保留原文件和来源元数据，在 `dictionaries/generations/UUID` 中复制基础资源，通过独立临时用户目录调用随包 Broker 编译和真实候选验证；活动代次只由受限 UUID 指针选择。切换时正常停止并重新启动用户 Broker，失败恢复前一代或内置资源，真实 `rime_q.userdb` 不参与代次复制。模型校验在后台进行，切换等所有组合结束后完成；文件独立存储，通过硬链接供引擎读取。`windows/installer` 使用单个嵌入 ZIP 的 EXE，逐文件验证摘要，版本化安装目录避免覆盖正在使用的 DLL；系统注册与原始用户会话中的启用分开执行。
 
 Windows 使用 librime 原生学习，未接入上述实验性核心。实现与验证范围见 [Windows 说明](WINDOWS.md) 和 [验证记录](VALIDATION.md)。
 

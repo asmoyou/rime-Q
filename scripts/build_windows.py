@@ -10,6 +10,7 @@ import subprocess
 import time
 import zipfile
 from prepare_windows_resources import prepare, ROOT, LOCK, digest
+from dictionary_catalog import write_windows_catalog
 
 
 def run(*arguments):
@@ -18,12 +19,12 @@ def run(*arguments):
 
 def resource_fingerprint():
     sources = {str(p.relative_to(ROOT)): digest(p) for p in sorted((ROOT / 'data').rglob('*')) if p.is_file()}
-    dependencies = {name: LOCK[name] for name in ['windows_runtime', 'windows_opencc_resources', 'rime_ice', 'windows_wanxiang_model']}
+    dependencies = {name: LOCK[name] for name in ['windows_runtime', 'windows_opencc_resources', 'rime_ice', 'wanxiang_model']}
     return hashlib.sha256(json.dumps([sources, dependencies], sort_keys=True).encode()).hexdigest()
 
 
 def record_resources(stage):
-    files = [stage / 'runtime/rime.dll', stage / 'model.json', stage / 'licenses/rime-ice-source.tar.gz',
+    files = [stage / 'runtime/rime.dll', stage / 'model.json', stage / 'dictionaries.json', stage / 'licenses/rime-ice-source.tar.gz',
              *sorted((stage / 'data').rglob('*'))]
     record = {'source_fingerprint': resource_fingerprint(), 'files': {
         str(p.relative_to(stage)).replace('\\','/'): digest(p) for p in files if p.is_file()}}
@@ -80,6 +81,7 @@ def build(args):
     stage = output / 'stage'
     if not args.reuse_resources:
         prepare(stage)
+        write_windows_catalog(stage, LOCK)
         # Deploy into a clean build-only user directory, then ship only compiled input resources.
         import tempfile
         with tempfile.TemporaryDirectory(prefix='rimeq-deploy-') as user:
@@ -111,6 +113,7 @@ def build(args):
             run(stage / 'RimeQ.Broker.exe', '--learn-read', stage, user)
         sources = sorted((ROOT / 'windows/settings').glob('*.cs')) + [ROOT / 'windows/installer/Setup.cs', ROOT / 'windows/tests/SettingsTests.cs']
         csharp(output / 'Settings.Tests.exe', sources, args.build, [(ROOT / 'windows/settings/Shell.xaml', 'Shell.xaml')], main='RimeQ.SettingsTests', console=True)
+        shutil.copy2(ROOT / 'windows/resources/app.config', output / 'Settings.Tests.exe.config')
         with tempfile.TemporaryDirectory(prefix='rimeq-settings-') as user:
             run(output / 'Settings.Tests.exe', stage, user, ROOT / 'artifacts/windows-ui')
         run('python', ROOT / 'scripts/test_windows_client.py')
@@ -138,7 +141,7 @@ def build(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--build', type=int, default=9122)
+    parser.add_argument('--build', type=int, default=9132)
     parser.add_argument('--reuse-resources', action='store_true')
     parser.add_argument('--smoke', action='store_true')
     parser.add_argument('--no-package', action='store_true')

@@ -97,7 +97,7 @@
 
 ## 从源码构建
 
-Windows 客户端构建：`python scripts/build_windows.py --smoke`，产物为 `dist/RimeQ-0.4.0-windows-x64.exe`。原生 TSF、独立引擎服务、WPF 设置、个人词库、可选模型及安装步骤见 [Windows 说明](docs/WINDOWS.md)。本文上方的产品截图和 macOS 安装说明对应已发布的 Mac 版；Windows 的功能与实际验证范围单独记录。
+Windows 客户端构建：`python scripts/build_windows.py --smoke`，产物为 `dist/RimeQ-0.4.0-windows-x64.exe`。原生 TSF、独立引擎服务、WPF 设置、个人词库、词库资源、可选模型及安装步骤见 [Windows 说明](docs/WINDOWS.md)。macOS 与 Windows 使用相同的设置页能力、词库与模型规则及操作流程，系统输入接入和原生控件分别适配；一致性契约见 [客户端功能一致性](docs/CLIENT_PARITY.md)。
 
 macOS 客户端构建需要 macOS 13+、Xcode 工具链和 Python 3.10+。首次构建会下载并核验固定版本依赖。
 

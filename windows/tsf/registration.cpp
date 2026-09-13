@@ -31,7 +31,8 @@ HRESULT setString(const std::wstring& path, const wchar_t* name, const std::wstr
     RegCloseKey(key); return HRESULT_FROM_WIN32(error);
 }
 const GUID categories[] = {GUID_TFCAT_TIP_KEYBOARD, GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER,
-    GUID_TFCAT_TIPCAP_UIELEMENTENABLED};
+    GUID_TFCAT_TIPCAP_UIELEMENTENABLED, GUID_TFCAT_TIPCAP_INPUTMODECOMPARTMENT,
+    GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT};
 }
 // Export aliases also preserve the COM ABI for 32-bit stdcall builds.
 #ifdef _WIN64

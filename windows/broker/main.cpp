@@ -90,6 +90,14 @@ int learning(const rq::fs::path& app, const rq::fs::path& data, bool write) {
     if (!test.process(2, {rq::Command::exportDictionary}).handled) throw std::runtime_error("Learning export failed");
     std::cout << (write ? "PASS learning import and commit\n" : "PASS learning recall after process restart\n"); return 0;
 }
+int dictionarySmoke(const rq::fs::path& app, const rq::fs::path& data, const std::string& code,
+                    const std::string& expected, bool present) {
+    rq::Engine test; test.start(app, data, false); rq::State state;
+    for (unsigned char key : code) state = test.process(1, {rq::Command::key, key, 0});
+    bool found = std::any_of(state.candidates.begin(), state.candidates.end(), [&](const rq::Candidate& item) { return item.text == expected; });
+    if (found != present) throw std::runtime_error("Managed dictionary activation mismatch");
+    std::cout << "PASS managed dictionary " << (present ? "active" : "absent") << "\n"; return 0;
+}
 int modelSmoke(const rq::fs::path& app, const rq::fs::path& data, const rq::fs::path& original) {
     if (!rq::verifiedModel(original)) throw std::runtime_error("Model fixture did not match dependency lock");
     rq::fs::create_directories(data / L"models");
@@ -118,6 +126,8 @@ int wmain(int argc, wchar_t** argv) {
             return smoke(rq::fs::absolute(argv[2]), rq::fs::absolute(argv[3]), std::wstring(argv[1]) == L"--deploy");
         if (argc == 4 && (std::wstring(argv[1]) == L"--learn-write" || std::wstring(argv[1]) == L"--learn-read"))
             return learning(rq::fs::absolute(argv[2]), rq::fs::absolute(argv[3]), std::wstring(argv[1]) == L"--learn-write");
+        if (argc == 7 && std::wstring(argv[1]) == L"--dictionary-smoke")
+            return dictionarySmoke(rq::fs::absolute(argv[2]), rq::fs::absolute(argv[3]), rq::utf8(argv[4]), rq::utf8(argv[5]), std::wstring(argv[6]) == L"present");
         if (argc == 5 && std::wstring(argv[1]) == L"--model-smoke")
             return modelSmoke(rq::fs::absolute(argv[2]), rq::fs::absolute(argv[3]), rq::fs::absolute(argv[4]));
         if (argc > 1 && (std::wstring(argv[1]) == L"--ping" || std::wstring(argv[1]) == L"--shutdown")) {
@@ -139,7 +149,12 @@ int wmain(int argc, wchar_t** argv) {
         SECURITY_ATTRIBUTES security{sizeof(security), descriptor, FALSE};
         lifecycle(root, "starting");
         std::thread initializer([app, root] {
-            try { engine.start(app, root, false); ready = true; lifecycle(root, "ready"); }
+            try {
+                engine.start(app, root, false);
+                auto generation = rq::wide(engine.generation());
+                WritePrivateProfileStringW(L"RimeQ", L"ActiveGeneration", generation.c_str(), (root / L"settings.ini").c_str());
+                ready = true; lifecycle(root, "ready");
+            }
             catch (...) { lifecycle(root, "engine-failed"); stopping = true; }
         });
         std::thread modelWorker([root] {

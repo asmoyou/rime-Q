@@ -1,65 +1,114 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
-using System.Windows.Data;
+using System.Windows.Input;
 using System.Windows.Media;
 using Microsoft.Win32;
 
 namespace RimeQ {
     internal sealed partial class SettingsWindow {
         void Personal() {
-            var actions = new WrapPanel(); page.Children.Add(actions);
-            actions.Children.Add(Async("读取个人词库", LoadDictionary));
-            actions.Children.Add(Async("导入 TSV", async () => {
-                var dialog = new OpenFileDialog { Filter = "UTF-8 词表|*.tsv;*.txt", Title = "导入个人词库" };
-                if (dialog.ShowDialog(Window) != true) return;
-                var imported = DictionaryData.Parse(File.ReadAllText(dialog.FileName, new System.Text.UTF8Encoding(false, true)));
-                await DictionaryData.Save(imported); await LoadDictionary(); Status("导入完成，学习记录已合并。");
-            }));
-            actions.Children.Add(Async("导出备份", async () => {
-                var records = await DictionaryData.Load(); var dialog = new SaveFileDialog { Filter = "UTF-8 词表|*.tsv", FileName = "RimeQ-个人词库-" + DateTime.Now.ToString("yyyyMMdd") + ".tsv" };
-                if (dialog.ShowDialog(Window) == true) { Paths.AtomicText(dialog.FileName, DictionaryData.Format(records)); Status("备份已保存。"); }
-            }));
-            var search = new TextBox { ToolTip = "按词语或全拼搜索" }; AutomationProperties.SetName(search, "搜索个人词库"); page.Children.Add(search);
-            dictionary = new DataGrid { Height = 360, AutoGenerateColumns = false, CanUserAddRows = false, CanUserDeleteRows = false,
-                SelectionMode = DataGridSelectionMode.Single, HeadersVisibility = DataGridHeadersVisibility.Column, GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-                BorderBrush = Brush("#DBE3D9"), RowHeight = 34, AlternatingRowBackground = Brush("#F7F9F6") };
-            dictionary.Columns.Add(new DataGridTextColumn { Header = "词语", Binding = new Binding("Text"), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-            dictionary.Columns.Add(new DataGridTextColumn { Header = "全拼编码", Binding = new Binding("Code"), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-            dictionary.Columns.Add(new DataGridTextColumn { Header = "学习次数", Binding = new Binding("Weight"), Width = 95 });
-            dictionary.SetResourceReference(DataGrid.BorderBrushProperty, "BorderColor");
-            dictionary.SetResourceReference(DataGrid.AlternatingRowBackgroundProperty, "WindowBackground");
-            page.Children.Add(dictionary);
-            search.TextChanged += (s,e) => { if (dictionary.ItemsSource != null) CollectionViewSource.GetDefaultView(dictionary.ItemsSource).Filter = o => {
-                var row = (DictionaryRow)o; return (row.Text ?? "").Contains(search.Text) || (row.Code ?? "").Contains(search.Text); }; };
-            var edits = new WrapPanel { Margin = new Thickness(0,14,0,0) }; page.Children.Add(edits);
-            edits.Children.Add(Action("新增", () => { if (rows == null) { Status("请先读取个人词库。"); return; } rows.Add(new DictionaryRow { Text = "新词", Code = "xin ci", Weight = 1 }); dictionary.SelectedIndex = rows.Count - 1; dictionary.ScrollIntoView(dictionary.SelectedItem); }));
-            edits.Children.Add(Action("删除所选", () => { var row = dictionary.SelectedItem as DictionaryRow; if (row != null) { rows.Remove(row); Status("已标记删除，点击保存后生效；可撤销。"); } }));
-            edits.Children.Add(Action("撤销编辑", () => { if (original != null) { rows = new ObservableCollection<DictionaryRow>(Clone(original)); dictionary.ItemsSource = rows; Status("已撤销未保存的编辑。"); } }));
-            edits.Children.Add(Async("保存修改", async () => {
-                if (saving || rows == null) return; saving = true;
-                try {
-                    dictionary.CommitEdit(DataGridEditingUnit.Cell, true); dictionary.CommitEdit(DataGridEditingUnit.Row, true);
-                    var modified = Clone(rows);
-                    var keys = new HashSet<string>(modified.Select(r => r.Text + "\t" + r.Code));
-                    modified.AddRange(original.Where(r => !keys.Contains(r.Text + "\t" + r.Code)).Select(r => new DictionaryRow { Text = r.Text, Code = r.Code, Weight = -1 }));
-                    await DictionaryData.Save(modified); await LoadDictionary(); Status("个人词库已保存。");
-                } finally { saving = false; }
-            }));
-            page.Children.Add(Text("双击单元格编辑。删除个人记录后，内置词库中的同名词仍可能出现。导入格式：词语、空格分隔的全拼、次数，使用 TAB 分列。", 12, "#667F71"));
-            Status("点击“读取个人词库”加载本机学习记录。操作前请结束正在输入的组合。");
+            var tools=new StackPanel { Orientation=Orientation.Horizontal,Margin=new Thickness(0,0,0,12) };
+            dictionarySearch=new TextBox { ToolTip="搜索词条或拼音",MinWidth=220 };
+            AutomationProperties.SetName(dictionarySearch,"搜索个人学习记录");
+            dictionarySort=new ComboBox { Width=132,ItemsSource=new[]{"按学习权重","按词条","按拼音"},SelectedIndex=0,Margin=new Thickness(0,0,8,0) };
+            var refresh=Async("刷新",LoadDictionary); var add=Async("新增…",()=>EditDictionary(null)); add.Margin=new Thickness(0);pageAction.Children.Add(add);
+            tools.Children.Add(SearchField(dictionarySearch,"搜索词条或拼音"));tools.Children.Add(dictionarySort);tools.Children.Add(refresh);page.Children.Add(tools);
+
+            dictionary=new DataGrid { Height=390,AutoGenerateColumns=false,CanUserAddRows=false,CanUserDeleteRows=false,IsReadOnly=true,
+                SelectionMode=DataGridSelectionMode.Extended,SelectionUnit=DataGridSelectionUnit.FullRow,HeadersVisibility=DataGridHeadersVisibility.Column,
+                GridLinesVisibility=DataGridGridLinesVisibility.Horizontal,BorderBrush=Brush("#DBE3D9"),RowHeight=34,AlternatingRowBackground=Brush("#F7F9F6") };
+            var textColumn=new DataGridTextColumn { Header="词条",Binding=new System.Windows.Data.Binding("Text"),Width=240 };
+            var codeColumn=new DataGridTextColumn { Header="全拼",Binding=new System.Windows.Data.Binding("Code"),Width=320 };
+            var weightHeader=new TextBlock { Text="学习权重",ToolTip="用于排序的参考值，包含导入权重，不等于实际输入次数。" };
+            dictionary.Columns.Add(textColumn);dictionary.Columns.Add(codeColumn);dictionary.Columns.Add(new DataGridTextColumn { Header=weightHeader,Binding=new System.Windows.Data.Binding("Weight"),Width=95 });
+            dictionary.SizeChanged+=(s,e)=>{ var available=Math.Max(360,e.NewSize.Width-95-SystemParameters.VerticalScrollBarWidth-4);
+                textColumn.Width=new DataGridLength(Math.Floor(available*.44)); codeColumn.Width=new DataGridLength(Math.Ceiling(available*.56)); };
+            dictionary.SetResourceReference(DataGrid.BorderBrushProperty,"BorderColor");dictionary.SetResourceReference(DataGrid.AlternatingRowBackgroundProperty,"WindowBackground");
+            dictionary.SelectionChanged+=(s,e)=>UpdateDictionaryActions(); dictionary.MouseDoubleClick+=async (s,e)=>{ if(dictionary.SelectedItems.Count==1) try { await EditDictionary((DictionaryRow)dictionary.SelectedItem); } catch(Exception error) { Error(error); } };
+            dictionaryEmptyTitle=Text("还没有学习记录",15);dictionaryEmptyTitle.FontWeight=FontWeights.Medium;dictionaryEmptyTitle.TextAlignment=TextAlignment.Center;
+            dictionaryEmptyNote=Text("日常选词后会逐渐积累，也可以手动新增。",12,"secondary");dictionaryEmptyNote.TextAlignment=TextAlignment.Center;
+            dictionaryEmpty=Vertical(dictionaryEmptyTitle,dictionaryEmptyNote);dictionaryEmpty.HorizontalAlignment=HorizontalAlignment.Center;dictionaryEmpty.VerticalAlignment=VerticalAlignment.Center;dictionaryEmpty.IsHitTestVisible=false;
+            var table=new Grid();table.Children.Add(dictionary);table.Children.Add(dictionaryEmpty);page.Children.Add(table);
+
+            dictionaryEdit=Async("编辑…",()=>EditDictionary(dictionary.SelectedItem as DictionaryRow));
+            dictionaryDelete=Async("删除…",DeleteDictionary);dictionaryUndo=Async("撤销上次修改",UndoDictionary);dictionaryExport=Async("导出…",ExportDictionary);
+            var import=Async("导入…",ImportDictionary);dictionaryExport.Margin=new Thickness(0);
+            var actionGrid=new Grid { Margin=new Thickness(0,12,0,0) };actionGrid.ColumnDefinitions.Add(new ColumnDefinition());actionGrid.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
+            var editActions=Row(dictionaryEdit,dictionaryDelete,dictionaryUndo); var fileActions=Row(import,dictionaryExport);actionGrid.Children.Add(editActions);Grid.SetColumn(fileActions,1);actionGrid.Children.Add(fileActions);page.Children.Add(actionGrid);
+            page.Children.Add(Text("学习权重不等于输入次数。删除仅移除个人记录，内置同名词仍可能出现。",11,"secondary"));
+            var bottom=new Grid { Margin=new Thickness(0,8,0,0) };bottom.ColumnDefinitions.Add(new ColumnDefinition());bottom.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
+            dictionaryStatus=Text("正在读取…",12,"secondary");AutomationProperties.SetName(dictionaryStatus,"个人词库状态");bottom.Children.Add(dictionaryStatus);
+            var backup=Action("查看备份",ShowDictionaryBackup);backup.Margin=new Thickness(0);Grid.SetColumn(backup,1);bottom.Children.Add(backup);page.Children.Add(bottom);
+            dictionarySearch.TextChanged+=(s,e)=>FilterDictionary();dictionarySort.SelectionChanged+=(s,e)=>FilterDictionary();
+            UpdateDictionaryActions();LoadDictionaryOnOpen();
         }
-        static List<DictionaryRow> Clone(IEnumerable<DictionaryRow> source) { return source.Select(r => new DictionaryRow { Text = r.Text, Code = r.Code, Weight = r.Weight }).ToList(); }
+        static List<DictionaryRow> Clone(IEnumerable<DictionaryRow> source) { return source.Select(row=>row.Copy()).ToList(); }
+        FrameworkElement SearchField(TextBox input,string placeholderText) {
+            var host=new Grid { Margin=new Thickness(0,0,10,0) };var placeholder=Text(placeholderText,12,"secondary");placeholder.Margin=new Thickness(9,0,0,0);placeholder.VerticalAlignment=VerticalAlignment.Center;placeholder.IsHitTestVisible=false;
+            host.Children.Add(input);host.Children.Add(placeholder);Action update=()=>placeholder.Visibility=string.IsNullOrEmpty(input.Text)&&!input.IsKeyboardFocused?Visibility.Visible:Visibility.Collapsed;
+            input.TextChanged+=(s,e)=>update();input.GotKeyboardFocus+=(s,e)=>update();input.LostKeyboardFocus+=(s,e)=>update();update();return host;
+        }
+        void DictionaryStatus(string text) { if(dictionaryStatus!=null) dictionaryStatus.Text=text; }
+        async void LoadDictionaryOnOpen() { try { await LoadDictionary(); } catch(Exception error) { if(selected==1) Error(error); } }
         async Task LoadDictionary() {
-            Status("正在读取个人词库…"); var loaded = await DictionaryData.Load();
-            if (selected != 1) return;
-            original = Clone(loaded); rows = new ObservableCollection<DictionaryRow>(loaded.Where(r => r.Weight >= 0)); dictionary.ItemsSource = rows; Status("已读取 " + rows.Count + " 条记录。");
+            var target=dictionary;int version=++dictionaryLoadVersion;dictionaryBusy=true;DictionaryStatus("正在读取…");UpdateDictionaryActions();
+            try { var loaded=await DictionaryLoader();if(selected!=1||dictionary!=target||dictionaryLoadVersion!=version)return;SetDictionaryRows(loaded); }
+            finally { if(selected==1&&dictionary==target&&dictionaryLoadVersion==version){dictionaryBusy=false;UpdateDictionaryActions();} }
         }
+        void SetDictionaryRows(IEnumerable<DictionaryRow> loaded) { dictionaryAll=Clone(loaded.Where(row=>row.Weight>=0));FilterDictionary(); }
+        void FilterDictionary() {
+            if(dictionary==null||dictionaryAll==null)return;
+            var query=(dictionarySearch.Text??"").Trim().ToLowerInvariant();var codeQuery=query.Replace(" ","").Replace("'","");IEnumerable<DictionaryRow> filtered=dictionaryAll.Where(row=>query.Length==0||
+                (row.Text??"").IndexOf(query,StringComparison.CurrentCultureIgnoreCase)>=0||(row.Code??"").Replace(" ","").ToLowerInvariant().Contains(codeQuery));
+            if(dictionarySort.SelectedIndex==0)filtered=filtered.OrderByDescending(row=>row.Weight).ThenBy(row=>row.Text,StringComparer.CurrentCulture);
+            else if(dictionarySort.SelectedIndex==2)filtered=filtered.OrderBy(row=>row.Code,StringComparer.Ordinal).ThenBy(row=>row.Text,StringComparer.CurrentCulture);
+            else filtered=filtered.OrderBy(row=>row.Text,StringComparer.CurrentCulture).ThenBy(row=>row.Code,StringComparer.Ordinal);
+            rows=new ObservableCollection<DictionaryRow>(filtered);dictionary.ItemsSource=rows;
+            dictionaryEmpty.Visibility=rows.Count==0?Visibility.Visible:Visibility.Collapsed;
+            dictionaryEmptyTitle.Text=dictionaryAll.Count==0?"还没有学习记录":"没有匹配的词条";
+            dictionaryEmptyNote.Text=dictionaryAll.Count==0?"日常选词后会逐渐积累，也可以手动新增。":"换个词语或拼音试试。";
+            DictionaryStatus(dictionaryAll.Count==0?"还没有个人学习记录。打字选词后可点击刷新，也可以手动新增。":"共 "+dictionaryAll.Count.ToString("N0",CultureInfo.CurrentCulture)+" 条 · 当前显示 "+rows.Count.ToString("N0",CultureInfo.CurrentCulture)+" 条");UpdateDictionaryActions();
+        }
+        void UpdateDictionaryActions() {
+            var count=dictionary==null?0:dictionary.SelectedItems.Count;
+            if(dictionaryEdit!=null)dictionaryEdit.IsEnabled=!dictionaryBusy&&dictionaryAll!=null&&count==1;
+            if(dictionaryDelete!=null)dictionaryDelete.IsEnabled=!dictionaryBusy&&dictionaryAll!=null&&count>0;
+            if(dictionaryUndo!=null)dictionaryUndo.IsEnabled=!dictionaryBusy&&DictionaryData.LastChange!=null;
+            if(dictionaryExport!=null)dictionaryExport.IsEnabled=!dictionaryBusy&&dictionaryAll!=null&&dictionaryAll.Count>0;
+        }
+        async Task ChangeDictionary(string pending,Func<Task<List<DictionaryRow>>> operation) {
+            dictionaryBusy=true;DictionaryStatus(pending);UpdateDictionaryActions();
+            try { var loaded=await operation();if(selected==1)SetDictionaryRows(loaded); }
+            finally { dictionaryBusy=false;if(selected==1)UpdateDictionaryActions(); }
+        }
+        async Task EditDictionary(DictionaryRow entry) {
+            DictionaryRow draft;if(!DictionaryDialogs.Edit(Window,entry,out draft))return;
+            await ChangeDictionary(entry==null?"正在新增个人词条…":"正在保存个人词条…",()=>DictionaryData.Save(draft,entry));
+        }
+        async Task DeleteDictionary() {
+            var selectedRows=dictionary.SelectedItems.Cast<DictionaryRow>().ToList();if(selectedRows.Count==0)return;
+            if(MessageBox.Show(Window,"删除 "+selectedRows.Count.ToString("N0",CultureInfo.CurrentCulture)+" 条个人学习记录？\n\n修改前会自动保存备份，也可以撤销本次删除。","删除个人记录",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)!=MessageBoxResult.Yes)return;
+            await ChangeDictionary("正在删除个人记录…",()=>DictionaryData.Delete(selectedRows));
+        }
+        async Task UndoDictionary() { await ChangeDictionary("正在撤销上次修改…",DictionaryData.Undo); }
+        async Task ImportDictionary() {
+            var dialog=new OpenFileDialog { Filter="UTF-8 词表|*.tsv;*.txt",Title="导入个人学习词库" };if(dialog.ShowDialog(Window)!=true)return;
+            var imported=await Task.Run(()=>DictionaryData.ReadPersonal(dialog.FileName));
+            if(MessageBox.Show(Window,"导入 "+imported.Count.ToString("N0",CultureInfo.CurrentCulture)+" 条个人记录？\n\n与现有记录合并；同词同拼音保留较高学习权重。修改前自动备份。","导入个人词库",MessageBoxButton.YesNo,MessageBoxImage.Question,MessageBoxResult.No)!=MessageBoxResult.Yes)return;
+            await ChangeDictionary("正在合并个人词库…",()=>DictionaryData.Merge(imported));
+        }
+        async Task ExportDictionary() {
+            var records=await DictionaryData.Load();var dialog=new SaveFileDialog { Filter="UTF-8 词表|*.tsv",FileName="RimeQ-个人词库.tsv",Title="导出全部个人学习记录" };
+            if(dialog.ShowDialog(Window)==true){Paths.AtomicText(dialog.FileName,DictionaryData.Format(records));DictionaryStatus("已导出 "+records.Count.ToString("N0",CultureInfo.CurrentCulture)+" 条个人记录。");}
+        }
+        void ShowDictionaryBackup() { Directory.CreateDirectory(DictionaryData.BackupDirectory);Paths.Open(DictionaryData.BackupDirectory); }
     }
 }

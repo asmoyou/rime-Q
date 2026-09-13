@@ -140,6 +140,23 @@ namespace RimeQ {
             dynamic link = shell.CreateShortcut(shortcut); link.TargetPath = Path.Combine(directory, "RimeQ.exe"); link.Arguments = "--settings";
             link.WorkingDirectory = directory; link.Description = "Rime Q 设置"; link.IconLocation = Path.Combine(directory, "RimeQ.exe"); link.Save();
         }
+        static IEnumerable<string> VersionDirectories() {
+            var versions=Path.Combine(Root,"versions");if(!Directory.Exists(versions))return Enumerable.Empty<string>();
+            return Directory.GetDirectories(versions).Where(directory=>{
+                try { SafePath(directory);var manifest=Path.Combine(directory,"payload.json");var broker=Path.Combine(directory,"RimeQ.Broker.exe");
+                    return File.Exists(manifest)&&File.Exists(broker)&&FileVersionInfo.GetVersionInfo(broker).ProductName=="Rime Q"; }
+                catch { return false; }
+            }).ToList();
+        }
+        static void RetireLaunchers(string active) {
+            foreach(var directory in VersionDirectories().Where(directory=>!string.Equals(directory,active,StringComparison.OrdinalIgnoreCase))) {
+                try {
+                    var metadata=new JavaScriptSerializer { MaxJsonLength=16*1024*1024 }.Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(directory,"payload.json")));
+                    var files=(Dictionary<string,object>)metadata["files"];
+                    foreach(var name in new[]{"RimeQ.Broker.exe","RimeQ.exe"})if(files.ContainsKey(name)){var file=EntryPath(directory,name);SafePath(file);File.Delete(file);}
+                } catch { try { Log("old-launcher-retained"); } catch { } }
+            }
+        }
         static void Install() {
             SafePath(Root); Directory.CreateDirectory(Root); Log("install-start");
             var old = Installed(); if (old != null) RequireUpgrade(InstalledVersion(old), Current);
@@ -153,7 +170,7 @@ namespace RimeQ {
                 var setup = Path.Combine(Root, "RimeQ.Setup.exe");
                 var temporary = Path.Combine(Root, "RimeQ.Setup.next.exe"); File.Copy(Path.Combine(target, "RimeQ.Uninstall.exe"), temporary, true);
                 if (File.Exists(setup)) File.Replace(temporary, setup, null); else File.Move(temporary, setup);
-                SaveRegistry(target); Shortcuts(target, false); Log("installed-pending-user-activation");
+                SaveRegistry(target); Shortcuts(target, false); Log("installed-pending-user-activation");RetireLaunchers(target);
                 // Loaded DLLs stay in their own old version directories. No overwrite or forced host termination.
                 if (old != null && !string.Equals(old, target, StringComparison.OrdinalIgnoreCase)) Log("previous-version-retained-until-uninstall");
             } catch {
@@ -191,10 +208,12 @@ namespace RimeQ {
         }
         static void StopUserService(string installed, bool removing) {
             if (installed == null) return;
-            int stopped = Run(Path.Combine(installed, "RimeQ.Broker.exe"), "--shutdown", 10);
-            if (stopped != 0 && stopped != 2) throw new IOException("请先结束正在输入的组合，再重试。");
             if (Run(Path.Combine(installed, "RimeQ.Control.exe"), "--deactivate") != 0) throw new IOException("未能切换到其他输入法。请先手动切换，再重试。");
-            Run(Path.Combine(installed, "RimeQ.exe"), "--quit", 10);
+            foreach(var directory in VersionDirectories()) {
+                int stopped=Run(Path.Combine(directory,"RimeQ.Broker.exe"),"--shutdown",10);
+                if(stopped!=0&&stopped!=2)throw new IOException("请先结束正在输入的组合，再重试。");
+                Run(Path.Combine(directory,"RimeQ.exe"),"--quit",10);
+            }
             if (removing) using (var run = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true))
                 if (run != null) run.DeleteValue("RimeQ", false);
         }
@@ -207,6 +226,10 @@ namespace RimeQ {
                 await Task.Delay(150);
             }
             return false;
+        }
+        internal static async Task<int> EnableAfterReady(Func<Task<bool>> start, Func<int> enable) {
+            if (!await start()) throw new IOException("新版输入服务未能启动，输入源仍保持停用。请稍后使用同一安装包修复。");
+            return await Task.Run(enable);
         }
         [STAThread]
         static int Main(string[] args) {
@@ -259,15 +282,16 @@ namespace RimeQ {
                     if (result != 0) throw new IOException("操作未完成（" + result + "）。程序文件及安装日志位于 Rime Q 安装目录。");
                     if (!uninstall) {
                         var current = Installed();
-                        int enabled = await Task.Run(() => Run(Path.Combine(current, "RimeQ.Control.exe"), "--enable"));
                         // This process is the original unelevated installer, so startup belongs to the actual desktop user.
-                        bool ready = await StartUserApplication(current);
-                        status.Text = enabled != 0 ? "程序已安装，输入源尚待启用。请在 Windows 语言设置中添加 Rime Q。" : ready ? "安装完成。可从 Windows 输入法列表选择 Rime Q。" : "程序已安装并启用，引擎仍在准备。请稍等再切换到 Rime Q，或从设置检查状态。";
+                        // Start the new broker before enabling the profile. A host that still has an older
+                        // versioned TIP loaded must never win the shared engine lock during this gap.
+                        int enabled = await EnableAfterReady(() => StartUserApplication(current), () => Run(Path.Combine(current, "RimeQ.Control.exe"), "--enable"));
+                        status.Text = enabled != 0 ? "程序已安装，输入源尚待启用。请在 Windows 语言设置中添加 Rime Q。" : "安装完成。可从 Windows 输入法列表选择 Rime Q。";
                     } else status.Text = "Rime Q 已停用并卸载。个人数据保留；宿主仍加载的旧文件会保留至关闭对应应用后清理。";
                     primary.Visibility = Visibility.Collapsed; close.Content = "完成";
                 } catch (Exception error) {
                     status.Text = error is System.ComponentModel.Win32Exception ? "已取消管理员认证，操作未完成。" : error.Message;
-                    if (installed != null) { try { Run(Path.Combine(installed, "RimeQ.Control.exe"), "--enable"); using (var restarted = StartPrivate(Path.Combine(installed, "RimeQ.exe"), "--background")) { } } catch { } }
+                    if (installed != null) { try { await StartUserApplication(installed); Run(Path.Combine(installed, "RimeQ.Control.exe"), "--enable"); } catch { } }
                 } finally { busy = false; primary.IsEnabled = close.IsEnabled = true; }
             };
             if (args.Length == 2 && args[0] == "--render") {

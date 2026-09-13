@@ -4,8 +4,7 @@ import json
 from pathlib import Path
 
 
-def write_catalog(contents: Path, lock: dict):
-    shared = contents / "SharedSupport"
+def catalog(shared: Path, lock: dict, model_key: str):
     ice_revision = lock["rime_ice"]["revision"]
     definitions = [
         ("cn_dicts/8105", "常用字与读音", "cn_dicts/8105.dict.yaml", False, "chinese"),
@@ -22,7 +21,7 @@ def write_catalog(contents: Path, lock: dict):
     result = []
     for resource_id, name, relative, optional, kind in definitions:
         if kind == "model":
-            model = lock["wanxiang_model"]
+            model = lock[model_key]
             result.append(dict(id=resource_id, name=name, file=relative, count=0,
                 bytes=model["bytes"], sha256=model["sha256"], optional=False, kind=kind,
                 source="https://github.com/amzxyz/RIME-LMDG", version="LTS · " + model["sha256"][:12],
@@ -51,4 +50,14 @@ def write_catalog(contents: Path, lock: dict):
             source="https://github.com/amzxyz/RIME-LMDG" if model else "https://github.com/iDvel/rime-ice",
             version="LTS · " + digest.hexdigest()[:12] if model else ice_revision[:12],
             license="CC-BY-4.0 · amzxyz" if model else "随雾凇分发；各词表原始声明保留在源文件中"))
+    return result
+
+
+def write_catalog(contents: Path, lock: dict):
+    result = catalog(contents / "SharedSupport", lock, "wanxiang_model")
     (contents / "Resources/dictionaries.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
+
+
+def write_windows_catalog(stage: Path, lock: dict):
+    result = catalog(stage / "data", lock, "wanxiang_model")
+    (stage / "dictionaries.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -17,30 +18,42 @@ using Microsoft.Win32;
 namespace RimeQ {
     internal sealed partial class SettingsWindow {
         internal readonly Window Window;
-        readonly StackPanel page, navigation, footer;
+        readonly StackPanel page, pageAction, navigation, footer;
         readonly TextBlock title, subtitle, status;
         readonly ScrollViewer scroll;
         readonly Updates updates;
         readonly ModelManager model;
+        readonly DictionaryResources resources;
         readonly Dictionary<int, Button> nav = new Dictionary<int, Button>();
         readonly Dictionary<int, Border> choices = new Dictionary<int, Border>();
         readonly Dictionary<int, TextBlock> checks = new Dictionary<int, TextBlock>();
         readonly List<NativePreview> previews = new List<NativePreview>();
-        int selected;
-        bool saving, dark;
-        TextBlock updateStatus, modelStatus, selectionStatus;
+        int selected, dictionaryLoadVersion;
+        bool dark, dictionaryBusy;
+        TextBlock updateStatus, updateCheckedAt, modelStatus, selectionStatus;
         ProgressBar modelProgress;
         Button download, cancel, remove, catUse;
         Border advancedCard;
         CheckBox grammar;
         ObservableCollection<DictionaryRow> rows;
-        List<DictionaryRow> original;
         DataGrid dictionary;
-        internal SettingsWindow(Updates updates, ModelManager model) {
-            this.updates = updates; this.model = model;
+        List<DictionaryRow> dictionaryAll;
+        TextBox dictionarySearch;
+        ComboBox dictionarySort;
+        TextBlock dictionaryStatus, dictionaryEmptyTitle, dictionaryEmptyNote;
+        FrameworkElement dictionaryEmpty;
+        Button dictionaryEdit, dictionaryDelete, dictionaryUndo, dictionaryExport;
+        DataGrid resourceTable;
+        ProgressBar resourceProgress;
+        TextBlock resourceDetail, resourceStatus;
+        Button resourceImport, resourceToggle, resourceRemove, resourceBrowse, resourceExport, resourceApply;
+        List<ResourceRow> resourceRows;
+        internal Func<Task<List<DictionaryRow>>> DictionaryLoader = DictionaryData.Load;
+        internal SettingsWindow(Updates updates, ModelManager model, DictionaryResources resources = null) {
+            this.updates = updates; this.model = model; this.resources = resources ?? new DictionaryResources();
             using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Shell.xaml")) Window = (Window)XamlReader.Load(stream);
             dark = Appearance.SystemDark; Appearance.Apply(Window, dark);
-            page = (StackPanel)Window.FindName("Page"); navigation = (StackPanel)Window.FindName("Navigation"); footer = (StackPanel)Window.FindName("Footer");
+            page = (StackPanel)Window.FindName("Page"); pageAction = (StackPanel)Window.FindName("PageAction"); navigation = (StackPanel)Window.FindName("Navigation"); footer = (StackPanel)Window.FindName("Footer");
             title = (TextBlock)Window.FindName("PageTitle"); subtitle = (TextBlock)Window.FindName("PageSubtitle"); status = (TextBlock)Window.FindName("Status"); scroll = (ScrollViewer)Window.FindName("PageScroll");
             var decoder = new IconBitmapDecoder(new Uri(Path.Combine(Paths.App,"RimeQ.ico")),BitmapCreateOptions.PreservePixelFormat,BitmapCacheOption.OnLoad);
             var logo = decoder.Frames.OrderByDescending(frame => frame.PixelWidth).First(); ((Image)Window.FindName("BrandIcon")).Source = logo; Window.Icon = logo;
@@ -50,12 +63,13 @@ namespace RimeQ {
             var divider = Separator(); divider.Margin = new Thickness(0,0,0,10); footer.Children.Add(divider);
             footer.Children.Add(Navigation("使用说明","help",() => Paths.Open(Path.Combine(Paths.App,"help","index.html"))));
             footer.Children.Add(Navigation("GitHub 项目","code",() => Paths.Open(Paths.Project))); AddNav("版本与更新",3,"update",footer);
-            updates.Changed += UpdateChanged; model.Changed += ModelChanged; SystemEvents.UserPreferenceChanged += SystemChanged;
-            Window.Closed += (s,e) => { updates.Changed -= UpdateChanged; model.Changed -= ModelChanged; SystemEvents.UserPreferenceChanged -= SystemChanged; };
+            updates.Changed += UpdateChanged; model.Changed += ModelChanged; this.resources.Changed += ResourcesChanged; SystemEvents.UserPreferenceChanged += SystemChanged;
+            Window.Closed += (s,e) => { updates.Changed -= UpdateChanged; model.Changed -= ModelChanged; this.resources.Changed -= ResourcesChanged; SystemEvents.UserPreferenceChanged -= SystemChanged; };
             ShowPage(0);
         }
         void UpdateChanged() { Window.Dispatcher.BeginInvoke(new Action(RefreshUpdate)); }
-        void ModelChanged() { Window.Dispatcher.BeginInvoke(new Action(RefreshModel)); }
+        void ModelChanged() { Window.Dispatcher.BeginInvoke(new Action(() => { RefreshModel(); RefreshResources(); })); }
+        void ResourcesChanged() { Window.Dispatcher.BeginInvoke(new Action(RefreshResources)); }
         void SystemChanged(object sender, UserPreferenceChangedEventArgs args) { Window.Dispatcher.BeginInvoke(new Action(() => SetAppearance(Appearance.SystemDark))); }
         internal void SetAppearance(bool value) { dark = value; Appearance.Apply(Window,dark); foreach (var preview in previews) preview.Dark = dark; }
         Brush Brush(string color) { return new SolidColorBrush((Color)ColorConverter.ConvertFromString(color)); }
@@ -133,8 +147,9 @@ namespace RimeQ {
             previews.Add(preview); return preview;
         }
         internal void ShowPage(int id) {
-            selected = id; page.Children.Clear(); previews.Clear(); choices.Clear(); checks.Clear();
-            updateStatus = modelStatus = selectionStatus = null; grammar = null; modelProgress = null; download = cancel = remove = catUse = null; advancedCard = null;
+            selected = id; page.Children.Clear(); pageAction.Children.Clear(); previews.Clear(); choices.Clear(); checks.Clear();
+            updateStatus = updateCheckedAt = modelStatus = selectionStatus = null; grammar = null; modelProgress = null; download = cancel = remove = catUse = null; advancedCard = null;
+            resourceTable=null;resourceProgress=null;resourceDetail=resourceStatus=null;resourceImport=resourceToggle=resourceRemove=resourceBrowse=resourceExport=resourceApply=null;resourceRows=null;
             status.Visibility = Visibility.Collapsed; scroll.ScrollToTop();
             foreach(var pair in nav) {
                 bool active = pair.Key == id;
@@ -144,9 +159,12 @@ namespace RimeQ {
                 ((TextBlock)content.Children[1]).FontWeight = active?FontWeights.SemiBold:FontWeights.Normal;
             }
             var names = new[] { "输入与外观","个人词库","词库与模型","版本与更新","皮肤" };
-            var descriptions = new[] { "按自己的习惯，调整输入与候选显示。","管理自己的学习记录，让常用表达更贴合你。","管理本机词库，了解内置资源与可选模型。","查看当前版本，自主决定何时更新。","选择舒服的配色，或让小伙伴陪你打字。" };
+            var descriptions = new[] { "按自己的习惯，调整输入与候选显示。","整理选词时积累的学习记录。","管理内置资源，添加自己的专业词表。","Rime Q · 简洁、流畅、离线的中文输入法。","选择舒服的配色，或让小伙伴陪你打字。" };
             title.Text = names[id]; subtitle.Text = descriptions[id];
             if(id == 0) InputPage(); else if(id == 1) Personal(); else if(id == 2) Resources(); else if(id == 3) Version(); else Skins();
+        }
+        internal void ActivateCurrent() {
+            if(selected==0)RefreshModel();else if(selected==1)LoadDictionaryOnOpen();else if(selected==2)RefreshResources();else if(selected==3)RefreshUpdate();else RefreshSkins();
         }
         void InputPage() {
             grammar = Check("整句优化（万象语法模型）","Grammar",toggle:true);
@@ -154,7 +172,9 @@ namespace RimeQ {
             help.Width = help.MinWidth = 20; help.Height = 22; help.MinHeight = 22; help.Padding = new Thickness(0); help.BorderThickness = new Thickness(0); help.Background = Brushes.Transparent;
             help.Content = Icon("help"); AutomationProperties.SetName(help,"了解整句优化");
             var controls = new Grid { Width = 96 }; var switchRow = Row(help,grammar); switchRow.HorizontalAlignment = HorizontalAlignment.Right; controls.Children.Add(switchRow);
-            modelStatus = Text(model.Status,12,"secondary"); download = Async("下载并开启",model.Download); cancel = Action("取消下载",model.Cancel); remove = Action("移除模型",model.Remove);
+            modelStatus = Text(model.Status,12,"secondary"); download = Async("下载并开启",model.Download); cancel = Action("取消下载",model.Cancel); remove = Action("移除模型…",() => {
+                if(MessageBox.Show(Window,"移除万象模型？\n\n释放约 420.3 MB 空间，并关闭整句优化。基础输入、词库和学习记录会保留。","移除万象模型",MessageBoxButton.YesNo,MessageBoxImage.Question,MessageBoxResult.No)==MessageBoxResult.Yes) model.Remove();
+            });
             var buttons = Row(download,cancel,remove);
             modelProgress = new ProgressBar { Height = 4, Minimum = 0, Maximum = 100, Margin = new Thickness(18,0,18,12) }; modelProgress.SetResourceReference(ProgressBar.ForegroundProperty,"Accent");
             var modelRow = new Grid { MinHeight = 48, Margin = new Thickness(18,0,18,0) }; modelRow.ColumnDefinitions.Add(new ColumnDefinition()); modelRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -167,7 +187,7 @@ namespace RimeQ {
             font.SelectionChanged += (s,e) => { if(font.SelectedItem != null) { Paths.Set("FontSize",font.SelectedItem.ToString()); preview.CandidateSize = (int)font.SelectedItem; preview.Height = PreviewHeight(preview.Skin,preview.CandidateSize); } };
             Section("候选显示",Vertical(rows,preview));
             var shortcuts = new UniformGrid { Columns = 3 };
-            string[] keys = {"⇧ Shift","数字键","− / ="}, details = {"中英文切换","选择候选","候选翻页"};
+            string[] keys = {"Shift / Ctrl+Space","数字键","− / ="}, details = {"中英文切换","选择候选","候选翻页"};
             for(int i=0;i<3;++i) { var key = Text(keys[i],12); key.FontFamily = new FontFamily("Consolas"); key.FontWeight = FontWeights.Medium; var detail = Text(details[i],12,"secondary"); detail.Margin = new Thickness(0,8,0,0); var card = Frame(Vertical(key,detail),16); card.Margin = new Thickness(0,0,i<2?12:0,0); shortcuts.Children.Add(card); }
             Section("常用按键",shortcuts);
             Section("快捷输入",Frame(Text("rq 日期 · sj 时间 · xq 星期 · nl 农历\ncC1+2 计算器 · R123.45 金额大写 · U62fc Unicode\nuuid 随机标识 · [ / ] 取候选首字 / 尾字",12,"secondary"),16),"中文模式下输入，空格或数字键选取结果。完整用法见“使用说明”。");
@@ -204,37 +224,32 @@ namespace RimeQ {
             if(advancedCard != null) { advancedCard.SetResourceReference(Border.BorderBrushProperty,active==6?"Accent":"BorderColor"); advancedCard.BorderThickness = new Thickness(active==6?2:1); }
             if(catUse != null) { catUse.Content = active==6?"正在使用":"使用敲敲猫"; catUse.IsEnabled = active!=6; }
         }
-        void Resources() {
-            var basic = Card("内置词库","雾凇基础词库随包提供，断网也能输入。两种组词方式共用个人学习记录。");
-            basic.Children.Add(Text("雾凇拼音  ·  iDvel / rime-ice\n固定版本  fbb516b2786e  ·  GPL-3.0-only",13));
-            var source = Row(Action("来源与许可",() => Paths.Open(Path.Combine(Paths.App,"licenses"))),Action("管理个人词库",() => ShowPage(1))); source.Margin = new Thickness(0,14,0,0); basic.Children.Add(source);
-            modelStatus = Text(model.Status,12,"secondary");
-            var manage = Action("管理整句优化  ›",() => ShowPage(0)); manage.Margin = new Thickness(0);
-            var row = Setting("万象语法模型",manage,"按需下载约 420.3 MB，校验通过后离线使用。",76);
-            var modelDescription = new Border { Child = modelStatus, Padding = new Thickness(18,14,18,14) };
-            Section("可选模型",Frame(Vertical(row,Separator(),modelDescription)),"关闭整句优化、升级或重装均保留已下载的模型。");
-            var data = Card("个人数据","个人词库、学习记录、设置和模型独立于程序保存，卸载默认保留。"); data.Children.Add(Text(Paths.Root,12,"secondary"));
-            var open = Action("打开个人数据文件夹",() => { Directory.CreateDirectory(Paths.Root); Paths.Open(Paths.Root); }); open.Margin = new Thickness(0,14,0,0); data.Children.Add(open);
-        }
         void RefreshModel() {
             if(modelStatus != null) modelStatus.Text = model.Status;
             if(modelProgress != null) { modelProgress.Value = model.Progress; modelProgress.Visibility = model.Busy?Visibility.Visible:Visibility.Collapsed; }
-            if(download != null) { download.Visibility = model.Valid?Visibility.Collapsed:Visibility.Visible; download.IsEnabled = !model.Busy; }
+            if(download != null) { download.Visibility = !model.Busy&&!model.Valid&&!File.Exists(Paths.Model)?Visibility.Visible:Visibility.Collapsed; download.IsEnabled = !model.Busy; }
             if(cancel != null) cancel.Visibility = model.Busy?Visibility.Visible:Visibility.Collapsed;
             if(remove != null) { remove.Visibility = File.Exists(Paths.Model) && !model.Busy?Visibility.Visible:Visibility.Collapsed; remove.IsEnabled = !model.Busy; }
             if(grammar != null) { grammar.IsEnabled = model.Valid && !model.Busy; grammar.IsChecked = Paths.Get("Grammar")=="1"; }
         }
         void Version() {
-            var version = Card("当前版本"); var name = Text("Rime Q "+Paths.Version,18); name.FontWeight = FontWeights.SemiBold; version.Children.Add(name);
-            var build = Text("Windows x64 · 构建 "+Paths.Build,12,"secondary"); build.Margin = new Thickness(0,6,0,0); version.Children.Add(build);
-            var controls = Check("每 24 小时在后台检查一次更新","AutoUpdate","1",true);
-            updateStatus = Text(updates.Result.Message,13); var info = Vertical(updateStatus,Text("只查询 GitHub 公开发布信息，不上传输入内容或个人词库，不自动下载安装。",12,"secondary")); info.Margin = new Thickness(18,14,18,14);
-            var buttons = Row(Async("检查更新",async () => { updateStatus.Text = "正在检查…"; await updates.Check(true); RefreshUpdate(); }),Action("查看发布记录",() => Paths.Open(Paths.Releases))); buttons.Margin = new Thickness(18,0,18,16);
-            Section("更新",Frame(Vertical(Setting("自动检查更新",controls,"每 24 小时在后台检查一次，不打断输入。",76),Separator(),info,buttons)));
-            var about = Card("关于 Rime Q","简洁、流畅、离线的中文输入法。"); about.Children.Add(Text("基于 librime 构建，使用独立的输入界面与个人数据目录。\n自有代码按 GPL-3.0-only 发布，第三方组件保留各自许可。",12,"secondary"));
-            var links = Row(Action("GitHub 项目",() => Paths.Open(Paths.Project)),Action("许可条款",() => Paths.Open(Path.Combine(Paths.App,"licenses"))),Action("卸载 Rime Q",Program.Uninstall)); links.Margin = new Thickness(0,14,0,0); about.Children.Add(links);
+            var check=Async("检查更新…",async()=>{updateStatus.Text="正在查询发布信息…";await updates.Check(true);RefreshUpdate();DictionaryDialogs.ShowUpdateResult(Window,updates.Result);});check.Width=120;check.Margin=new Thickness(0);
+            Section("当前版本",Frame(Setting("Rime Q "+Paths.Version,check,"Windows x64 · 构建 "+Paths.Build,80)));
+            var controls=new CheckBox { IsChecked=Paths.Get("AutoUpdate","1")=="1",Style=(Style)Window.FindResource("Switch") };AutomationProperties.SetName(controls,"每天自动检查更新");
+            controls.Click+=(s,e)=>{try{Paths.Set("AutoUpdate",controls.IsChecked==true?"1":"0");RefreshUpdate();}catch(Exception error){Error(error);}};
+            updateStatus=Text("",13);updateCheckedAt=Text("",12,"secondary");var updateInfo=Vertical(updateStatus,updateCheckedAt);updateInfo.Margin=new Thickness(0,12,0,0);
+            Section("软件更新",Vertical(Frame(Setting("自动检查更新",controls,"每天一次，只查询 GitHub 发布信息。",76)),updateInfo),"发现新版会在输入法菜单和此处提示。下载与安装由你决定。");
+            var project=Action("打开 GitHub",()=>Paths.Open(Paths.Project));project.Width=120;project.Margin=new Thickness(0);
+            var releases=Action("查看发布记录",()=>Paths.Open(Paths.Releases));releases.Width=120;releases.Margin=new Thickness(0);
+            Section("项目",Frame(Vertical(Setting("GitHub 项目",project,"asmoyou / rime-Q · 源码、文档与问题反馈",76),Separator(),Setting("发布记录",releases,"查看版本变化，下载安装包。",76))));
+            page.Children.Add(Text("日常输入与学习都在本机完成。更新检查不发送输入内容或个人词库。",12,"secondary"));RefreshUpdate();
         }
-        void RefreshUpdate() { if(updateStatus != null) updateStatus.Text = updates.Result.Message; }
+        void RefreshUpdate() {
+            if(updateStatus==null)return;updateStatus.Text=updates.Result.Message;
+            if(updates.Result.State=="available")updateStatus.SetResourceReference(TextBlock.ForegroundProperty,"Accent");else updateStatus.SetResourceReference(TextBlock.ForegroundProperty,"TextColor");
+            DateTime last;if(DateTime.TryParse(Paths.Get("LastUpdateAttempt"),CultureInfo.InvariantCulture,DateTimeStyles.RoundtripKind,out last))updateCheckedAt.Text="上次检查："+last.ToLocalTime().ToString("g",CultureInfo.CurrentCulture);
+            else updateCheckedAt.Text=Paths.Get("AutoUpdate","1")=="1"?"启用输入法后将在后台检查。":"自动检查已关闭，可随时手动检查。";
+        }
     }
     internal sealed class SkinGrid : Panel {
         protected override Size MeasureOverride(Size available) {

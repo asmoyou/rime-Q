@@ -8,6 +8,12 @@ permissions:
   contents: read
 
 jobs:
+  client-parity:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/test_client_parity.py
+
   core:
     strategy:
       fail-fast: false

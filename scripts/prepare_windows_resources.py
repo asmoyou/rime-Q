@@ -106,7 +106,7 @@ def prepare(destination):
             if digest(original) != metadata['sha256']:
                 raise ValueError('Third-party license differs from dependency lock: ' + name)
         shutil.copytree(ROOT / 'third_party/windows/licenses', licenses / 'windows', dirs_exist_ok=True)
-        model = LOCK['windows_wanxiang_model']
+        model = LOCK['wanxiang_model']
         shutil.copy2(fetch('wanxiang-LICENSE', {'url': model['license_url'], 'sha256': model['license_sha256']}),
                      licenses / 'wanxiang-CC-BY-4.0.txt')
         (destination / 'model.json').write_text(json.dumps(model, ensure_ascii=False, indent=2), encoding='utf-8')

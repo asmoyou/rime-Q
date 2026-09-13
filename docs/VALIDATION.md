@@ -302,3 +302,64 @@ UI 目视复查后修正开关与帮助图标的约束，并让下载操作按�
 新版首轮 x64 检查在第二组中止，原记录没有区分具体中止分支，没有计为通过。随后仅给测试报告补充焦点/文本不匹配原因及模块版本字段，生产代码没有因此修改；之后的完整检查通过。不据这一中止记录推断 Windows 内部原因或宣称修复了新的输入故障。
 
 当前已安装并使用新版绘制模块。界面布局、配色与猫咪曲线以 macOS 源码为基准；字体与窗口仍由 Windows 渲染，不宣称两个系统达到像素级完全一致。此次没有重新运行未受改动影响的 macOS 构建，也没有在用户机器上测试卸载。
+
+
+### 小狼毫个人词库迁移与卸载（2026-09-12）
+
+迁移来源为本机小狼毫 0.17.4.0，程序目录 `C:\Program Files\Rime\weasel-0.17.4`，用户目录 `C:\Users\36527\AppData\Roaming\Rime`。操作前切换到 Rime Q，并通过小狼毫自身的退出命令停止 `WeaselServer.exe`。完整用户目录已归档到忽略目录 `artifacts/weasel-migration/20260912-215704/weasel-user-data.tar.gz`，大小 60081944 字节，SHA-256 `436e67764e4551350889e4f4df4062458debdfc4022aff9b4d4c6967422368d2`。原用户目录及该归档均保留。
+
+使用小狼毫自身的 `rime.dll` 与 librime levers API 导出两个学习库：`luna_pinyin.userdb` 36 条、`rime_ice.userdb` 6982 条；另解析 `custom_phrase.txt` 的 35 条有效短语。共 7053 条来源记录，按词语和编码去重并保留较高权重后为 7039 条，重复 14 条，无效 0 条。合并文件为 140333 字节，SHA-256 `71bfa5af59f09445460cf7ea8edf48facff57ab0b3402053fa04474a3079a39e`；验证记录不包含实际词条内容。
+
+导入前先从 Rime Q 导出并保留原有 71 条个人记录。Broker 报告导入 7039 条；导入后重新导出 7048 条，按规范化编码核对，7039 个迁移键缺失 0 个，原有 71 个键缺失 0 个。回导文件 SHA-256 为 `94c2930c7b1c5b552c86f6331a9289f5a6a3657fc1b93900c52ee00ec283b34d`。这些结果证明词库记录已进入 Rime Q 的学习库并可由 librime 回读；本轮没有把某个真实个人词条显示到日志或输入到其他窗口。
+
+随后运行小狼毫正式卸载程序，返回码为 0。卸载后 `C:\Program Files\Rime\weasel-0.17.4`、控制面板卸载项及 HKLM 下的 Weasel 注册键均不存在，`WeaselServer.exe` 未运行，CTF TIP 注册中搜索不到 Weasel。卸载器保留了 `%APPDATA%\Rime` 和 HKCU 用户设置，本轮没有额外删除这些个人数据；空的 `C:\Program Files\Rime` 父目录也未手动清理。
+
+卸载后 Rime Q 0.4.0.9122 的应用与 Broker 仍在运行，Profile 激活返回 `hr=0`，HKLM CTF 注册仍指向 `Rime Q`。再次导出仍为 7048 条，迁移键缺失 0 个。此次验证覆盖备份、学习库迁移、回读完整性、正式卸载和 Rime Q 服务存续；没有在卸载后重复此前已通过且未受影响的 x64/x86 RichEdit 全套物理按键测试。
+
+
+## Windows 与 macOS 客户端功能对齐及远程模式状态（构建 9130，2026-09-13）
+
+用户指出 Windows 的“个人词库”和“词库与模型”与 macOS 功能及交互不同。核对 `PersonalDictionary.swift`、`DictionaryViews.swift`、`DictionaryResources.swift`、`ModelSettings.swift`、`UpdateSettings.swift` 与 Windows 实现后，确认 Windows 首版只实现了个人 TSV 的简化编辑和静态资源说明，属于产品能力缺口，不是迁移数据丢失。修复前 Broker 可导出 7053 条，全部符合设置解析规则；空表首先来自页面未自动读取，原星号列宽在 WPF 布局中也被压缩。
+
+构建 9130 包含两端产品契约对齐：个人词库打开即读取，支持词条/全拼搜索、三种排序、多选、新增/编辑、确认删除、修改前完整备份、撤销上次修改、确认导入并按同词同拼音保留较高权重、导出全部、空状态和总数/筛选数。写入前重新导出并比较受影响词条，发现新的学习或修改时停止覆盖。TSV 使用 `rime_q`、32 MB、20 万条及相同的全拼音节校验语义。
+
+“词库与模型”读取同一脚本生成的 10 项资源清单，展示内置词库、第三方词库与可选模型的类型、数量/大小、状态、来源、版本、许可和 SHA-256。支持导入独立全拼 `.dict.yaml`/TSV/TXT、填写来源与许可、启停、移除但保留原文件、查看词条、导出源文件、详细信息、重新应用和确认恢复内置。Windows 使用与 macOS 相同的 `dictionaries/configuration.json`、`imports`、`generations/UUID` 和备份语义；平台差异仅为 Windows 代次内的 `data` 布局与 Broker 生命周期。新资源先复制到用户代次，在独立临时用户目录通过随包 librime 编译并验证候选，再正常重启 Broker 切换；失败恢复原活动代次或内置资源，`rime_q.userdb` 不参与复制或清理。活动指针只接受受限 UUID、父目录和标记文件，配置/活动代次不一致时下次启动重新应用。.NET 4.8 长路径模式启用后，原先触发 `PathTooLongException` 的安装目录与长隔离用户路径组合通过。
+
+输入与外观、版本页和菜单也按审查结果补齐：模型移除先确认且只显示当前状态对应的单一操作；版本页显示构建号、上次检查时间、检查结果窗口、项目与发布入口；重新打开设置保留当前页并刷新个人词库；TSF 菜单显示“英文输入”选中状态、关于入口和动态新版本标题。macOS/Windows 模型不再使用两个锁，统一为上游 LTS 资产 `558301149`，420343852 字节，SHA-256 `9f80530f470033cfb6d4b44bb861b540f64100426f92dd0f87140883632a3d93`。新增 `docs/CLIENT_PARITY.md`、架构 ADR 和 `scripts/test_client_parity.py`，CI 在平台构建前检查五页、个人词库、资源、模型、更新、菜单及共用模型锁，避免功能再次静默分叉。
+
+本机隔离验证通过：x64/x86 协议；librime 全拼、选词、Lua 与跨进程学习；个人词库新增、备份、删除、撤销、过期快照拒绝；第三方 YAML 列顺序解析、隔离编译、启用后真实候选召回、停用后候选消失；安装目录中的资源清单及长路径编译；配置写入失败后的活动代次回退；x64/x86 生产 TIP 对真实 TSF 文本上下文、组合/写锁、取消、焦点、Shift/Ctrl+Space、模式 compartment、Language Bar 按钮和连接的测试。候选尺寸、长注释、鼠标索引、装饰透传/隐藏及边缘避让仍通过。设置测试对 5 页 × 2 外观 × 3 尺寸执行布局断言，但本轮桌面会话的 `RenderTargetBitmap` 连独立红色矩形也返回全透明，明确报告 `WPF render unavailable`，没有把透明 PNG 计为目视通过。Windows Computer Use 在本会话未提供可用的原生窗口连接，因此新版两页的最终像素目视仍需当前打开的 9130 设置窗口或后续 CI 截图确认。
+
+远程控制下单独 Shift 的按下/抬起可能未完整传递。9130 的 TSF 同时发布 `GUID_COMPARTMENT_KEYBOARD_OPENCLOSE` 与 `GUID_COMPARTMENT_KEYBOARD_INPUTMODE_CONVERSION`，新增可点击的蓝色“中/A” Language Bar 按钮，并注册 Ctrl+Space 备用切换。x64/x86 测试均从 Windows Language Bar 管理器按固定 GUID 取得按钮，验证图标非空、文本按“中 → 英 → 中”变化；Shift、Ctrl+Space、按钮点击及外部 compartment 改动均与 Broker 的实际中英文状态同步。已安装 9130 的 x64/x86 DLL 使用隔离引擎重复通过同一测试。
+
+升级测试复现了长期运行宿主中仍驻留的 9121 TIP 在新 Broker 停止后重新拉起 9121 Broker。9130 安装器先停用 Profile，再通知所有仍可启动的旧 Broker/设置退出；新版本 Broker 必须 ready 后才启用 Profile，并从经过清单校验的旧版本目录删除 `RimeQ.Broker.exe` 与 `RimeQ.exe`，不强制结束仍占用旧 TIP DLL 的宿主。实际升级后 9121 至 9129 的 9 个旧目录均保留 TIP，但旧启动器数量为 0；保持 Profile 启用并停止 9130 Broker 后观察 4 秒，没有旧 Broker 自动重启。安装顺序另有测试保证 Broker 未 ready 时不调用 Profile 启用。
+
+构建 9130 已安装到 `C:\Program Files\RimeQ\versions\0.4.0.9130-92e6ec8d72044f758f126aa7bdffc03d`。Profile 首次激活在系统刷新窗口内返回 `0x80004005`，1 秒后重试成功；随后 Profile 验证返回 `hr=0x0`，Broker 返回 `ready`，设置与 Broker 进程均来自该目录。实际个人词库回导为 7059 条，7039 个小狼毫迁移键缺失 0 个，Rime Q 原有 71 个键缺失 0 个。已安装 9124 的独立 RichEdit 验收窗口多次无法取得交互桌面前台焦点，保护条件都在首键前停止且未向其他窗口发键；此前 9122 的真实宿主结果不移作 9130 结论。
+
+最终安装包为 `dist/RimeQ-0.4.0-windows-x64.exe`，构建 9130，大小 66250240 字节，SHA-256 `82279e0394525455b90549156c797102bc28e78bb5cd44a4de30af77d0389064`。包内包含共享资源清单、离线帮助、第三方许可和长路径配置，不包含 `.gram` 模型。macOS 源码的功能与状态契约已静态核对并由新增一致性检查覆盖；当前机器没有 Swift/AppKit 工具链，未把未执行的 macOS 构建或运行测试记为通过。
+
+
+## Windows 任务栏状态与远程 Unicode 输入（构建 9131，2026-09-13）
+
+用户在 9130 真实会话中确认：本机键盘可切换中英文，任务栏没有显示“中/A”，远程控制输入只产生英文。代码检查确认 9130 的状态按钮使用项目自定义 GUID，未注册 TSF 的输入模式/系统托盘能力；按键路径只识别普通 A-Z 虚拟键，不识别高字中携带 Unicode 字符的 `VK_PACKET`。9131 改用 `GUID_LBI_INPUTMODE`，持有系统 `ITfLangBarItemMgr`，注册 `GUID_TFCAT_TIPCAP_INPUTMODECOMPARTMENT` 与 `GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT`，并将 `VK_PACKET` 中的 ASCII 拼音、数字、空格及组词键送入原有 librime 路径。非 ASCII Unicode、英文模式、密码框及带 Ctrl/Alt/Windows 修饰键的输入仍交由宿主处理。
+
+x64/x86 生产 TIP 测试新增组合 `Unicode << 16 | VK_PACKET` 的真实 TSF 回调路径，验证连续拼音、空格上屏、标准任务栏 GUID、图标非空、“中/英”文字变化、按钮点击、Shift/Ctrl+Space 及 compartment 反向同步。构建产物和安装目录中的 x64/x86 DLL 均通过。设置测试通过个人词库、第三方词库、更新/下载、安装顺序、皮肤/字号/动画及 5 页 × 2 外观 × 3 尺寸的 30 张非透明 WPF 渲染；候选栏尺寸、鼠标索引、长注释、装饰透传/隐藏与边缘避让通过。
+
+9131 安装到 `C:\Program Files\RimeQ\versions\0.4.0.9131-0ce058583afb44f297f0b1e917a68f11`。Broker `--version` 返回 `Rime Q 0.4.0 (9131)`，`--ping` 返回 `ready`，Profile 验证返回 `hr=0x0`，Broker 与设置进程均来自 9131 目录。注册表中 CTF Profile 图标路径也指向 9131 x86 TIP，类别由 3 项增至 5 项。用户已在设置中看到 7060 条个人词库；当前导出也为 7060 条，7039 个小狼毫迁移键缺失 0，Rime Q 原有 71 个键缺失 0。
+
+升级后 `explorer.exe`、ChatGPT 与 NVIDIA Overlay 仍驻留 9130 TIP；已重启 Explorer，重启后的 Explorer 未再加载旧 DLL。ChatGPT 与 Overlay 不为输入测试而停止，它们要在自身重启后才会加载 9131。因此任务栏实际可见性与远程控制的真实输入结果必须在升级后新建的普通编辑宿主中验收，隔离 TSF 测试不代替该结论。Windows Computer Use 仍因 `Trusted RPC service is not configured: sky` 无法代为目视。
+
+最终安装包为 `dist/RimeQ-0.4.0-windows-x64.exe`，构建 9131，大小 66250752 字节，SHA-256 `f99cfc59e2f3f8d11562e0c2fd9d19e271ea49063943ad9a70f012abda881d27`。尚未进行 Authenticode 签名，也未发布 Windows Release。
+
+## Windows 模式图标外观与宿主版本差异（构建 9132，2026-09-13）
+
+用户确认 9131 在记事本切换 Rime Q 时已经显示“中/A”，但 ChatGPT 聊天界面不显示。再次读取进程模块确认：记事本 PID 16184 与 Explorer PID 15960 加载 9131 TIP，ChatGPT PID 20792 仍加载 9130 TIP。后者没有 9131 的标准模式按钮实现；需要在自身完整退出后重新打开，再验证新版。未停止当前任务所在的 ChatGPT，不把模块路径检查记作其新版真实输入通过。用户本次尚未确认远程键盘的中文候选和上屏结果。
+
+9132 按用户要求将模式图标改为透明底、白色文字，按实际笔画边界分别居中，使用灰度抗锯齿并明确生成预乘 alpha 和透明掩码。尺寸随系统小图标指标调整。直接编译生产图标函数的临时渲染检查覆盖“中”和“A”在 16/20/24/32/48 像素下的十种结果：透明角点、白色像素和水平/垂直居中均通过，居中误差不超过半个像素。已查看原尺寸及放大图，证据在 `artifacts/mode-icons-9132/contact-sheet.png`；该图不代替系统任务栏实际显示验收。
+
+已通过 x64/x86 编译、协议检查及资源复用校验。9131 已通过的隔离输入状态机、个人词库和设置页测试不因本次纯图标外观变更重复运行。
+
+安装包 `dist/RimeQ-0.4.0-windows-x64.exe` 为 66252800 字节，SHA-256 `a6e13dddc17a6da1cb2bb1877f2bf07f9dc0b2b0b330a293af2cbcc802a29f50`，与 SHA256SUMS 一致；安装包解压及清单校验通过，Python 编译检查和 `git diff --check` 通过。用户已完成升级，实际安装目录为 `C:\Program Files\RimeQ\versions\0.4.0.9132-5b07e4d504744dd6927a5fc34b6a4bf6`，Broker 报告 9132/ready，Profile 验证 `hr=0x0`，已安装 x64 TIP 与构建产物摘要一致。
+
+用户确认已能看到白色模式图标，但偶尔变回蓝底黑字。读取所有可访问进程模块发现：ChatGPT PID 23332、设置与 Sublime 已加载 9132，Explorer PID 15960 仍加载带蓝底绘制代码的 9131。此时确有新旧版本混用；不能仅凭模块路径将用户看到的每次变色都判定为同一原因。确认没有 Explorer 文件窗口后重启该 Shell 进程，新的 Explorer PID 24232 已加载 9132。随后复查 ChatGPT、Explorer、设置、Sublime 与新记事本均加载 9132，没有发现旧 TIP；刷新后的图标稳定性仍待用户实际观察反馈。
+
+9132 已在本机独立 RichEdit50W 实际宿主中通过 x64/x86 各六组物理按键验收：首键及空格上屏、数字选词、取消、Shift 中英文切换、焦点变化、切换输入法后的首键。报告均记录实际加载 `0.4.0.9132`，证据为 `artifacts/windows-host-9132-x64.json` 和 `artifacts/windows-host-9132-x86-retry.json`。x86 首次因焦点变化在首键前停止，未向其他窗口输入；单独重试后通过。Windows Computer Use 文本模式也确认新建空白记事本正文有焦点，按 n 出现 Rime Q 候选，Esc 隐藏候选。截图模式返回 `SetIsBorderRequired failed: 不支持此接口 (0x80004002)`，因此没有将任务栏截图验收或用户远程工具的实际 Unicode 输入记为通过。
