@@ -137,7 +137,9 @@ def build(args):
              for file in sorted(stage.rglob('*')) if file.is_file() and file.name != 'payload.json'}
     (stage / 'payload.json').write_text(json.dumps({'version':'0.4.0', 'build':args.build, 'files':files}, indent=2), encoding='utf-8')
     payload = output / 'payload.zip'
-    with zipfile.ZipFile(payload, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+    # Crate source notices may retain epoch timestamps. Clamp ZIP metadata to
+    # its supported range while preserving the licensed source bytes.
+    with zipfile.ZipFile(payload, 'w', zipfile.ZIP_DEFLATED, compresslevel=9, strict_timestamps=False) as archive:
         for file in sorted(stage.rglob('*')):
             if file.is_file(): archive.write(file, file.relative_to(stage))
     dist = ROOT / 'dist'; dist.mkdir(exist_ok=True)

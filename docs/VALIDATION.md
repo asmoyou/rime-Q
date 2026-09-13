@@ -473,16 +473,26 @@ Control 在发现自身 CLSID 时额外输出实际 Profile GUID、类型、语�
 发布后查询确认仓库当前为 **private**。有权限请求的 `releases/latest` 返回 `v0.4.0`，三个附件回下载校验通过；匿名仓库查询、Release 查询和下载链接均返回 404。因此本次是私有仓库中的正式 Release，不是已验证公开可下载的发布；两端客户端的匿名更新接口目前也无法取得发布信息。未改变仓库可见性。原始 CI 日志、发布说明、产物和回下载证据保留在忽略目录 `build-windows/release-v0.4.0/`。
 # 2026-09-13：多设备附近同步开发与隔离验收（尚未发布）
 
-开发基线为 `origin/main d7080df49596311fbd7ce0a5d997935b3466f279`；本轮再次 fetch 后仍一致。工作在独立目录 `C:/Users/36527/Downloads/rime-Q-lan-sync`、分支 `codex/lan-dictionary-sync`，未安装或替换宿主正在使用的输入法。实际范围与限制见 `LAN_SYNC.md`。
+开发基线为 `origin/main d7080df49596311fbd7ce0a5d997935b3466f279`；本轮再次 fetch 后仍一致。工作在独立目录 `C:/Users/36527/Downloads/rime-Q-lan-sync`、分支 `codex/lan-dictionary-sync`，未安装或替换宿主正在使用的输入法。实现与限制见 `LAN_SYNC.md`，交付检查见草稿 [PR #3](https://github.com/asmoyou/rime-Q/pull/3)。CI 状态以 PR 对应提交的检查结果为准。
 
 已取得的证据：
 
-- Windows 10 Pro 10.0.19045，Rust 1.92.0：共用核心 10 项测试通过，覆盖六节点转发、删除屏障、并发权重与降低、缺口/签名原子性、成员撤销授权/乱序、引擎应用持久恢复与成员摘要、明确采用本机恢复、4 MiB 分批，以及“同步进程收到删除但引擎未应用”的离线学习时序。`cargo clippy --locked --all-targets -- -D warnings` 通过；后续源变更需再次验证。
-- 六个隔离 Windows 进程与独立目录，真实 TLS：再次通过八项转发、重启、新地址、断线删除和撤销场景，用时 41.65 秒。报告 `artifacts/lan-sync-process-report.json`；这是进程测试，不是六台虚拟机。
-- Docker Desktop 29.6.2 / WSL2 内核 5.15.153.1：六个独立网络/存储命名空间、每容器 384 MiB/1 CPU。专用普通桥接网络上九项测试通过：单次加入、真实 mDNS、六来源加密收敛、3+3 网络分区、恢复且无需手填新地址、创建者关机、容器重启补齐、删除后重新学习与迟到旧权重、重复传输幂等。报告 `artifacts/lan-sync-sandbox-bridge-report.json` 保存实际镜像摘要。容器共享内核，不称为六台独立内核虚拟机。
-- 初次 Docker `--internal` 网络中配对成功但 mDNS 验证失败；同网络组播探针仅收到自身响应。换用仅属本测试的普通桥接网络后通过。保留初始失败报告 `artifacts/lan-sync-sandbox-report.json`，未关闭宿主防火墙。普通桥接有默认出站路由；无端口发布、无主机文件挂载。
-- Windows Sandbox 10.0.19041：真实 librime 六个独立数据库，以及 x64 / x86 生产 TIP 的 TSF 上下文测试全部通过。覆盖输入组合保护、同步词条召回/上屏、中英文保持、过期快照拒绝、删除/降权、备份、重启、焦点/快捷键/TSF compartment。证据 `build-windows/sync-sandbox-c910911c32/output/report.json` 与对应 engine/client 日志。仅映射任务构建只读输入和专用报告目录，网络禁用；这是一个独立内核 VM 内的六个引擎数据目录，组网能力由上述六容器验证。
-- 首轮 Sandbox 的引擎和 x64 客户端通过，但测试进程退出检查失败；修正进程句柄获取并将等待从 10 秒改为 20 秒后，两种位数全部通过。第二轮启动遇到登录命令 0x800705b4 超时，重新启动本任务沙盒后第三轮通过，不能把超时当成功。
-- Windows x64/x86 原生构建及现有协议/配置测试通过，现有设置/词库/学习测试及 30 张 WPF 渲染通过；新增设置程序后续编译通过。宿主完整 `--smoke` 在 TSF 测试检测到现用 Broker 时按保护规则停止，因此不报告整条宿主 smoke 全绿；该 TSF 验证已在 Sandbox 完成。
+- Windows 10 Pro 10.0.19045，Rust 1.92.0：共用核心 10 项集成测试与 1 项备份保留测试通过，覆盖六节点转发、删除屏障、并发权重与降低、缺口/签名原子性、成员撤销授权/乱序、引擎应用持久恢复与成员摘要、明确采用本机恢复、4 MiB 分批，以及“同步进程收到删除但引擎未应用”的离线学习时序。最新发现通知修正后再次通过 `cargo test --locked` 与 `cargo clippy --locked --all-targets -- -D warnings`。
+- 六个隔离 Windows 进程与独立目录、真实 TLS：11 项通过，用时 39.71 秒，包含错误配对码/伪造身份拒绝、每设备一次加入、多来源收敛、创建者离线、重启/新地址、离线删除与重新学习、强制结束后恢复、撤销传播、被移除端收到通知、退出后轮换身份并经非创建者重新加入。报告 `artifacts/lan-sync-process-report.json`。这是进程测试，不是六台虚拟机。
+- Docker Desktop 29.6.2 / WSL2 内核 5.15.153.1：六个独立网络/存储命名空间、每容器 384 MiB/1 CPU。九项通过，包含真实 mDNS、六来源 TLS 收敛、3+3 网络分区与自动恢复、创建者关机、容器重启补齐、删除后重新学习与迟到旧权重、重复传输幂等。报告 `artifacts/lan-sync-sandbox-bridge-report.json` 保存镜像摘要。
+- 二十个 Docker 节点：上述九项场景全部通过，用时 151.79 秒，分区为 10+10，测试对每个节点检查词条结果。报告 `artifacts/lan-sync-20-sandbox-final-report.json`，镜像 `sha256:922331ea2c8c8d376d8501682d6f5a7503d74763f773ee9821e9f51c750c6830`。此轮在后续发现服务生命周期修正之前。
+- Windows Sandbox 10.0.19041：真实 librime 六个独立数据库、x64/x86 生产 TIP 的 TSF 上下文、以及六引擎与六辅助进程的真实 TLS 完整链路全部通过。完整链路 5 项用时 24.96 秒，逐台验证实际导出/写回/回读及签名回执、收到删除但引擎尚未应用时的离线学习、组合输入中延后应用、重启保留。证据 `build-windows/sync-sandbox-c9121aab52/output/report.json`、`end-to-end.json` 与 engine/client 日志。仅映射任务构建只读输入和专用报告目录，禁用来宾外部网络；这是一个独立内核 VM 内的六套引擎/辅助进程，跨网络节点能力由 Docker 命名空间测试覆盖。完整链路在宿主隔离目录另跑 5 项通过，用时 29.99 秒，报告 `artifacts/lan-sync-native-report.json`。
+- 新增 WPF 同步窗口在六个真实隔离服务下验证加入页面、六设备列表、暂停/恢复，已渲染并目视检查 `artifacts/sync-ui-join.png` 与 `artifacts/sync-ui-six.png`，无裁切、可滚动。测试宿主补齐 WPF DispatcherSynchronizationContext 后通过，不将原测试宿主的问题写成生产回调故障。
+- Windows x64/x86 原生构建、协议/配置、现有设置/词库/学习回归及 30 张 WPF 渲染通过。完整宿主 `--smoke` 在 TSF 检测到现用 Broker 时按保护规则停止，不报告整条宿主 smoke 全绿；TSF 检查已在 Sandbox 完成。辅助程序静态运行库构建及锁定依赖来源/许可收集通过。
 
-尚待完成：最终提交对应的三平台 CI、新增同步窗口视觉与操作验收、20/50 容器扩展及后续协议变更回归；macOS 安装后的权限归属、跨平台真机同步与持续输入、公共/VPN 接口策略、管理权限迁移、历史压缩和快照保留。没有将容器通过写成六台真机通过，也没有将开发分支写成已发布商业功能。
+失败及修正证据：
+
+- 初次 Docker `--internal` 桥接中配对成功但 mDNS 失败，同网络组播探针仅收到自身响应。换用仅属本测试的普通桥接网络后通过；保留 `artifacts/lan-sync-sandbox-report.json`。普通桥接允许默认出站路由，无端口发布、无主机数据挂载，未关闭宿主防火墙。
+- 首次二十节点测试在加入第十九台前超时；诊断时剩余两台可加入，随后从空状态完整重跑通过。不把补跑加入当作完整场景通过。
+- 首次五十节点测试中创建者达到容器 128 PID 限额，定位到每次邀请重建发现服务且旧浏览线程未退出。修正为复用发现服务和临时标识、更新 TXT、退出时关闭并限时结束浏览线程；测试增加全部加入后的 PID 上限断言。第二次五十节点在已加入 33 个成员时，mDNS 通知套接字返回 `Invalid argument`，创建者退出码 1、无 OOM。修正为发现更新错误延后重试，保留本地控制与数据传输，部分初始化失败也清理发现服务。分别保留 `artifacts/lan-sync-50-sandbox-report.json`、`artifacts/lan-sync-50-sandbox-final-report.json` 与 `artifacts/lan-sync-50-notification-failure.json`；不将套接字错误归因于尚未证实的操作系统内部原因。
+- Sandbox 早期遇到测试进程退出句柄/等待处理、登录命令超时，以及调试辅助程序缺少独立运行条件；已修正测试句柄和失败清理，使用静态运行库 Release 辅助程序完成上述整轮通过。保留各轮失败报告，不将超时记为通过。
+- 早期分支 CI 中三平台核心/同步、Mac 包和六容器通过；Windows 包在新测试传入已存在目录时按预期拒绝。已改为临时目录下尚不存在的 `fixture` 子目录，并将六真实引擎/TLS 完整链路接入 Windows CI。后续 `9e51532` 的 Windows CI 已通过六数据库和 5 项真实 TLS/引擎完整链路、x64/x86 TSF、设置及候选界面测试；打包因依赖许可文件的历史时间戳早于 ZIP 支持的 1980 年而失败。现仅将 ZIP 时间元数据钳制至支持范围，保留文件原字节和摘要；最终提交检查由 PR 展示。
+
+五十节点第三轮仍未通过：修正进程退出后，已运行的容器在配对期间发生回环控制连接超时，用时 262.27 秒，报告 `artifacts/lan-sync-50-sandbox-recovery-report.json`。此时创建者仍运行、4 个线程，回环监听存在且监听丢弃/溢出计数均为 0。独立 Python 最小 UDP/TCP 回环测试在该网络命名空间，以及全新 `--network none` 容器中均复现 UDP `EINVAL`、TCP 超时；后一个容器不运行 Rime Q。证据 `artifacts/lan-sync-loopback-probe.json`。可以确认该轮环境的基础回环网络也失败，不能据此确定 WSL/Docker 的内部根因，更不能记为五十节点通过。停止这批五十节点后，全新 `--network none` Python 容器的 UDP/TCP 回环均恢复通过，见 `artifacts/lan-sync-loopback-after-stop.json`。未重置 Docker 或修改宿主网络配置。
+
+尚未验收：macOS 安装应用的本地网络权限归属、Windows 防火墙的真实用户体验、Mac/Windows 跨平台真机同步与持续输入、公共/VPN 接口策略、管理权限迁移及历史压缩。2+2+2 分区、并发加入、容量上限与长期压力尚未取得专项网络测试证据。容器共享内核，不称为六台独立内核 VM 或六台真机，开发分支尚未合并或发布。
