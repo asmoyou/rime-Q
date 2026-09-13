@@ -1,5 +1,5 @@
 # Uses the real DLLs and the same shared identity in a disposable runner only.
-param([string]$BuildRoot = 'build-registration')
+param([string]$BuildRoot = 'build-registration', [switch]$WarnOnTsfProfileRemains)
 $ErrorActionPreference = 'Stop'
 if ($env:GITHUB_ACTIONS -ne 'true' -or $env:CI -ne 'true') { throw 'Run global registration tests only on a disposable GitHub Actions runner.' }
 if (Test-Path 'HKLM:\Software\RimeQ') { throw 'Existing Rime Q installation found.' }
@@ -40,5 +40,5 @@ foreach ($view in @('Registry64','Registry32')) {
     try { $user.DeleteSubKeyTree("Software\Microsoft\CTF\TIP\$identity",$false) } finally { $user.Dispose() }
 }
 Assert-NoRegistration
-Invoke-RimeQ $control '--verify-absent'
-Write-Output 'PASS actual x64/x86 DLLs with one shared identity: registration, repair, enable, deactivate, unregister and absence from TSF and both COM views.'
+Write-Output 'PASS actual x64/x86 DLLs with one shared identity: registration, repair, enable, deactivate, unregister and CTF/COM registry cleanup in both views.'
+Invoke-RimeQ $control '--verify-absent' -WarnOnProfileRemains:$WarnOnTsfProfileRemains

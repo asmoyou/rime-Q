@@ -34,7 +34,7 @@ function Invoke-RimeQ([string]$File, [string]$Arguments, [int]$Expected = 0, [sw
             } | ForEach-Object { Write-Output $_ }
         if ($process.ExitCode -ne $Expected) {
             if ($WarnOnProfileRemains -and $Expected -eq 0 -and (Test-RimeQProfileResidual $action $process.ExitCode $outputLines)) {
-                Write-Output '::warning title=Windows TSF profile remains::Windows still enumerates a Rime Q profile after uninstall (0x80004005). TSF profile absence is not confirmed; see the profile diagnostics.'
+                Write-Output '::warning title=Windows TSF profile remains::Windows still enumerates a Rime Q profile after unregistering its components (0x80004005). TSF profile absence is not confirmed; see the profile diagnostics.'
                 return
             }
             $log = Join-Path $env:ProgramFiles 'RimeQ\installation.log'
