@@ -14,7 +14,7 @@
 ## 安装与启用
 
 - 发布安装路径固定为 `/Library/Input Methods/RimeQ.app`；开发安装可用 `~/Library/Input Methods/RimeQ.app`。同一标识只保留一个实际安装。
-- Bundle ID 为 `com.asmoyou.inputmethod.RimeQ`，简体模式为 `.Hans`。禁止残留旧 RIMES 标识。
+- Bundle ID 为 `com.asmoyou.inputmethod.RimeQ`，简体模式为 `.Hans`，英文模式为 `.Latin`。禁止残留旧 RIMES 标识。
 - `InputMethodConnectionName` 与运行时统一为 `com.asmoyou.inputmethod.RimeQ_Connection`。构建与启用预检必须拒绝旧的短连接名。GUI 预览使用独立 Bundle ID，移除输入源声明；生产构建模板和预览退出后均按确切路径取消临时 LaunchServices 注册，避免污染现用输入法。
 - PKG 必须禁用 `BundleIsRelocatable`。旧包曾被 Installer 安装到已移动的 `.payload` 排查目录，不能只相信安装器的成功提示。
 - 默认构建只保留 PKG；临时 `.app` 打包后删除。备份用 TAR 等归档，不能靠改后缀来隐藏应用；`.payload` 等目录仍可能被系统识别。
@@ -30,6 +30,8 @@
 - 注销和重启是不同操作。不要在根因未明时将注销描述为必需步骤，也不要把注销后的结果当成清理配置成功的证明。
 
 ## 菜单、更新与卸载
+
+- macOS 中英文状态占用原系统输入源图标的位置：中文显示“中”，英文显示“A”，不额外增加菜单栏状态按钮。系统模式与实际引擎状态须同步；模式切换不重复调用启用流程。
 
 - 系统输入法菜单提供设置、个人数据文件夹、使用说明、检查更新和卸载入口，避免重复的成功提示和无意义的操作步骤。
 - 候选栏采用原生半透明材质，文字本身保持清晰，并遵循系统的减少透明度设置。按当前页编号、候选文字、实际注释和必要边距测量宽度，不给一两个字保留大块固定空白；长句限制宽度，注释不覆盖正文。

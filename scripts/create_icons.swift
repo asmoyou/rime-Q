@@ -38,3 +38,20 @@ NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false
 NSGraphicsContext.restoreGraphicsState()
 context.endPDFPage()
 context.closePDF()
+
+for (filename, title) in [("mode-chinese.pdf", "中"), ("mode-english.pdf", "A")] {
+    var box = CGRect(x: 0, y: 0, width: 18, height: 18)
+    let consumer = CGDataConsumer(url: destination.appendingPathComponent(filename) as CFURL)!
+    let context = CGContext(consumer: consumer, mediaBox: &box, nil)!
+    context.beginPDFPage(nil)
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+    let attributes: [NSAttributedString.Key: Any] = [
+        .font: NSFont.systemFont(ofSize: 16, weight: .medium), .foregroundColor: NSColor.black]
+    let text = title as NSString
+    let size = text.size(withAttributes: attributes)
+    text.draw(at: NSPoint(x: (18 - size.width) / 2, y: (18 - size.height) / 2), withAttributes: attributes)
+    NSGraphicsContext.restoreGraphicsState()
+    context.endPDFPage()
+    context.closePDF()
+}

@@ -107,7 +107,8 @@ private enum InputSourceInstallExit {
 
 private struct InputSourceInstallIdentity {
     let bundleID: String
-    let modeID: String
+    let modeIDs: [String]
+    var modeID: String { modeIDs[0] }
 
     static func load() -> InputSourceInstallIdentity? {
         guard let info = Bundle.main.infoDictionary,
@@ -118,17 +119,19 @@ private struct InputSourceInstallIdentity {
                 as? [String: Any],
               let visibleModes = component["tsVisibleInputModeOrderedArrayKey"]
                 as? [String],
-              visibleModes.count == 1,
-              let modeID = visibleModes.first,
+              visibleModes == InputMode.identifiers,
               let modeList = component["tsInputModeListKey"]
                 as? [String: Any],
-              let modeEntry = modeList[modeID] as? [String: Any],
-              modeEntry["TISInputSourceID"] as? String == modeID,
-              modeID.hasPrefix(bundleID + ".") else {
+              Set(modeList.keys) == Set(visibleModes),
+              visibleModes.allSatisfy({ identifier in
+                  guard let entry = modeList[identifier] as? [String: Any] else { return false }
+                  return entry["TISInputSourceID"] as? String == identifier
+                      && identifier.hasPrefix(bundleID + ".")
+              }) else {
             print("install: invalid bundle/input-mode metadata")
             return nil
         }
-        return InputSourceInstallIdentity(bundleID: bundleID, modeID: modeID)
+        return InputSourceInstallIdentity(bundleID: bundleID, modeIDs: visibleModes)
     }
 }
 
@@ -230,7 +233,7 @@ private func inputSourceRoster(identity: InputSourceInstallIdentity,
         switch metadata.sourceID {
         case identity.bundleID:
             parent.append(match)
-        case identity.modeID:
+        case let identifier where identity.modeIDs.contains(identifier):
             mode.append(match)
         default:
             unexpected.append(match)
@@ -279,7 +282,7 @@ private func logRoster(_ roster: InputSourceInstallRoster,
         let ids = roster.unexpected.map(\.metadata.sourceID).joined(separator: ",")
         print("install: \(label) unexpected bundle sources=\(ids)")
     }
-    if roster.parent.count > 1 || roster.mode.count > 1 {
+    if roster.parent.count > 1 || Dictionary(grouping: roster.mode, by: \.metadata.sourceID).values.contains(where: { $0.count > 1 }) {
         print(
             "install: \(label) ambiguous registrations"
                 + " parent=\(roster.parent.count) mode=\(roster.mode.count)"
@@ -303,18 +306,26 @@ private func uniqueParent(in roster: InputSourceInstallRoster,
 }
 
 private func uniqueMode(in roster: InputSourceInstallRoster,
-                        identity: InputSourceInstallIdentity)
+                        identity: InputSourceInstallIdentity, identifier: String? = nil)
     -> InputSourceInstallMatch? {
-    guard roster.mode.count == 1,
-          let mode = roster.mode.first,
+    let modeID = identifier ?? identity.modeID
+    let matches = roster.mode.filter { $0.metadata.sourceID == modeID }
+    guard matches.count == 1,
+          let mode = matches.first,
           InputSourceInstallRules.isMode(
             mode.metadata,
             bundleID: identity.bundleID,
-            modeID: identity.modeID
+            modeID: modeID
           ) else {
         return nil
     }
     return mode
+}
+
+private func allModes(in roster: InputSourceInstallRoster,
+                      identity: InputSourceInstallIdentity) -> [InputSourceInstallMatch]? {
+    let modes = identity.modeIDs.compactMap { uniqueMode(in: roster, identity: identity, identifier: $0) }
+    return modes.count == identity.modeIDs.count ? modes : nil
 }
 
 private func runInputSourceInstallPhase(_ phase: InputSourceInstallPhase) -> Int32 {
@@ -346,7 +357,7 @@ private func runInputSourceInstallPhase(_ phase: InputSourceInstallPhase) -> Int
         }
         logRoster(roster, label: "installed", identity: identity)
         return uniqueParent(in: roster, identity: identity) != nil
-            && uniqueMode(in: roster, identity: identity) != nil
+            && allModes(in: roster, identity: identity) != nil
             ? InputSourceInstallExit.success
             : InputSourceInstallExit.retryable
 
@@ -374,12 +385,19 @@ private func runInputSourceInstallPhase(_ phase: InputSourceInstallPhase) -> Int
               let roster = inputSourceRoster(identity: identity, includeAllInstalled: true) else { return InputSourceInstallExit.retryable }
         let matches = phase == .disableMode ? roster.mode : roster.parent
         if matches.isEmpty { return InputSourceInstallExit.success }
-        guard let match = phase == .disableMode ? uniqueMode(in: roster, identity: identity) : uniqueParent(in: roster, identity: identity) else {
-            return InputSourceInstallExit.failed
+        // Older installed versions may not yet expose the new Latin mode.
+        // Disable every present, unique owned child before disabling the parent.
+        for match in matches {
+            let unique = phase == .disableMode
+                ? uniqueMode(in: roster, identity: identity, identifier: match.metadata.sourceID)
+                : uniqueParent(in: roster, identity: identity)
+            guard unique != nil else { return InputSourceInstallExit.failed }
+            if match.metadata.enabled == false { continue }
+            let result = TISDisableInputSource(match.source)
+            print("install: refresh disable=\(result) id=\(match.metadata.sourceID)")
+            if result != noErr { return InputSourceInstallExit.retryable }
         }
-        let result = TISDisableInputSource(match.source)
-        print("install: refresh disable=\(result) id=\(match.metadata.sourceID)")
-        return result == noErr ? InputSourceInstallExit.success : InputSourceInstallExit.retryable
+        return InputSourceInstallExit.success
 
     case .verifyModeDisabled, .verifyParentDisabled:
         guard let roster = inputSourceRoster(identity: identity, includeAllInstalled: false) else { return InputSourceInstallExit.retryable }
@@ -396,6 +414,8 @@ private func runInputSourceInstallPhase(_ phase: InputSourceInstallPhase) -> Int
             print("install: cannot resolve a unique parent to enable")
             return InputSourceInstallExit.retryable
         }
+        if let enabled = inputSourceRoster(identity: identity, includeAllInstalled: false),
+           uniqueParent(in: enabled, identity: identity) != nil { return InputSourceInstallExit.success }
         let status = TISEnableInputSource(parent.source)
         print(
             "install: enable parent=\(status)"
@@ -447,19 +467,18 @@ private func runInputSourceInstallPhase(_ phase: InputSourceInstallPhase) -> Int
                     identity: identity
                 ) != nil
               ),
-              let mode = uniqueMode(in: installed, identity: identity) else {
+              let modes = allModes(in: installed, identity: identity) else {
             print("install: parent not ready or child mode is ambiguous")
             return InputSourceInstallExit.retryable
         }
-        let status = TISEnableInputSource(mode.source)
-        print(
-            "install: enable mode=\(status)"
-                + " reportedBefore=\(describe(mode.metadata.enabled))"
-                + " \(identity.modeID)"
-        )
-        return status == noErr
-            ? InputSourceInstallExit.success
-            : InputSourceInstallExit.retryable
+        for mode in modes {
+            let identifier = mode.metadata.sourceID
+            if uniqueMode(in: enabled, identity: identity, identifier: identifier) != nil { continue }
+            let status = TISEnableInputSource(mode.source)
+            print("install: enable mode=\(status) id=\(identifier)")
+            if status != noErr { return InputSourceInstallExit.retryable }
+        }
+        return InputSourceInstallExit.success
 
     case .verifyMode:
         guard let roster = inputSourceRoster(
@@ -470,11 +489,7 @@ private func runInputSourceInstallPhase(_ phase: InputSourceInstallPhase) -> Int
         }
         logRoster(roster, label: "enabled-mode", identity: identity)
         let parent = uniqueParent(in: roster, identity: identity)
-        let mode = uniqueMode(in: roster, identity: identity)
-        let ready = parent != nil && mode != nil
-            && InputSourceInstallRules.modeReachedEnabledRoster(
-                roster.mode.count
-            )
+        let ready = parent != nil && allModes(in: roster, identity: identity) != nil
         print(
             "install: child enabled roster ready=\(ready)"
                 + " parentPresent=\(parent != nil)"

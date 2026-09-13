@@ -52,6 +52,19 @@ def verify(package):
         assert not (infos[0].parent / "Scripts/model-info.plist").exists(), "Obsolete bundled-model migration metadata"
         contents = infos[0].parent / "Payload/RimeQ.app/Contents"
         bundle = plistlib.loads((contents / "Info.plist").read_bytes())
+        identifier = "com.asmoyou.inputmethod.RimeQ"
+        component = bundle["ComponentInputModeDict"]
+        assert component["tsVisibleInputModeOrderedArrayKey"] == [identifier + ".Hans", identifier + ".Latin"]
+        modes = component["tsInputModeListKey"]
+        assert set(modes) == {identifier + ".Hans", identifier + ".Latin"}
+        for suffix, icon in [(".Hans", "mode-chinese.pdf"), (".Latin", "mode-english.pdf")]:
+            mode = modes[identifier + suffix]
+            assert mode["TISInputSourceID"] == identifier + suffix
+            assert mode["tsInputModeScriptKey"] == ("smRoman" if suffix == ".Latin" else "smUnicodeScript")
+            assert mode["tsInputModeDefaultStateKey"] and mode["tsInputModeIsVisibleKey"]
+            assert mode["tsInputModeMenuIconFileKey"] == icon
+            assert mode["tsInputModeAlternateMenuIconFileKey"] == icon
+            assert (contents / "Resources" / icon).read_bytes().startswith(b"%PDF-")
         assert bundle["NSBonjourServices"] == ["_rimeq-sync._tcp"]
         assert "Local typing" in bundle["NSLocalNetworkUsageDescription"]
         for language in ["en", "zh-Hans", "zh-Hant"]:
