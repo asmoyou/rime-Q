@@ -40,6 +40,29 @@ jobs:
         if: runner.os == 'macOS'
         run: swift build -c release
 
+  windows-registration:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build isolated global registration regressions
+        shell: pwsh
+        run: |
+          cmake -S windows -B build-registration/x64 -A x64 -DRIMEQ_BUILD_TSF=OFF
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build build-registration/x64 --config Release --target rimeq_profile_tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake -S windows -B build-registration/x86 -A Win32 -DRIMEQ_BUILD_TSF=OFF
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build build-registration/x86 --config Release --target rimeq_profile_tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify global TSF registration without installing the client
+        shell: pwsh
+        run: |
+          ./build-registration/x64/Release/rimeq_profile_tests.exe --global
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./build-registration/x86/Release/rimeq_profile_tests.exe --global
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
   windows-package:
     runs-on: windows-2022
     steps:

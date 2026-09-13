@@ -88,18 +88,7 @@ extern "C" HRESULT __stdcall DllUnregisterServer() {
     ComPtr<ITfCategoryMgr> manager;
     if (SUCCEEDED(CoCreateInstance(CLSID_TF_CategoryMgr, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&manager))))
         for (const auto& category : categories) manager->UnregisterCategory(rq::clsid, category, rq::clsid);
-    // Remove the service registration after its profile and categories. The
-    // profile manager updates TSF enumeration; this also removes the CTF service
-    // directory that category unregistration can otherwise leave behind.
-    if (SUCCEEDED(hr)) {
-        ComPtr<ITfInputProcessorProfiles> profiles;
-        hr = CoCreateInstance(CLSID_TF_InputProcessorProfiles, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&profiles));
-        if (SUCCEEDED(hr)) hr = profiles->Unregister(rq::clsid);
-    }
-    if (SUCCEEDED(hr)) {
-        auto key = std::wstring(L"Software\\Classes\\CLSID\\") + rq::clsidString;
-        auto error = RegDeleteTreeW(HKEY_LOCAL_MACHINE, key.c_str());
-        if (error != ERROR_SUCCESS && error != ERROR_FILE_NOT_FOUND) hr = HRESULT_FROM_WIN32(error);
-    }
+    // Only our CTF/COM service keys remain after profile and category removal.
+    if (SUCCEEDED(hr)) hr = rq::removeServiceRegistry(rq::clsid);
     manager.Reset(); if (SUCCEEDED(init)) CoUninitialize(); return hr;
 }

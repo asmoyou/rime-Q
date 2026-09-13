@@ -398,3 +398,7 @@ x64/x86 生产 TIP 测试新增组合 `Unicode << 16 | VK_PACKET` 的真实 TSF 
 新增 `windows/tests/profile_tests.cpp`，使用与生产相同的注销函数，并验证另一个临时 Profile 保持可枚举。x64/x86 的 `windows_profile_lifecycle` 均通过，测试不注册全局输入法或激活输入源，临时 Profile 随测试清理。可单独编译 `rimeq_profile_tests` 目标，再执行 `ctest --test-dir build-windows/x64 -C Release -R windows_profile_lifecycle --output-on-failure`（x86 替换对应目录）。两种位数的常规 CTest 构建均包含此项。
 
 [34739757035](https://github.com/asmoyou/rime-Q/actions/runs/34739757035) 的安装、修复、拒绝降级、停用和卸载器均返回预期结果，但仅使用 Profile 注销后仍留下 HKLM CTF 服务目录，注册表检查失败；该次检查在首个残留处中断，尚不能从该运行确认最终枚举状态。最终注销顺序改为 `UnregisterProfile`、注销类别、`ITfInputProcessorProfiles::Unregister`、删除自己的 COM 注册，兼顾 TSF Profile 状态和完整服务注册清理。诊断收集全部注册状态并执行 TSF 检查后再汇总残留，保留原有通过条件。
+
+[34740058831](https://github.com/asmoyou/rime-Q/actions/runs/34740058831) 显示串联旧服务注销 API 后卸载器返回失败，这一尝试没有完成验收。改为保留 `UnregisterProfile` 和类别注销，再直接删除按自身 CLSID 限定的 HKLM CTF/COM 注册目录；不再二次调用旧服务注销 API。若另一个位数的注销已移除共享 Profile，仅在 TSF 重新枚举证明确实不存在后接受重复注销，枚举失败或仍有 Profile 均继续失败。
+
+新增独立 `windows-registration` CI 作业，仅编译小型原生测试，分别以 x64/x86 在一次性 Runner 中创建随机标识、默认禁用且隐藏的全局测试 Profile，验证全局注销后的枚举与服务目录、重复注销以及另一个测试 Profile 保留。它不构建词库或安装包，补充了此前进程内测试不覆盖全局作用域的缺口；本机拒绝该 `--global` 模式，日常 CTest 继续只测试进程内临时 Profile。全局回归与完整安装作业均需通过后才能交付。
