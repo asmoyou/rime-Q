@@ -60,7 +60,7 @@ import AppKit
         super.showWindow(sender)
         if timer == nil {
             timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
-                Task { @MainActor in
+                Task { @MainActor [weak self] in
                     guard let self, self.window?.isVisible == true else { return }
                     await self.refresh()
                 }
@@ -174,8 +174,12 @@ import AppKit
             }
         }
         pauseButton = pause
+        summaryTitle.maximumNumberOfLines = 1; summaryTitle.lineBreakMode = .byTruncatingTail
+        summaryDetail.maximumNumberOfLines = 1; summaryDetail.lineBreakMode = .byTruncatingTail
+        let summaryLabels = SettingsLayout.vertical([summaryTitle, summaryDetail], spacing: 6)
+        summaryLabels.setContentHuggingPriority(.defaultLow, for: .horizontal)
         let summary = SettingsCard([SyncUI.row([SyncUI.icon("rectangle.3.group", size: 26),
-            SettingsLayout.vertical([summaryTitle, summaryDetail], spacing: 6), SyncUI.spacer(), pause], spacing: 18)], padding: 20)
+            summaryLabels, pause], spacing: 18)], padding: 20)
         let add = button("添加设备", symbol: "plus", primary: true) { [weak self] in self?.showInvitation() }; addButton = add
         let now = button("立即同步", symbol: "arrow.clockwise") { [weak self] in
             guard let self else { return }
@@ -360,6 +364,15 @@ import AppKit
         window.appearance = NSAppearance(named: appearance); window.setContentSize(size)
         window.orderFront(nil); defer { window.orderOut(nil) }
         view.layoutSubtreeIfNeeded()
+        if state["group"] is [String: Any], let pauseButton {
+            let naturalWidth = (summaryDetail.stringValue as NSString).size(withAttributes: [.font: summaryDetail.font!]).width
+            let labelFrame = summaryDetail.convert(summaryDetail.bounds, to: view)
+            let buttonFrame = pauseButton.convert(pauseButton.bounds, to: view)
+            try EngineSmoke.check(summaryDetail.bounds.width >= ceil(naturalWidth) && summaryDetail.bounds.height < 30,
+                                  "group summary wrapped despite available width")
+            try EngineSmoke.check(buttonFrame.minX - labelFrame.maxX <= 24,
+                                  "group summary lost available width to an empty spacer")
+        }
         guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { throw LexiconError.message("sync bitmap unavailable") }
         window.appearance!.performAsCurrentDrawingAppearance { view.displayIfNeeded(); view.cacheDisplay(in: view.bounds, to: bitmap) }
         guard let data = bitmap.representation(using: .png, properties: [:]) else { throw LexiconError.message("sync PNG unavailable") }
@@ -374,6 +387,13 @@ import AppKit
         let group: [String: Any] = ["group": ["id": "preview-group", "name": "我的设备"], "enabled": true, "can_remove": true, "members": devices, "pending": []]
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let suffix = appearance == .aqua ? "light" : "dark"
+            let single = DeviceSyncWindow()
+            var singleGroup = group
+            singleGroup["group"] = ["id": "single-preview", "name": "测试组"]
+            singleGroup["members"] = [devices[0]]
+            single.render(singleGroup)
+            try single.snapshot(to: directory.appendingPathComponent("single-device-\(suffix).png"), size: .init(width: 760, height: 780), appearance: appearance)
+            try single.snapshot(to: directory.appendingPathComponent("single-device-compact-\(suffix).png"), size: .init(width: 680, height: 580), appearance: appearance)
             controller.render(["enabled": false])
             try controller.snapshot(to: directory.appendingPathComponent("welcome-\(suffix).png"), size: .init(width: 760, height: 780), appearance: appearance)
             controller.render(group)

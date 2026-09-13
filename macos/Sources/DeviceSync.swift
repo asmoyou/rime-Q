@@ -52,7 +52,7 @@ struct SyncApplication: Decodable { let id: String; let before: [SyncRecord]; le
 
     func startIfEnabled() {
         guard defaults.bool(forKey: "SyncStarted"), timer == nil else { return }
-        timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in Task { await self?.tick() } }
+        timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in Task { [weak self] in await self?.tick() } }
         Task { await tick() }
     }
     func markStarted() { defaults.set(true, forKey: "SyncStarted"); startIfEnabled() }

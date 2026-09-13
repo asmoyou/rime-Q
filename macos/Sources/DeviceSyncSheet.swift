@@ -217,7 +217,7 @@ import AppKit
     }
     private func startTimer() {
         guard timer == nil else { return }
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in Task { await self?.refresh() } }
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in Task { [weak self] in await self?.refresh() } }
     }
     private func generateInvite() {
         guard !working else { return }

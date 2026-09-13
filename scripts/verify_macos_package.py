@@ -62,6 +62,10 @@ def verify(package):
         assert native_arches == sync_arches, "Sync helper architectures differ from the native client"
         sync_build = json.loads((contents / "Resources/Licenses/sync/build.json").read_text())
         assert sync_build["binary_sha256"] == hashlib.sha256((contents / "MacOS/RimeQ.Sync").read_bytes()).hexdigest(), "Signed sync helper checksum differs from its provenance"
+        dependencies = json.loads((contents / "Resources/Licenses/sync/dependencies.json").read_text())
+        assert not any(item["name"].startswith("security-framework") for item in dependencies), "Unexpected Keychain dependency"
+        imports = subprocess.check_output(["nm", "-u", str(contents / "MacOS/RimeQ.Sync")], text=True)
+        assert not any(symbol in imports for symbol in ["_SecKeychain", "_SecItemCopyMatching", "_SecItemAdd", "_SecItemUpdate", "_SecItemDelete"]), "Sync helper imports Keychain APIs"
         subprocess.run(["codesign", "--verify", "--deep", "--strict", str(contents.parent)], check=True)
         postinstall = infos[0].parent / "Scripts/postinstall"
         script = postinstall.read_text()
