@@ -20,6 +20,31 @@ using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 
 namespace RimeQ {
+    [ComImport, Guid("00021401-0000-0000-C000-000000000046")]
+    internal class ShellLink { }
+
+    [ComImport, Guid("000214F9-0000-0000-C000-000000000046"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    internal interface IShellLinkW {
+        void GetPath([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder path, int count, IntPtr data, uint flags);
+        void GetIDList(out IntPtr idList);
+        void SetIDList(IntPtr idList);
+        void GetDescription([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder description, int count);
+        void SetDescription([MarshalAs(UnmanagedType.LPWStr)] string description);
+        void GetWorkingDirectory([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder directory, int count);
+        void SetWorkingDirectory([MarshalAs(UnmanagedType.LPWStr)] string directory);
+        void GetArguments([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder arguments, int count);
+        void SetArguments([MarshalAs(UnmanagedType.LPWStr)] string arguments);
+        void GetHotkey(out ushort hotkey);
+        void SetHotkey(ushort hotkey);
+        void GetShowCmd(out int showCommand);
+        void SetShowCmd(int showCommand);
+        void GetIconLocation([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder iconPath, int count, out int iconIndex);
+        void SetIconLocation([MarshalAs(UnmanagedType.LPWStr)] string iconPath, int iconIndex);
+        void SetRelativePath([MarshalAs(UnmanagedType.LPWStr)] string relativePath, uint reserved);
+        void Resolve(IntPtr window, uint flags);
+        void SetPath([MarshalAs(UnmanagedType.LPWStr)] string path);
+    }
+
     internal static class Setup {
         static readonly string Root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "RimeQ");
         static readonly string Self = Assembly.GetExecutingAssembly().Location;
@@ -136,9 +161,20 @@ namespace RimeQ {
             var shortcut = Path.Combine(folder, "Rime Q 设置.lnk");
             if (remove) { if (File.Exists(shortcut)) File.Delete(shortcut); if (Directory.Exists(folder) && !Directory.EnumerateFileSystemEntries(folder).Any()) Directory.Delete(folder); return; }
             Directory.CreateDirectory(folder);
-            dynamic shell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell"));
-            dynamic link = shell.CreateShortcut(shortcut); link.TargetPath = Path.Combine(directory, "RimeQ.exe"); link.Arguments = "--settings";
-            link.WorkingDirectory = directory; link.Description = "Rime Q 设置"; link.IconLocation = Path.Combine(directory, "RimeQ.exe"); link.Save();
+            CreateSettingsShortcut(shortcut, directory);
+        }
+        internal static void CreateSettingsShortcut(string shortcut, string directory) {
+            var instance = new ShellLink();
+            try {
+                var link = (IShellLinkW)instance;
+                var target = Path.Combine(directory, "RimeQ.exe");
+                link.SetPath(target);
+                link.SetArguments("--settings");
+                link.SetWorkingDirectory(directory);
+                link.SetDescription("Rime Q 设置");
+                link.SetIconLocation(target, 0);
+                ((System.Runtime.InteropServices.ComTypes.IPersistFile)link).Save(shortcut, true);
+            } finally { Marshal.FinalReleaseComObject(instance); }
         }
         static IEnumerable<string> VersionDirectories() {
             var versions=Path.Combine(Root,"versions");if(!Directory.Exists(versions))return Enumerable.Empty<string>();

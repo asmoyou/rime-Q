@@ -107,6 +107,9 @@ namespace RimeQ {
             Reject(() => Setup.RequireUpgrade(new Version("0.4.1.1"), new Version("0.4.0.999")));
             Reject(() => Setup.RequireUpgrade(new Version("0.4.0.5"), new Version("0.4.0.4")));
             Setup.RequireUpgrade(new Version("0.4.0.5"), new Version("0.4.0.5"));
+            var shortcut=Path.Combine(Paths.Root,"Rime Q settings.lnk");
+            Setup.CreateSettingsShortcut(shortcut,Paths.App);
+            Require(File.Exists(shortcut),"Native settings shortcut");
             var startupOrder=new List<string>();
             var enableResult=await Setup.EnableAfterReady(()=>{startupOrder.Add("broker");return Task.FromResult(true);},()=>{startupOrder.Add("profile");return 0;});
             Require(enableResult==0&&startupOrder.SequenceEqual(new[]{"broker","profile"}),"Installer did not start the broker before enabling the profile");
