@@ -814,6 +814,7 @@ async fn control(shared: Shared, value: Value) -> Result<Value> {
                 serde_json::from_value(value.get("rows").context("missing rows")?.clone())?;
             s.store.acknowledge(string("id")?, &rows)?;
             receipt(&s)?;
+            let _ = crate::backups::prune(&s.root);
             Ok(json!({"applied":true}))
         }
         "recover_local" => {
@@ -1009,6 +1010,7 @@ pub async fn run(
     let mut listener: Option<TcpListener> = None;
     let mut discovery: Option<Discovery> = None;
     let mut discovery_state = String::new();
+    let mut discovery_retry = Instant::now();
     let peer_permits = Arc::new(tokio::sync::Semaphore::new(8));
     let mut tick = tokio::time::interval(Duration::from_millis(500));
     loop {
@@ -1036,9 +1038,10 @@ pub async fn run(
             continue;
         }
         if !enabled {
-            if !no_discovery && discovery.is_none() {
-                if let Ok(d) = discover(shared.clone(), 0) {
-                    discovery = Some(d);
+            if !no_discovery && discovery.is_none() && Instant::now() >= discovery_retry {
+                match discover(shared.clone(), 0) {
+                    Ok(d) => discovery = Some(d),
+                    Err(_) => discovery_retry = Instant::now() + Duration::from_secs(2),
                 }
             }
             continue;
@@ -1071,21 +1074,29 @@ pub async fn run(
                         .unwrap_or("")
                 )
             };
-            if discovery.is_none() || discovery_state != next {
+            if (discovery.is_none() || discovery_state != next) && Instant::now() >= discovery_retry
+            {
                 let p = shared.lock().unwrap().port;
-                if let Some(d) = discovery.as_ref() {
-                    d.daemon.register(discovery_info(&shared, p)?)?;
-                    discovery_state = next;
-                    continue;
-                }
-                match discover(shared.clone(), p) {
-                    Ok(d) => {
-                        discovery = Some(d);
+                // mDNS notification errors must not stop authenticated transfers
+                // or the local control service. A queued registration is safe
+                // to repeat on the same daemon after a transient socket failure.
+                let result = if let Some(d) = discovery.as_ref() {
+                    discovery_info(&shared, p)
+                        .and_then(|info| d.daemon.register(info).map_err(Into::into))
+                } else {
+                    discover(shared.clone(), p).map(|d| discovery = Some(d))
+                };
+                match result {
+                    Ok(()) => {
                         discovery_state = next;
+                        let mut s = shared.lock().unwrap();
+                        if s.network_error.as_deref() == Some(DISCOVERY_ERROR) {
+                            s.network_error = None;
+                        }
                     }
                     Err(_) => {
-                        shared.lock().unwrap().network_error =
-                            Some("设备发现暂不可用，可使用连接地址。".into())
+                        discovery_retry = Instant::now() + Duration::from_secs(2);
+                        shared.lock().unwrap().network_error = Some(DISCOVERY_ERROR.into());
                     }
                 }
             }
@@ -1215,6 +1226,8 @@ fn discovery_info(shared: &Shared, port: u16) -> Result<mdns_sd::ServiceInfo> {
     .enable_addr_auto())
 }
 
+const DISCOVERY_ERROR: &str = "设备发现暂不可用，可使用连接地址。";
+
 struct Discovery {
     daemon: mdns_sd::ServiceDaemon,
     stop: Arc<std::sync::atomic::AtomicBool>,
@@ -1234,15 +1247,18 @@ impl Drop for Discovery {
 fn discover(shared: Shared, port: u16) -> Result<Discovery> {
     use mdns_sd::{ServiceDaemon, ServiceEvent};
     let daemon = ServiceDaemon::new()?;
+    // Own shutdown before any fallible setup, so partially initialized
+    // discovery attempts cannot leave a daemon behind.
+    let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let discovery = Discovery { daemon, stop };
     let service = "_rimeq-sync._tcp.local.";
     let info = discovery_info(&shared, port)?;
-    let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let thread_stop = stop.clone();
+    let thread_stop = discovery.stop.clone();
     let own = info.get_fullname().to_string();
     if port != 0 {
-        daemon.register(info)?;
+        discovery.daemon.register(info)?;
     }
-    let events = daemon.browse(service)?;
+    let events = discovery.daemon.browse(service)?;
     std::thread::spawn(move || {
         while !thread_stop.load(std::sync::atomic::Ordering::Acquire) {
             let Ok(event) = events.recv_timeout(Duration::from_secs(1)) else {
@@ -1279,5 +1295,5 @@ fn discover(shared: Shared, port: u16) -> Result<Discovery> {
             }
         }
     });
-    Ok(Discovery { daemon, stop })
+    Ok(discovery)
 }

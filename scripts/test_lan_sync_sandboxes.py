@@ -16,7 +16,7 @@ import uuid
 def docker(*args, data=None, timeout=180):
     result = subprocess.run(["docker", *args], input=data, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout)
     if result.returncode:
-        raise RuntimeError("Docker operation failed: " + result.stderr.decode(errors="replace")[:600])
+        raise RuntimeError(f"Docker {args[0]} failed (exit {result.returncode}): " + result.stderr.decode(errors="replace")[:600])
     return result.stdout
 
 
@@ -121,7 +121,7 @@ def main():
         passed("real_multicast_discovery")
         parallel(list(enumerate(nodes)), lambda item: item[1].change("沙盒词条" + str(item[0]), item[0] + 1))
         wait_for(lambda: all(len(r) == len(nodes) for r in parallel(nodes, lambda n:n.rows())), "initial concurrent convergence")
-        passed("six_origin_tls_convergence")
+        passed("all_origin_tls_convergence")
         # Separate actual network interfaces, not merely application pause flags.
         split = len(nodes) // 2
         for i, node in enumerate(nodes):

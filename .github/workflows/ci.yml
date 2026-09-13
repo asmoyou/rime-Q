@@ -134,6 +134,7 @@ jobs:
           name: RimeQ-Windows-validation
           path: |
             artifacts/windows-ui/*.png
+            artifacts/lan-sync-native-report.json
           retention-days: 7
 
   windows-install:
