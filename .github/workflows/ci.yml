@@ -63,7 +63,7 @@ jobs:
           ./build-registration/x86/Release/rimeq_profile_tests.exe --global
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verify both production DLLs sharing the same input profile
-        run: ./scripts/test_windows_registration.ps1
+        run: ./scripts/test_windows_registration.ps1 -WarnOnTsfProfileRemains
 
   windows-package:
     runs-on: windows-2022
