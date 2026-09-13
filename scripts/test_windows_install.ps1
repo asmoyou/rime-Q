@@ -48,7 +48,7 @@ $modelHash = (Get-FileHash $model -Algorithm SHA256).Hash
 Invoke-RimeQ $setup '--install-elevated --silent'
 $repaired = (Get-ItemProperty 'HKLM:\Software\RimeQ').ActiveDirectory
 if ($repaired -eq $installed) { throw 'Repair did not create a replacement application.' }
-if (Test-Path (Join-Path $installed 'RimeQ.Broker.exe') -or Test-Path (Join-Path $installed 'RimeQ.exe')) { throw 'Repair left obsolete launchers able to reclaim the user engine lock.' }
+if ((Test-Path (Join-Path $installed 'RimeQ.Broker.exe')) -or (Test-Path (Join-Path $installed 'RimeQ.exe'))) { throw 'Repair left obsolete launchers able to reclaim the user engine lock.' }
 Invoke-RimeQ (Join-Path $repaired 'RimeQ.Control.exe') '--verify'
 if ((Get-FileHash $learning).Hash -ne $learningHash -or (Get-FileHash $model).Hash -ne $modelHash) { throw 'Repair changed personal data.' }
 
