@@ -72,6 +72,7 @@ def csharp(output, sources, build, resources=(), main=None, console=False):
 def build(args):
     if os.name != 'nt': raise RuntimeError('The Windows client must be built on Windows')
     if args.build < 1 or args.build > 65535: raise ValueError('Windows build must be 1..65535')
+    if args.smoke: run('python', ROOT / 'scripts/test_windows_resources.py')
     output = ROOT / 'build-windows'; output.mkdir(exist_ok=True); icon(output / 'RimeQ.ico')
     for arch, platform in [('x64', 'x64'), ('x86', 'Win32')]:
         run('cmake', '-S', 'windows', '-B', output / arch, '-G', 'Visual Studio 17 2022', '-A', platform,

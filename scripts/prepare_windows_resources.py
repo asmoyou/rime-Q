@@ -61,6 +61,17 @@ def extractor():
     return tool
 
 
+def extract_verified_tar(source, destination):
+    destination = Path(destination).resolve()
+    with tarfile.open(source) as archive:
+        members = archive.getmembers()
+        for entry in members:
+            if not (destination / entry.name).resolve().is_relative_to(destination) or not (entry.isfile() or entry.isdir()):
+                raise ValueError('Unsafe upstream archive entry')
+        archive.extractall(destination, members=members, filter='data')
+    return destination
+
+
 def prepare(destination):
     destination = Path(destination).resolve()
     seven = extractor()
@@ -73,11 +84,7 @@ def prepare(destination):
             subprocess.run([str(seven), 'x', str(archive), '-o' + str(work / folder), '-aou', '-y', '-bso0'], check=True)
         unpacked = work / 'ice'
         unpacked.mkdir()
-        with tarfile.open(ice) as archive:
-            for entry in archive.getmembers():
-                if not (unpacked / entry.name).resolve().is_relative_to(unpacked) or not (entry.isfile() or entry.isdir()):
-                    raise ValueError('Unsafe upstream archive entry')
-            archive.extractall(unpacked, filter='data')
+        unpacked = extract_verified_tar(ice, unpacked)
         source = unpacked / ('rime-ice-' + LOCK['rime_ice']['revision'])
         data = destination / 'data'
         data.mkdir(parents=True, exist_ok=True)
