@@ -388,3 +388,11 @@ x64/x86 生产 TIP 测试新增组合 `Unicode << 16 | VK_PACKET` 的真实 TSF 
 `windows/tests/InstallerRegistryTests.cs` 使用 `HKCU\Software\RimeQ.Tests\Uninstall-随机标识` 下的隔离子树模拟残留状态，不注册或激活输入法。未实现清理时返回 1，报 `Uninstall left the user's disabled CTF profile`；实现后通过禁用 Profile 清理、重复执行、两个用户上下文隔离、其他输入法和个人设置原值保留、只读权限错误上报，最后删除自己的测试子树。该回归加入 `build_windows.py --smoke` 的开头，也可单独运行 `build-windows/Installer.Tests.exe`。线上生命周期脚本进一步要求 32/64 位 HKLM/HKCU 的 Rime Q CTF/COM 分支不存在，并继续要求真实 TSF 枚举无残留及个人文件哈希不变。完整线上验收结果仍待补充。
 
 独立编译并运行命令为 `python scripts/build_windows.py --installer-tests-only`，本机通过；该模式不构建引擎、词库或安装包，也不安装、停用或卸载现用客户端。
+
+### TSF Profile 注销接口回归
+
+[34739305842](https://github.com/asmoyou/rime-Q/actions/runs/34739305842) 进一步确认：上述修复后 HKLM/HKCU 的 32/64 位 CTF/COM 注册检查全部通过，但 `--verify-absent` 仍报告 `profile-remains`。因此删除注册表残留不足以完成 TSF 注销，前一项隔离注册表测试不能代替接口状态验收。
+
+核对 [UnregisterProfile 官方说明](https://learn.microsoft.com/en-us/windows/win32/api/msctf/nf-msctf-itfinputprocessorprofilemgr-unregisterprofile) 后，生产 `DllUnregisterServer` 改用该方法按 CLSID、语言和 Profile GUID 注销，不再调用旧的 `Unregister`。本机独立实验用 `TF_RP_LOCALPROCESS` 创建随机标识的临时 Profile：创建后可枚举，旧接口调用后仍可枚举，`UnregisterProfile(..., TF_URP_LOCALPROCESS)` 后不可枚举，重复调用成功。该实验只覆盖进程内注册作用域；正式安装的全局注销仍需线上完整验收。
+
+新增 `windows/tests/profile_tests.cpp`，使用与生产相同的注销函数，并验证另一个临时 Profile 保持可枚举。x64/x86 的 `windows_profile_lifecycle` 均通过，测试不注册全局输入法或激活输入源，临时 Profile 随测试清理。可单独编译 `rimeq_profile_tests` 目标，再执行 `ctest --test-dir build-windows/x64 -C Release -R windows_profile_lifecycle --output-on-failure`（x86 替换对应目录）。两种位数的常规 CTest 构建均包含此项。

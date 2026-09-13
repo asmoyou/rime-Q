@@ -1,5 +1,6 @@
 #include "win.h"
 #include "identity.h"
+#include "profile_registration.h"
 #include <msctf.h>
 #include <wrl/client.h>
 using Microsoft::WRL::ComPtr;
@@ -83,12 +84,7 @@ extern "C" HRESULT __stdcall DllRegisterServer() {
 }
 extern "C" HRESULT __stdcall DllUnregisterServer() {
     auto init = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-    ComPtr<ITfInputProcessorProfiles> profiles;
-    HRESULT hr = CoCreateInstance(CLSID_TF_InputProcessorProfiles, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&profiles));
-    if (SUCCEEDED(hr)) {
-        profiles->EnableLanguageProfile(rq::clsid, rq::language, rq::profile, FALSE);
-        hr = profiles->Unregister(rq::clsid);
-    }
+    HRESULT hr = rq::unregisterProfile(rq::clsid, rq::language, rq::profile);
     ComPtr<ITfCategoryMgr> manager;
     if (SUCCEEDED(CoCreateInstance(CLSID_TF_CategoryMgr, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&manager))))
         for (const auto& category : categories) manager->UnregisterCategory(rq::clsid, category, rq::clsid);
@@ -97,5 +93,5 @@ extern "C" HRESULT __stdcall DllUnregisterServer() {
         auto error = RegDeleteTreeW(HKEY_LOCAL_MACHINE, key.c_str());
         if (error != ERROR_SUCCESS && error != ERROR_FILE_NOT_FOUND) hr = HRESULT_FROM_WIN32(error);
     }
-    manager.Reset(); profiles.Reset(); if (SUCCEEDED(init)) CoUninitialize(); return hr;
+    manager.Reset(); if (SUCCEEDED(init)) CoUninitialize(); return hr;
 }
