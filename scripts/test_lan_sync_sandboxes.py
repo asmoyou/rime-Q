@@ -64,8 +64,14 @@ def parallel(nodes, operation):
 
 def pair(inviter, guest, network):
     invitation = inviter.call("invite")
+    guest.call("discover")
+    found = []
+    def discovered_invitation():
+        found[:] = [d for d in guest.call("status")["discovered"] if d["invite"] == invitation["invite"]]
+        return bool(found)
+    wait_for(discovered_invitation, "current invitation was not advertised by mDNS", 30)
     with ThreadPoolExecutor(1) as executor:
-        joining = executor.submit(guest.call, "join", address=inviter.address(network), invite=invitation["invite"], code=invitation["code"], name=guest.name)
+        joining = executor.submit(guest.call, "join", address=found[0]["address"], invite=invitation["invite"], code=invitation["code"], name=guest.name)
         def awaiting_approval():
             if joining.done():
                 joining.result()
@@ -108,6 +114,9 @@ def main():
             pair(nodes[0], node, main_net)
         wait_for(lambda: all(n == len(nodes) for n in parallel(nodes, lambda n: len(n.call("status")["members"]))), "membership convergence")
         passed("one_enrollment_per_device")
+        threads = int(docker("stats", "--no-stream", "--format", "{{.PIDs}}", nodes[0].name))
+        assert threads < 16, "repeated invitations leaked discovery threads"
+        passed("discovery_threads_bounded_after_all_enrollments")
         wait_for(lambda: all(n > 0 for n in parallel(nodes, lambda n: len(n.call("status")["discovered"]))), "mDNS discovery between sandboxes")
         passed("real_multicast_discovery")
         parallel(list(enumerate(nodes)), lambda item: item[1].change("沙盒词条" + str(item[0]), item[0] + 1))

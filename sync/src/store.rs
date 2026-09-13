@@ -139,7 +139,7 @@ impl Store {
     }
     pub fn set<T: Serialize>(&self, key: &str, value: &T) -> Result<()> {
         self.db.execute(
-            "INSERT OR REPLACE INTO meta VALUES(?,?)",
+            "INSERT INTO meta VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value WHERE value!=excluded.value",
             params![key, serde_json::to_string(value)?],
         )?;
         Ok(())

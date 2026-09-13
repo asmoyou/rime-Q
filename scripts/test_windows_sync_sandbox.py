@@ -29,7 +29,7 @@ def main():
     (source/'scripts').mkdir()
     for name in ['test_lan_sync.py','test_lan_sync_native.py']:
         shutil.copy2(ROOT/'scripts'/name,source/'scripts'/name)
-    shutil.copy2(ROOT/'sync/target/debug/rimeq-sync.exe',source/'RimeQ.Sync.Test.exe')
+    shutil.copy2(ROOT/'build-windows/stage/RimeQ.Sync.exe',source/'RimeQ.Sync.Test.exe')
     for arch in ["x64", "x86"]:
         (source / arch).mkdir()
         for name in (["rimeq_sync_engine_tests.exe", "rimeq_sync_engine_node.exe"] if arch == "x64" else []) + ["rimeq_tsf_tests.exe", "RimeQ.Tip.dll"]:
@@ -65,7 +65,9 @@ try {
             $report.passed += "actual $arch TSF context with isolated x64 engine"
         } finally { if (!$server.HasExited) { Stop-Process -Id $server.Id } }
     }
+    $ErrorActionPreference = 'Continue'
     & C:\RimeQ-TestInput\python\python.exe -B C:\RimeQ-TestInput\scripts\test_lan_sync_native.py --binary C:\RimeQ-TestInput\RimeQ.Sync.Test.exe --native C:\RimeQ-TestInput\x64\rimeq_sync_engine_node.exe --app C:\RimeQ-TestInput\app --output C:\RimeQ-TestOutput\end-to-end.json *> C:\RimeQ-TestOutput\end-to-end.log
+    $ErrorActionPreference = 'Stop'
     if ($LASTEXITCODE -ne 0) { throw 'Six native engine + TLS end-to-end tests failed' }
     $report.passed += 'six native engines with TLS, durable applied receipts, offline deletion, composition and restart'
 } catch { $report.failure = $_.Exception.Message }

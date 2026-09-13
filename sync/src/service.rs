@@ -81,8 +81,11 @@ struct State {
     invite: Option<Invite>,
     pending: BTreeMap<String, Pending>,
     peers: BTreeMap<String, Peer>,
+    seen: BTreeMap<String, u64>,
+    seen_saved: u64,
     discovered: BTreeMap<String, Value>,
     discover_until: Option<Instant>,
+    discovery_tag: String,
     stop: bool,
     network_error: Option<String>,
 }
@@ -295,9 +298,11 @@ async fn serve_peer(
                 if let Some(p) = s.peers.get_mut(&id) {
                     p.last_seen = now();
                 }
-                let mut seen: BTreeMap<String, u64> = s.store.get("seen")?.unwrap_or_default();
-                seen.insert(id.clone(), now());
-                s.store.set("seen", &seen)?;
+                s.seen.insert(id.clone(), now());
+                if now().saturating_sub(s.seen_saved) >= 60 {
+                    s.store.set("seen", &s.seen)?;
+                    s.seen_saved = now();
+                }
                 (
                     Welcome {
                         signature: s.store.identity.sign(&bytes),
@@ -627,7 +632,7 @@ fn status(s: &State) -> Result<Value> {
         .get::<Group>("group")?
         .is_some_and(|g| g.founder == s.store.id());
     let receipts: BTreeMap<String, Receipt> = s.store.get("receipts")?.unwrap_or_default();
-    let seen: BTreeMap<String, u64> = s.store.get("seen")?.unwrap_or_default();
+    let seen = &s.seen;
     let members:Vec<_>=s.store.members()?.iter().map(|m| {
         let p=s.peers.get(&m.id);let r=receipts.get(&m.id);let removed=!s.store.authorized(&m.id).unwrap_or(false);
         let last_seen=p.map(|p|p.last_seen).unwrap_or(0).max(seen.get(&m.id).copied().unwrap_or(0));
@@ -944,6 +949,7 @@ pub async fn run(
         &root.join("control.json"),
         &serde_json::to_vec(&descriptor)?,
     )?;
+    let seen = store.get("seen")?.unwrap_or_default();
     let shared = Arc::new(Mutex::new(State {
         store,
         root,
@@ -955,8 +961,11 @@ pub async fn run(
         invite: None,
         pending: BTreeMap::new(),
         peers,
+        seen,
+        seen_saved: now(),
         discovered: BTreeMap::new(),
         discover_until: None,
+        discovery_tag: identity::random(),
         stop: false,
         network_error: None,
     }));
@@ -998,7 +1007,7 @@ pub async fn run(
     });
     let acceptor = network::acceptor()?;
     let mut listener: Option<TcpListener> = None;
-    let mut discovery: Option<mdns_sd::ServiceDaemon> = None;
+    let mut discovery: Option<Discovery> = None;
     let mut discovery_state = String::new();
     let peer_permits = Arc::new(tokio::sync::Semaphore::new(8));
     let mut tick = tokio::time::interval(Duration::from_millis(500));
@@ -1063,10 +1072,12 @@ pub async fn run(
                 )
             };
             if discovery.is_none() || discovery_state != next {
-                if let Some(d) = discovery.take() {
-                    let _ = d.shutdown();
-                }
                 let p = shared.lock().unwrap().port;
+                if let Some(d) = discovery.as_ref() {
+                    d.daemon.register(discovery_info(&shared, p)?)?;
+                    discovery_state = next;
+                    continue;
+                }
                 match discover(shared.clone(), p) {
                     Ok(d) => {
                         discovery = Some(d);
@@ -1159,11 +1170,10 @@ pub async fn run(
     Ok(())
 }
 
-fn discover(shared: Shared, port: u16) -> Result<mdns_sd::ServiceDaemon> {
-    use mdns_sd::{ServiceDaemon, ServiceEvent, ServiceInfo};
-    let daemon = ServiceDaemon::new()?;
+fn discovery_info(shared: &Shared, port: u16) -> Result<mdns_sd::ServiceInfo> {
+    use mdns_sd::ServiceInfo;
     let service = "_rimeq-sync._tcp.local.";
-    let tag = identity::random();
+    let tag = shared.lock().unwrap().discovery_tag.clone();
     let instance = format!("rq-{}", &tag[..12]);
     let invitation = {
         shared
@@ -1194,7 +1204,7 @@ fn discover(shared: Shared, port: u16) -> Result<mdns_sd::ServiceDaemon> {
         ("invite", invitation.as_str()),
         ("name", display_name.as_str()),
     ];
-    let info = ServiceInfo::new(
+    Ok(ServiceInfo::new(
         service,
         &instance,
         &format!("{instance}.local."),
@@ -1202,14 +1212,42 @@ fn discover(shared: Shared, port: u16) -> Result<mdns_sd::ServiceDaemon> {
         port,
         &props[..],
     )?
-    .enable_addr_auto();
+    .enable_addr_auto())
+}
+
+struct Discovery {
+    daemon: mdns_sd::ServiceDaemon,
+    stop: Arc<std::sync::atomic::AtomicBool>,
+}
+impl Discovery {
+    fn shutdown(&self) -> Result<()> {
+        self.stop.store(true, std::sync::atomic::Ordering::Release);
+        self.daemon.shutdown()?;
+        Ok(())
+    }
+}
+impl Drop for Discovery {
+    fn drop(&mut self) {
+        let _ = self.shutdown();
+    }
+}
+fn discover(shared: Shared, port: u16) -> Result<Discovery> {
+    use mdns_sd::{ServiceDaemon, ServiceEvent};
+    let daemon = ServiceDaemon::new()?;
+    let service = "_rimeq-sync._tcp.local.";
+    let info = discovery_info(&shared, port)?;
+    let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let thread_stop = stop.clone();
     let own = info.get_fullname().to_string();
     if port != 0 {
         daemon.register(info)?;
     }
     let events = daemon.browse(service)?;
     std::thread::spawn(move || {
-        while let Ok(event) = events.recv() {
+        while !thread_stop.load(std::sync::atomic::Ordering::Acquire) {
+            let Ok(event) = events.recv_timeout(Duration::from_secs(1)) else {
+                continue;
+            };
             if let ServiceEvent::ServiceResolved(info) = event {
                 if info.get_fullname() == own {
                     continue;
@@ -1241,5 +1279,5 @@ fn discover(shared: Shared, port: u16) -> Result<mdns_sd::ServiceDaemon> {
             }
         }
     });
-    Ok(daemon)
+    Ok(Discovery { daemon, stop })
 }

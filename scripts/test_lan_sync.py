@@ -72,7 +72,11 @@ class Node:
         self.process = subprocess.Popen([str(self.binary), "serve", "--root", str(self.root), "--bind", "127.0.0.1", "--isolated", "--no-discovery"],
                                         stdout=self.log, stderr=self.log, env=env,
                                         creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
-        until(lambda: self.root.joinpath("control.json").exists() and self.call("status"), "node failed to start")
+        try:
+            until(lambda: self.root.joinpath("control.json").exists() and self.call("status"), "node failed to start")
+        except Exception:
+            self.process.kill(); self.process.wait(timeout=5); self.log.close()
+            raise
 
     def call(self, action, **values):
         return request(self.root, action, **values)
