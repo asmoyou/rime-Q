@@ -22,6 +22,15 @@ struct Fixture {
     ~Fixture() { rq::unregisterProfile(clsid, 0x0804, profile, scope()); if (global) rq::removeServiceRegistry(clsid); }
     void add(ITfInputProcessorProfileMgr* manager) {
         const wchar_t description[] = L"Rime Q process-only regression fixture";
+        if (global) {
+            ComPtr<ITfInputProcessorProfiles> legacy; check(manager->QueryInterface(IID_PPV_ARGS(&legacy)));
+            wchar_t module[32768]{}; auto length = GetModuleFileNameW(nullptr, module, _countof(module));
+            check(legacy->Register(clsid));
+            check(legacy->AddLanguageProfile(clsid, 0x0804, profile, description, _countof(description) - 1, module, length, 0));
+            check(legacy->EnableLanguageProfile(clsid, 0x0804, profile, TRUE));
+            check(legacy->EnableLanguageProfile(clsid, 0x0804, profile, FALSE));
+            return;
+        }
         check(manager->RegisterProfile(clsid, 0x0804, profile, description, _countof(description) - 1,
             nullptr, 0, 0, nullptr, 0, FALSE, (global ? 0 : TF_RP_LOCALPROCESS) | TF_RP_HIDDENINSETTINGUI));
     }

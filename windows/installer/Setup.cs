@@ -86,8 +86,9 @@ namespace RimeQ {
             if (installed > incoming) throw new IOException("已安装的版本或构建更新，不能使用旧安装包覆盖。");
         }
         static string Quote(string text) { return "\"" + text.Replace("\"", "") + "\""; }
-        static Process StartPrivate(string file, string arguments) {
-            var info = new ProcessStartInfo(file, arguments) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetDirectoryName(file) };
+        static Process StartPrivate(string file, string arguments, bool diagnostics = false) {
+            var info = new ProcessStartInfo(file, arguments) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetDirectoryName(file),
+                RedirectStandardOutput = diagnostics, RedirectStandardError = diagnostics };
             var variables = new Dictionary<string, string>();
             foreach (var key in new[] { "APPDATA", "LOCALAPPDATA", "SystemRoot", "TEMP", "TMP", "USERPROFILE", "WINDIR" }) {
                 var value = Environment.GetEnvironmentVariable(key); if (value != null) variables[key] = value;
@@ -111,8 +112,13 @@ namespace RimeQ {
             foreach (var architecture in new[] { "x64", "x86" }) {
                 var file = Path.Combine(directory, architecture, "RimeQ.Tip.dll");
                 if (FileVersionInfo.GetVersionInfo(file).ProductName != "Rime Q") throw new IOException("输入服务标识不正确。");
-                if (Run(Regsvr(architecture == "x86"), "/s " + (remove ? "/u " : "") + Quote(file)) != 0)
-                    throw new IOException(remove ? "输入法注销失败，已保留安装文件。" : "输入法注册失败。");
+                using (var process = StartPrivate(Regsvr(architecture == "x86"), "/s " + (remove ? "/u " : "") + Quote(file), true)) {
+                    var output = process.StandardOutput.ReadToEndAsync(); var errors = process.StandardError.ReadToEndAsync();
+                    if (!process.WaitForExit(30000)) throw new IOException("输入服务注册操作超时。");
+                    foreach (var line in (output.GetAwaiter().GetResult() + "\n" + errors.GetAwaiter().GetResult()).Split('\n'))
+                        if (System.Text.RegularExpressions.Regex.IsMatch(line.Trim(), @"^tsf-[a-z0-9-]+$")) Log(line.Trim());
+                    if (process.ExitCode != 0) throw new IOException(remove ? "输入法注销失败，已保留安装文件。" : "输入法注册失败。");
+                }
             }
         }
         internal static string EntryPath(string directory, string name) {

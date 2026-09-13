@@ -3,11 +3,18 @@
 #include "profile_registration.h"
 #include <msctf.h>
 #include <wrl/client.h>
+#include <sstream>
 using Microsoft::WRL::ComPtr;
 extern HMODULE rqModule;
 extern long rqObjects;
 extern HRESULT createService(REFIID, void**);
 namespace {
+void traceRegistration(const char* stage, HRESULT hr) {
+    std::ostringstream output;
+    output << "tsf-" << stage << "-x" << (sizeof(void*) == 8 ? 64 : 86) << "-hr-" << std::hex << static_cast<unsigned long>(hr) << '\n';
+    auto text = output.str(); DWORD written = 0;
+    WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), text.data(), static_cast<DWORD>(text.size()), &written, nullptr);
+}
 class Factory final : public IClassFactory {
     long references_ = 1;
 public:
@@ -85,10 +92,12 @@ extern "C" HRESULT __stdcall DllRegisterServer() {
 extern "C" HRESULT __stdcall DllUnregisterServer() {
     auto init = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     HRESULT hr = rq::unregisterProfile(rq::clsid, rq::language, rq::profile);
+    traceRegistration("unregister-profile", hr);
     ComPtr<ITfCategoryMgr> manager;
     if (SUCCEEDED(CoCreateInstance(CLSID_TF_CategoryMgr, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&manager))))
         for (const auto& category : categories) manager->UnregisterCategory(rq::clsid, category, rq::clsid);
     // Only our CTF/COM service keys remain after profile and category removal.
     if (SUCCEEDED(hr)) hr = rq::removeServiceRegistry(rq::clsid);
+    traceRegistration("remove-service-keys", hr);
     manager.Reset(); if (SUCCEEDED(init)) CoUninitialize(); return hr;
 }
