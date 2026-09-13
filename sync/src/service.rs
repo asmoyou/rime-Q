@@ -76,6 +76,7 @@ struct State {
     token: String,
     isolated: bool,
     port: u16,
+    listening: bool,
     bind: std::net::IpAddr,
     invite: Option<Invite>,
     pending: BTreeMap<String, Pending>,
@@ -669,6 +670,24 @@ async fn control(shared: Shared, value: Value) -> Result<Value> {
         )
         .await;
     }
+    if action == "invite" {
+        // A configured fixed port does not prove that the listener is ready.
+        // Wait before exposing an invitation, including on fast CI hosts.
+        for _ in 0..40 {
+            {
+                let s = shared.lock().unwrap();
+                ensure!(s.store.enabled() && !s.stop, "sync unavailable");
+                if s.listening {
+                    break;
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        ensure!(
+            shared.lock().unwrap().listening,
+            "local network listener unavailable"
+        );
+    }
     let mut s = shared.lock().unwrap();
     ensure!(!s.stop, "sync service is restarting");
     match action {
@@ -931,6 +950,7 @@ pub async fn run(
         token,
         isolated,
         port,
+        listening: false,
         bind,
         invite: None,
         pending: BTreeMap::new(),
@@ -997,6 +1017,7 @@ pub async fn run(
         }
         if !enabled {
             listener = None;
+            shared.lock().unwrap().listening = false;
         }
         if !enabled && !browsing {
             if let Some(d) = discovery.take() {
@@ -1018,6 +1039,7 @@ pub async fn run(
                 Ok(l) => {
                     let p = l.local_addr()?.port();
                     shared.lock().unwrap().port = p;
+                    shared.lock().unwrap().listening = true;
                     listener = Some(l);
                 }
                 Err(_) => {

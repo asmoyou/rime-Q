@@ -12,6 +12,7 @@ import AppKit
     private let invitationDetails = SettingsUI.label("", secondary: true)
     private var timer: Timer?
     private var refreshing = false, working = false
+    private var pauseButton: NSButton?
     private var shownGroup: String?
     private var state: [String: Any] = [:]
     private var actions: [ObjectIdentifier: () async throws -> Void] = [:]
@@ -74,7 +75,12 @@ import AppKit
                 }
                 return
             }
-            let devices = (state["members"] as? [[String: Any]] ?? []).filter { $0["removed"] as? Bool != true }
+            let devices = (state["members"] as? [[String: Any]] ?? []).filter { $0["removed"] as? Bool != true }.sorted { a, b in
+                if (a["self"] as? Bool == true) != (b["self"] as? Bool == true) { return a["self"] as? Bool == true }
+                if (a["online"] as? Bool == true) != (b["online"] as? Bool == true) { return a["online"] as? Bool == true }
+                return (a["name"] as? String ?? "").localizedStandardCompare(b["name"] as? String ?? "") == .orderedAscending
+            }
+            pauseButton?.title = state["enabled"] as? Bool == true ? "暂停同步" : "恢复同步"
             status.stringValue = "\(group["name"] as? String ?? "我的电脑") · \(devices.count) 台设备 · \(devices.filter { $0["online"] as? Bool == true }.count) 台在线" + (state["enabled"] as? Bool == true ? "" : " · 已暂停")
             if let error = DeviceSync.shared.lastError { status.stringValue += "\n" + error }
             if let error = state["network_error"] as? String { status.stringValue += "\n" + error }
@@ -126,7 +132,7 @@ import AppKit
             }); body.addArrangedSubview(invitationDetails)
             body.addArrangedSubview(button("取消邀请") { [weak self] in _ = try await DeviceSync.shared.request(["action": "cancel_invite"]); self?.invitationDetails.stringValue = "" })
             body.addArrangedSubview(button("立即同步") { _ = try await DeviceSync.shared.request(["action": "sync_now"]); await DeviceSync.shared.tick() })
-            body.addArrangedSubview(button("暂停 / 恢复同步") { [weak self] in _ = try await DeviceSync.shared.request(["action": self?.state["enabled"] as? Bool == true ? "pause" : "resume"]) })
+            let pause = button(state["enabled"] as? Bool == true ? "暂停同步" : "恢复同步") { [weak self] in _ = try await DeviceSync.shared.request(["action": self?.state["enabled"] as? Bool == true ? "pause" : "resume"]) }; pauseButton = pause; body.addArrangedSubview(pause)
             body.addArrangedSubview(button("处理未完成的同步") { [weak self] in
                 guard self?.confirm("采用本机当前词库继续？", detail: "这会覆盖本轮待应用的同步结果，并向其他设备同步本机的新增、修改与删除。两份快照会先备份。") == true else { return }
                 try await DeviceSync.shared.recoverLocal()

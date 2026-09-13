@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import socket
+import ssl
 import struct
 import subprocess
 import tempfile
@@ -119,6 +120,37 @@ def rows(node):
     return {row["key"]["text"]: row["weight"] for row in node.call("fixture_rows")["rows"]}
 
 
+def reject_unauthorized(inviter, guest):
+    invitation = inviter.call("invite")
+    wrong = "000000" if invitation["code"] != "000000" else "000001"
+    try:
+        guest.call("join", address=inviter.address(), invite=invitation["invite"], code=wrong, name=guest.name)
+        raise AssertionError("wrong pairing code was accepted")
+    except RuntimeError:
+        pass
+    assert not inviter.call("status")["pending"]
+    assert not guest.call("status")["group"]
+    inviter.call("cancel_invite")
+    # A TLS channel alone never authorizes a peer to read dictionary data.
+    host, port = inviter.address().rsplit(":", 1)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    context.minimum_version = ssl.TLSVersion.TLSv1_3
+    with socket.create_connection((host, int(port)), timeout=5) as raw:
+        with context.wrap_socket(raw, server_hostname="rimeq.local") as stream:
+            size = struct.unpack(">I", exact(stream, 4))[0]
+            assert size <= MAX_FRAME
+            hello = json.loads(exact(stream, size))
+            forged = {"mode":"Sync", "id":hello["id"], "group":inviter.call("status")["group"]["id"], "members":[], "signature":"A"*86}
+            data = json.dumps(forged).encode()
+            stream.sendall(struct.pack(">I",len(data))+data)
+            try:
+                assert stream.recv(1) == b"", "unauthorized peer received application data"
+            except (ssl.SSLError, ConnectionResetError):
+                pass
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--binary", required=True, type=Path)
@@ -136,6 +168,8 @@ def main():
                 nodes.append(Node(args.binary.resolve(), Path(temporary) / f"node-{i}", f"Test device {i}"))
             nodes[0].call("create", group="Isolated test group", name=nodes[0].name)
             nodes[0].address()
+            reject_unauthorized(nodes[0], nodes[1])
+            cases.append("wrong_pairing_code_and_forged_peer_rejected")
             for node in nodes[1:]:
                 pair(nodes[0], node)
             cases.append("each_device_joins_once")
