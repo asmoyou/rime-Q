@@ -117,6 +117,8 @@ def build(args):
         import tempfile
         with tempfile.TemporaryDirectory(prefix='rimeq-sync-engine-') as user:
             run(output / 'x64/Release/rimeq_sync_engine_tests.exe', stage, user)
+        run('python', ROOT / 'scripts/test_lan_sync_native.py', '--binary', stage / 'RimeQ.Sync.exe',
+            '--native', output / 'x64/Release/rimeq_sync_engine_node.exe', '--app', stage)
         with tempfile.TemporaryDirectory(prefix='rimeq-smoke-') as user:
             run(stage / 'RimeQ.Broker.exe', '--smoke', stage, user)
             run(stage / 'RimeQ.Broker.exe', '--learn-write', stage, user)

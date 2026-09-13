@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import uuid
 from xml.sax.saxutils import escape
 
@@ -17,9 +18,21 @@ def main():
     source.mkdir(parents=True)
     output.mkdir()
     shutil.copytree(ROOT / "build-windows/stage", source / "app")
+    # Copy only the interpreter and standard library, never user site packages.
+    runtime = Path(sys.base_prefix)
+    python = source / "python"
+    python.mkdir()
+    for file in [runtime/'python.exe', *runtime.glob('*.dll')]:
+        shutil.copy2(file, python/file.name)
+    shutil.copytree(runtime/'DLLs',python/'DLLs')
+    shutil.copytree(runtime/'Lib',python/'Lib',ignore=shutil.ignore_patterns('site-packages','__pycache__','test','tests','idlelib','tkinter','turtledemo'))
+    (source/'scripts').mkdir()
+    for name in ['test_lan_sync.py','test_lan_sync_native.py']:
+        shutil.copy2(ROOT/'scripts'/name,source/'scripts'/name)
+    shutil.copy2(ROOT/'sync/target/debug/rimeq-sync.exe',source/'RimeQ.Sync.Test.exe')
     for arch in ["x64", "x86"]:
         (source / arch).mkdir()
-        for name in (["rimeq_sync_engine_tests.exe"] if arch == "x64" else []) + ["rimeq_tsf_tests.exe", "RimeQ.Tip.dll"]:
+        for name in (["rimeq_sync_engine_tests.exe", "rimeq_sync_engine_node.exe"] if arch == "x64" else []) + ["rimeq_tsf_tests.exe", "RimeQ.Tip.dll"]:
             shutil.copy2(ROOT / "build-windows" / arch / "Release" / name, source / arch / name)
     script = r'''
 $ErrorActionPreference = 'Stop'
@@ -52,6 +65,9 @@ try {
             $report.passed += "actual $arch TSF context with isolated x64 engine"
         } finally { if (!$server.HasExited) { Stop-Process -Id $server.Id } }
     }
+    & C:\RimeQ-TestInput\python\python.exe -B C:\RimeQ-TestInput\scripts\test_lan_sync_native.py --binary C:\RimeQ-TestInput\RimeQ.Sync.Test.exe --native C:\RimeQ-TestInput\x64\rimeq_sync_engine_node.exe --app C:\RimeQ-TestInput\app --output C:\RimeQ-TestOutput\end-to-end.json *> C:\RimeQ-TestOutput\end-to-end.log
+    if ($LASTEXITCODE -ne 0) { throw 'Six native engine + TLS end-to-end tests failed' }
+    $report.passed += 'six native engines with TLS, durable applied receipts, offline deletion, composition and restart'
 } catch { $report.failure = $_.Exception.Message }
 $report | ConvertTo-Json -Depth 5 | Set-Content C:\RimeQ-TestOutput\report.json -Encoding UTF8
 '''
