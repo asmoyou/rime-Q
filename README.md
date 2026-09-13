@@ -4,7 +4,7 @@
 
 基于 Rime 引擎，内置雾凇词库，万象语法模型可按需下载。熟悉的全拼输入，清晰的原生候选栏，再加上一只陪你敲键盘的小猫。
 
-[下载 macOS 版](https://github.com/asmoyou/rime-Q/releases/latest) · [使用说明](docs/MACOS.md) · [版本记录](https://github.com/asmoyou/rime-Q/releases) · [反馈问题](https://github.com/asmoyou/rime-Q/issues)
+[下载 Windows 版](https://github.com/asmoyou/rime-Q/releases/latest) · [下载 macOS 版](https://github.com/asmoyou/rime-Q/releases/latest) · [版本记录](https://github.com/asmoyou/rime-Q/releases) · [反馈问题](https://github.com/asmoyou/rime-Q/issues)
 
 [![Release](https://img.shields.io/github/v/release/asmoyou/rime-Q?label=Release)](https://github.com/asmoyou/rime-Q/releases/latest)
 [![Build and test](https://github.com/asmoyou/rime-Q/actions/workflows/ci.yml/badge.svg)](https://github.com/asmoyou/rime-Q/actions/workflows/ci.yml)
@@ -14,7 +14,7 @@
 
 ## 为日常中文输入而做
 
-- **装好就能输入。** 约 69 MB 的安装包包含引擎和基础词库，无需另外安装鼠须管。支持简体全拼、空格与数字选词、鼠标选词、翻页和中英文切换。
+- **装好就能输入。** 安装包包含引擎和基础词库，无需另外安装其他输入法。支持简体全拼、空格与数字选词、鼠标选词、翻页和中英文切换。
 - **输入留在本机。** 组词、候选和个人学习都在本地完成，断网也可以打字。更新检查只查询 GitHub 发布信息，不发送输入内容或个人词库。
 - **按自己的习惯调整。** 原生候选栏按内容收紧宽度，支持四档字号、六款简洁配色与系统深浅外观；可选万象语法模型辅助整句组词。
 - **让词库更贴合自己。** 搜索、编辑和导入导出个人学习记录；管理内置词表，导入带全拼编码的第三方词库，查看资源来源与许可。
@@ -26,14 +26,18 @@
 | 平台 | 当前支持情况 |
 | --- | --- |
 | macOS 13 及更新版本 | 已提供 PKG；同一安装包支持 Apple Silicon 与 Intel |
-| Windows 10 22H2 / Windows 11 x64 | 已加入原生客户端和 EXE 构建，含 x64/x86 TSF；安装与宿主验收状态见 [Windows 说明](docs/WINDOWS.md) |
+| Windows 10 22H2 / Windows 11 x64 | 独立 EXE 安装包，含 x64/x86 TSF；安装与宿主验收状态见 [Windows 说明](docs/WINDOWS.md) |
 | Linux | 客户端规划中 |
 
-1. 前往 [最新版本](https://github.com/asmoyou/rime-Q/releases/latest)，下载 `RimeQ-0.3.1-macos-universal.pkg`。
+Windows：前往 [最新版本](https://github.com/asmoyou/rime-Q/releases/latest)，下载 `RimeQ-0.4.0-windows-x64.exe`。双击安装并完成管理员认证，然后在输入法列表选择 **Rime Q**。安装、升级和备份步骤见 [Windows 使用说明](docs/WINDOWS.md)。Windows 安装包尚未进行 Authenticode 签名。
+
+macOS：
+
+1. 前往 [最新版本](https://github.com/asmoyou/rime-Q/releases/latest)，下载 `RimeQ-0.4.0-macos-universal.pkg`。
 2. 双击安装包，按 macOS 安装器的提示完成安装。应用会安装到系统输入法目录，并在后台完成启用。
 3. 从菜单栏的输入法菜单选择 **Rime Q**，开始输入。
 
-当前版本为 **0.3.1**。万象模型不再随包安装，安装包约 69 MB，比 0.3.0 缩小约 84%。安装包已做本地 ad-hoc 签名，尚未完成 Apple Developer ID 签名与公证。若 macOS 阻止打开，请确认文件来自本项目，再按“系统设置 → 隐私与安全性”的提示处理（[Apple 说明](https://support.apple.com/zh-cn/102445)）。当前实际宿主测试主要在 Intel Mac 上完成，Apple Silicon 包已构建，更多设备与应用的兼容性仍在持续验证。
+当前版本为 **0.4.0**，新增 Windows 原生客户端。万象模型仍按需下载，不随安装包提供。macOS 安装包已做本地 ad-hoc 签名，尚未完成 Apple Developer ID 签名与公证。若 macOS 阻止打开，请确认文件来自本项目，再按“系统设置 → 隐私与安全性”的提示处理（[Apple 说明](https://support.apple.com/zh-cn/102445)）。macOS 实际宿主测试主要在 Intel Mac 上完成，Apple Silicon 包已构建，更多设备与应用的兼容性仍在持续验证。
 
 安装时，管理员认证用于写入系统输入法目录；安装器可能请求读取下载文件夹。升级较早版本时，也可能请求退出仍在运行的旧版 Rime Q。详见 [安装与授权说明](docs/PERMISSIONS.md)。
 
@@ -107,7 +111,7 @@ cd rime-Q
 python3 scripts/build_macos.py --universal --smoke
 ```
 
-产物为 `dist/RimeQ-0.3.1-macos-universal.pkg`。已有资源缓存时可加 `--reuse-resources`；默认只保留 PKG，临时应用在打包后清理。
+产物为 `dist/RimeQ-0.4.0-macos-universal.pkg`。已有资源缓存时可加 `--reuse-resources`；默认只保留 PKG，临时应用在打包后清理。
 
 构建检查包括真实引擎与学习、快捷输入、词库管理、原生设置操作、候选皮肤、安装状态、更新版本比较和每日调度。CI 还会在独立运行环境安装实际 PKG，核验启用或明确的待启用处理，并验证卸载保留数据。
 

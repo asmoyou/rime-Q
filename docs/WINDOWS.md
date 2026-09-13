@@ -1,6 +1,6 @@
 # Windows 客户端
 
-Windows 客户端源码位于 `windows/`，使用原生 TSF 接入，独立进程运行 librime，设置使用 WPF。当前开发版本 **0.4.0**；安装包由本机或 CI 构建，尚未发布 Windows Release。系统级安装与外部宿主验收的实际状态见 [验证记录](VALIDATION.md)，不要将隔离测试等同于所有应用可用。
+Windows 客户端源码位于 `windows/`，使用原生 TSF 接入，独立进程运行 librime，设置使用 WPF。版本 **0.4.0**；安装包名为 `RimeQ-0.4.0-windows-x64.exe`，下载入口为 [GitHub Releases](https://github.com/asmoyou/rime-Q/releases)。系统级安装与外部宿主验收的实际状态见 [验证记录](VALIDATION.md)，不要将隔离测试等同于所有应用可用。
 
 ## 支持范围与功能
 
