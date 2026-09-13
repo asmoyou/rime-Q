@@ -249,3 +249,200 @@ UI 目视复查后修正开关与帮助图标的约束，并让下载操作按�
 新增 [Windows 开发交接](WINDOWS.md)，给出新电脑拉取、Visual Studio/vcpkg 核心构建步骤、引擎与资源移植边界、首个输入里程碑及 Git 同步范围。README 和开发计划增加入口；开发计划的更新策略与当前实现及项目约定对齐。文档本地链接与代码围栏检查通过，构建参数已核对现有 CI 和官方工具文档；本轮没有在目标 Windows 电脑执行命令或重新进行客户端验收。
 
 本机下载缓存、构建产物、临时诊断脚本、原始验证日志与旧项目笔记未纳入 Git；当前源码和构建不引用原工作区的兄弟目录。可选历史 Windows 参考已确认能从文档所列上游固定提交访问，不依赖本机旧 fork。
+
+
+## Windows 0.4.0 客户端本机验证（2026-09-12）
+
+本机为 Windows 10 专业版 x64，版本 10.0.19045，Intel Core i5-6600K。使用 Visual Studio 2022/MSVC 19.44、Windows SDK 10.0.26100、Python 3.13 和 Windows .NET Framework 构建。新增代码位于 `windows`，未修改 macOS 客户端实现，也没有把未运行的 macOS 回归写作本次通过。
+
+`python scripts/build_windows.py --smoke` 完整构建通过，包含：
+
+- x64/x86 TSF DLL、用户启用工具、独立 x64 librime 服务、WPF 设置与独立 EXE 安装包；两个位数的协议测试通过。
+- 固定 librime 1.17.0 的全拼、空格/数字/候选索引选词、独立会话、取消、Shift 中英切换；组合中切换英文保留拼写。日期、时间、农历、计算器、金额和 Unicode Lua 候选与真实引擎提交通过。
+- 词库预编译后在全新用户目录直接输入；中文路径的独立用户目录验证通过。个人词库实际导入、上屏和导出后，使用新的进程读取同一隔离目录，能够召回固定的自定义测试词。
+- 生产 x64/x86 DLL 通过命名管道连接隔离 x64 引擎，使用真正的 TSF 文本上下文、组合与写锁。预编辑、上屏、Esc、焦点取消、切换后的首键、重复测试键无文本副作用、写锁拒绝时不推进引擎和 Shift 检查通过。**测试替代了系统按键路由并主动投递焦点事件，未注册输入源，不能视为外部宿主验收。**
+- 原生候选按短词收紧宽度、长句/注释分别截断、鼠标选词索引、装饰不改变候选尺寸、装饰透传、屏幕边缘避让与隐藏检查通过，并渲染了短词、浅色及深色长句表面。未在本机改动全局高对比度、透明度或动画偏好来测试。
+- 更新响应与版本比较、无发布/失败区分、24 小时边界、失败后限频、跨实例恢复、手动越过间隔及请求合并；TSV 校验；下载流的进度、大小/SHA-256、取消、失败清理与已有文件保护检查通过。WPF 四页 × 两种宽度的 8 张渲染通过并进行了目视检查。
+- 安装器的版本/构建拒绝降级、路径越界防护、嵌入 ZIP 实际解包及逐文件摘要核验通过；最终包没有 `.gram`，包含雾凇源码、第三方许可、离线帮助和模型描述。安装界面单独渲染检查了授权说明及操作按钮。
+
+首轮连接测试发现每次新会话重新加载方案耗时可能超过短握手期限，已改为保留启动时验证过的会话并复用空闲会话。取消组合使用原上下文与原组合；宿主终止与迟到的取消共享完成状态，防止取消回调碰到新输入。初始隔离夹具未接入系统输入源，因此不能依赖操作系统自动发送注册服务的焦点事件；最终用明确的按键/焦点驱动验证回调，不将夹具行为误写为 Windows 内部故障根因。
+
+模型原锁中的项目公开副本在本次查询返回 404；上游 LTS 同名资产已于 2026-09-12 00:34:09 UTC 替换。Windows 首版在 `windows_wanxiang_model` 独立锁定官方资产 `558301149`，420343852 字节，SHA-256 `9f80530f470033cfb6d4b44bb861b540f64100426f92dd0f87140883632a3d93`。经过网络中断及重试后，实际完整下载并校验成功。`--model-smoke` 在隔离目录中验证了模型硬链接、真实语法候选/上屏、切回基础方案、移除两个个人目录链接，以及学习记录导出仍可用。构建和正常启动不下载模型，测试缓存不打包。
+
+最终开发安装包为 `dist/RimeQ-0.4.0-windows-x64.exe`，构建 **9121**，大小 **66104832** 字节，SHA-256 **790c6019caafdfbeadaf5855dea2aa0cc37329fc01c86fd1015391fd36b7402e**。尚未进行 Authenticode 签名，也未发布 Windows Release。主要日志在忽略目录 `artifacts/windows-final-build.log`、`artifacts/windows-package-final.log`、`artifacts/windows-model-live.log`，界面渲染在 `artifacts/windows-ui`。
+
+系统级安装、原始用户会话启用、独立 RichEdit 物理按键测试，以及记事本/浏览器/编辑器中的输入尚待执行；当前工具进程不是管理员。实际 EXE 安装、同版修复、拒绝降级和卸载保留数据已加入一次性 Windows CI 脚本，但远端 CI 尚未运行。本机没有为测试卸载现用输入法，也没有改动其他输入法的数据。Windows 11、ARM64、AppContainer、高权限宿主、远程桌面和不同 DPI/多屏仍未取得实际验收证据。
+
+
+## Windows 安装确认与 macOS 外观对齐（构建 9122，2026-09-12）
+
+用户确认构建 9121 已安装。实际应用位于 `C:\Program Files\RimeQ\versions\0.4.0.9121-53defa1c81b94b099c486b81600bee45`，安装日志记录 12:18:36 UTC 开始、12:18:39 UTC 完成落盘。已装 `RimeQ.Control.exe --verify` 返回 `hr=0x0`，已装 Broker 的版本限定就绪检查返回 `ready`。
+
+随后在独立空白 RichEdit50W 文档中使用 Windows 物理按键路径，x64 和 x86 均通过六组检查：首次全拼/空格、数字选词、Esc、中英切换、两个输入框间的焦点变化、切离/切回输入源后的首键。每次发键前检查准确的前台窗口、编辑控件与激活 Profile；没有向其他窗口发送测试文本。首轮被焦点保护条件停止，没有将其计作通过；之后完整通过的报告为 `artifacts/windows-installed-host-x64.json` 和 `artifacts/windows-installed-host-x86.json`。这些结果针对已安装的 9121，不表示任意宿主或新版已安装。
+
+用户指出 Windows 设置与猫咪和 macOS 差异过大。构建 9122 改为参考 `SettingsDesign.swift`、`SkinSettings.swift`、`AppearancePreferences.swift` 与 `TypingCat.swift`：
+
+- 设置恢复 204 px 侧栏、28 px 内容边距、偏好/词库分组与底部三入口，使用灰白和深色配色，独立皮肤页。输入页采用整句优化、候选显示、预览、常用按键和快捷输入的顺序。
+- 迁移完整猫咪的 96×64 贝塞尔曲线、卷尾、身体、面颊、键盘、肉垫与左右爪。沿用 160 ms 的短暂姿态和闲置恢复，关闭动画或隐藏时停止。
+- 原生候选和 WPF 预览共用 `windows/visuals/render.cpp`，使用与 macOS 对应的七种配色、候选测量和宠物避让规则。移除候选内部额外的拼音行，不按拼音长度扩张候选框；实际预编辑继续由 TSF 宿主显示。
+- 皮肤与字号选择会保存并更新同源预览；沿用现有 Theme/Cat/FontSize 偏好。新增 `RimeQ.Visuals.dll` 仅供设置绘制，TSF 直接链接相同绘制代码。
+- 升级通过正常停用旧 Profile、重新注册和用户会话启用流程更新服务；失败时尝试恢复启用，个人数据保持独立。
+
+本机通过 x64/x86 构建与协议检查；五页 × 两种外观 × 三种尺寸的 30 张 WPF 原生渲染；实际皮肤/字号控件操作、预览动画恢复/停止；候选短词宽度、注释、鼠标索引、猫咪不改变候选尺寸/透传/隐藏和边缘避让。目视复查后修正了侧栏文字对齐、高级皮肤预览右边裁切和皮肤卡片的双层边框。渲染在 `artifacts/windows-parity`，日志为 `artifacts/windows-parity-ui.log`、`artifacts/windows-parity-candidates.log`。
+
+构建 9122 安装包已完成嵌入资源解包、逐文件摘要与许可核验，大小 66201600 字节，SHA-256 `fa69fa8b48bb3ce0b38648c19cdbcfb4c88b3ee9c780ef5aa58a6eb2875ccda7`；日志 `artifacts/windows-parity-build.log`。包内无 `.gram`。新版系统升级与升级后的真实输入仍待实际执行；未将前述 9121 的宿主结果移用为新版结论。
+
+
+### 构建 9122 升级后验收
+
+用户完成了 9122 的系统升级。实际安装目录为 `C:\Program Files\RimeQ\versions\0.4.0.9122-ba5a593a04ab4490898d8876f06a8138`，安装日志记录 13:20:14 UTC 开始、13:20:17 UTC 完成。已装启用检查返回 `hr=0x0`，版本限定的引擎检查返回 `ready`。设置进程确实加载了该目录的 `RimeQ.Visuals.dll`，不是构建目录或旧目录中的组件。
+
+新版 x64/x86 RichEdit50W 独立空白文档各完成六组物理按键检查并通过：首次全拼/空格、数字选词、取消、中英切换、两个输入框的焦点变化和切换输入源后的首键。报告记录的实际已加载 TIP 文件版本均为 **0.4.0.9122**，证据为 `artifacts/windows-installed-9122-x64-diagnostic.json`、`artifacts/windows-installed-9122-x86.json`。所有发键仍受前台窗口、编辑控件和当前输入源约束；没有操作用户其他文档。
+
+新版首轮 x64 检查在第二组中止，原记录没有区分具体中止分支，没有计为通过。随后仅给测试报告补充焦点/文本不匹配原因及模块版本字段，生产代码没有因此修改；之后的完整检查通过。不据这一中止记录推断 Windows 内部原因或宣称修复了新的输入故障。
+
+当前已安装并使用新版绘制模块。界面布局、配色与猫咪曲线以 macOS 源码为基准；字体与窗口仍由 Windows 渲染，不宣称两个系统达到像素级完全一致。此次没有重新运行未受改动影响的 macOS 构建，也没有在用户机器上测试卸载。
+
+
+### 小狼毫个人词库迁移与卸载（2026-09-12）
+
+迁移来源为本机小狼毫 0.17.4.0，程序目录 `C:\Program Files\Rime\weasel-0.17.4`，用户目录 `C:\Users\36527\AppData\Roaming\Rime`。操作前切换到 Rime Q，并通过小狼毫自身的退出命令停止 `WeaselServer.exe`。完整用户目录已归档到忽略目录 `artifacts/weasel-migration/20260912-215704/weasel-user-data.tar.gz`，大小 60081944 字节，SHA-256 `436e67764e4551350889e4f4df4062458debdfc4022aff9b4d4c6967422368d2`。原用户目录及该归档均保留。
+
+使用小狼毫自身的 `rime.dll` 与 librime levers API 导出两个学习库：`luna_pinyin.userdb` 36 条、`rime_ice.userdb` 6982 条；另解析 `custom_phrase.txt` 的 35 条有效短语。共 7053 条来源记录，按词语和编码去重并保留较高权重后为 7039 条，重复 14 条，无效 0 条。合并文件为 140333 字节，SHA-256 `71bfa5af59f09445460cf7ea8edf48facff57ab0b3402053fa04474a3079a39e`；验证记录不包含实际词条内容。
+
+导入前先从 Rime Q 导出并保留原有 71 条个人记录。Broker 报告导入 7039 条；导入后重新导出 7048 条，按规范化编码核对，7039 个迁移键缺失 0 个，原有 71 个键缺失 0 个。回导文件 SHA-256 为 `94c2930c7b1c5b552c86f6331a9289f5a6a3657fc1b93900c52ee00ec283b34d`。这些结果证明词库记录已进入 Rime Q 的学习库并可由 librime 回读；本轮没有把某个真实个人词条显示到日志或输入到其他窗口。
+
+随后运行小狼毫正式卸载程序，返回码为 0。卸载后 `C:\Program Files\Rime\weasel-0.17.4`、控制面板卸载项及 HKLM 下的 Weasel 注册键均不存在，`WeaselServer.exe` 未运行，CTF TIP 注册中搜索不到 Weasel。卸载器保留了 `%APPDATA%\Rime` 和 HKCU 用户设置，本轮没有额外删除这些个人数据；空的 `C:\Program Files\Rime` 父目录也未手动清理。
+
+卸载后 Rime Q 0.4.0.9122 的应用与 Broker 仍在运行，Profile 激活返回 `hr=0`，HKLM CTF 注册仍指向 `Rime Q`。再次导出仍为 7048 条，迁移键缺失 0 个。此次验证覆盖备份、学习库迁移、回读完整性、正式卸载和 Rime Q 服务存续；没有在卸载后重复此前已通过且未受影响的 x64/x86 RichEdit 全套物理按键测试。
+
+
+## Windows 与 macOS 客户端功能对齐及远程模式状态（构建 9130，2026-09-13）
+
+用户指出 Windows 的“个人词库”和“词库与模型”与 macOS 功能及交互不同。核对 `PersonalDictionary.swift`、`DictionaryViews.swift`、`DictionaryResources.swift`、`ModelSettings.swift`、`UpdateSettings.swift` 与 Windows 实现后，确认 Windows 首版只实现了个人 TSV 的简化编辑和静态资源说明，属于产品能力缺口，不是迁移数据丢失。修复前 Broker 可导出 7053 条，全部符合设置解析规则；空表首先来自页面未自动读取，原星号列宽在 WPF 布局中也被压缩。
+
+构建 9130 包含两端产品契约对齐：个人词库打开即读取，支持词条/全拼搜索、三种排序、多选、新增/编辑、确认删除、修改前完整备份、撤销上次修改、确认导入并按同词同拼音保留较高权重、导出全部、空状态和总数/筛选数。写入前重新导出并比较受影响词条，发现新的学习或修改时停止覆盖。TSV 使用 `rime_q`、32 MB、20 万条及相同的全拼音节校验语义。
+
+“词库与模型”读取同一脚本生成的 10 项资源清单，展示内置词库、第三方词库与可选模型的类型、数量/大小、状态、来源、版本、许可和 SHA-256。支持导入独立全拼 `.dict.yaml`/TSV/TXT、填写来源与许可、启停、移除但保留原文件、查看词条、导出源文件、详细信息、重新应用和确认恢复内置。Windows 使用与 macOS 相同的 `dictionaries/configuration.json`、`imports`、`generations/UUID` 和备份语义；平台差异仅为 Windows 代次内的 `data` 布局与 Broker 生命周期。新资源先复制到用户代次，在独立临时用户目录通过随包 librime 编译并验证候选，再正常重启 Broker 切换；失败恢复原活动代次或内置资源，`rime_q.userdb` 不参与复制或清理。活动指针只接受受限 UUID、父目录和标记文件，配置/活动代次不一致时下次启动重新应用。.NET 4.8 长路径模式启用后，原先触发 `PathTooLongException` 的安装目录与长隔离用户路径组合通过。
+
+输入与外观、版本页和菜单也按审查结果补齐：模型移除先确认且只显示当前状态对应的单一操作；版本页显示构建号、上次检查时间、检查结果窗口、项目与发布入口；重新打开设置保留当前页并刷新个人词库；TSF 菜单显示“英文输入”选中状态、关于入口和动态新版本标题。macOS/Windows 模型不再使用两个锁，统一为上游 LTS 资产 `558301149`，420343852 字节，SHA-256 `9f80530f470033cfb6d4b44bb861b540f64100426f92dd0f87140883632a3d93`。新增 `docs/CLIENT_PARITY.md`、架构 ADR 和 `scripts/test_client_parity.py`，CI 在平台构建前检查五页、个人词库、资源、模型、更新、菜单及共用模型锁，避免功能再次静默分叉。
+
+本机隔离验证通过：x64/x86 协议；librime 全拼、选词、Lua 与跨进程学习；个人词库新增、备份、删除、撤销、过期快照拒绝；第三方 YAML 列顺序解析、隔离编译、启用后真实候选召回、停用后候选消失；安装目录中的资源清单及长路径编译；配置写入失败后的活动代次回退；x64/x86 生产 TIP 对真实 TSF 文本上下文、组合/写锁、取消、焦点、Shift/Ctrl+Space、模式 compartment、Language Bar 按钮和连接的测试。候选尺寸、长注释、鼠标索引、装饰透传/隐藏及边缘避让仍通过。设置测试对 5 页 × 2 外观 × 3 尺寸执行布局断言，但本轮桌面会话的 `RenderTargetBitmap` 连独立红色矩形也返回全透明，明确报告 `WPF render unavailable`，没有把透明 PNG 计为目视通过。Windows Computer Use 在本会话未提供可用的原生窗口连接，因此新版两页的最终像素目视仍需当前打开的 9130 设置窗口或后续 CI 截图确认。
+
+远程控制下单独 Shift 的按下/抬起可能未完整传递。9130 的 TSF 同时发布 `GUID_COMPARTMENT_KEYBOARD_OPENCLOSE` 与 `GUID_COMPARTMENT_KEYBOARD_INPUTMODE_CONVERSION`，新增可点击的蓝色“中/A” Language Bar 按钮，并注册 Ctrl+Space 备用切换。x64/x86 测试均从 Windows Language Bar 管理器按固定 GUID 取得按钮，验证图标非空、文本按“中 → 英 → 中”变化；Shift、Ctrl+Space、按钮点击及外部 compartment 改动均与 Broker 的实际中英文状态同步。已安装 9130 的 x64/x86 DLL 使用隔离引擎重复通过同一测试。
+
+升级测试复现了长期运行宿主中仍驻留的 9121 TIP 在新 Broker 停止后重新拉起 9121 Broker。9130 安装器先停用 Profile，再通知所有仍可启动的旧 Broker/设置退出；新版本 Broker 必须 ready 后才启用 Profile，并从经过清单校验的旧版本目录删除 `RimeQ.Broker.exe` 与 `RimeQ.exe`，不强制结束仍占用旧 TIP DLL 的宿主。实际升级后 9121 至 9129 的 9 个旧目录均保留 TIP，但旧启动器数量为 0；保持 Profile 启用并停止 9130 Broker 后观察 4 秒，没有旧 Broker 自动重启。安装顺序另有测试保证 Broker 未 ready 时不调用 Profile 启用。
+
+构建 9130 已安装到 `C:\Program Files\RimeQ\versions\0.4.0.9130-92e6ec8d72044f758f126aa7bdffc03d`。Profile 首次激活在系统刷新窗口内返回 `0x80004005`，1 秒后重试成功；随后 Profile 验证返回 `hr=0x0`，Broker 返回 `ready`，设置与 Broker 进程均来自该目录。实际个人词库回导为 7059 条，7039 个小狼毫迁移键缺失 0 个，Rime Q 原有 71 个键缺失 0 个。已安装 9124 的独立 RichEdit 验收窗口多次无法取得交互桌面前台焦点，保护条件都在首键前停止且未向其他窗口发键；此前 9122 的真实宿主结果不移作 9130 结论。
+
+最终安装包为 `dist/RimeQ-0.4.0-windows-x64.exe`，构建 9130，大小 66250240 字节，SHA-256 `82279e0394525455b90549156c797102bc28e78bb5cd44a4de30af77d0389064`。包内包含共享资源清单、离线帮助、第三方许可和长路径配置，不包含 `.gram` 模型。macOS 源码的功能与状态契约已静态核对并由新增一致性检查覆盖；当前机器没有 Swift/AppKit 工具链，未把未执行的 macOS 构建或运行测试记为通过。
+
+
+## Windows 任务栏状态与远程 Unicode 输入（构建 9131，2026-09-13）
+
+用户在 9130 真实会话中确认：本机键盘可切换中英文，任务栏没有显示“中/A”，远程控制输入只产生英文。代码检查确认 9130 的状态按钮使用项目自定义 GUID，未注册 TSF 的输入模式/系统托盘能力；按键路径只识别普通 A-Z 虚拟键，不识别高字中携带 Unicode 字符的 `VK_PACKET`。9131 改用 `GUID_LBI_INPUTMODE`，持有系统 `ITfLangBarItemMgr`，注册 `GUID_TFCAT_TIPCAP_INPUTMODECOMPARTMENT` 与 `GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT`，并将 `VK_PACKET` 中的 ASCII 拼音、数字、空格及组词键送入原有 librime 路径。非 ASCII Unicode、英文模式、密码框及带 Ctrl/Alt/Windows 修饰键的输入仍交由宿主处理。
+
+x64/x86 生产 TIP 测试新增组合 `Unicode << 16 | VK_PACKET` 的真实 TSF 回调路径，验证连续拼音、空格上屏、标准任务栏 GUID、图标非空、“中/英”文字变化、按钮点击、Shift/Ctrl+Space 及 compartment 反向同步。构建产物和安装目录中的 x64/x86 DLL 均通过。设置测试通过个人词库、第三方词库、更新/下载、安装顺序、皮肤/字号/动画及 5 页 × 2 外观 × 3 尺寸的 30 张非透明 WPF 渲染；候选栏尺寸、鼠标索引、长注释、装饰透传/隐藏与边缘避让通过。
+
+9131 安装到 `C:\Program Files\RimeQ\versions\0.4.0.9131-0ce058583afb44f297f0b1e917a68f11`。Broker `--version` 返回 `Rime Q 0.4.0 (9131)`，`--ping` 返回 `ready`，Profile 验证返回 `hr=0x0`，Broker 与设置进程均来自 9131 目录。注册表中 CTF Profile 图标路径也指向 9131 x86 TIP，类别由 3 项增至 5 项。用户已在设置中看到 7060 条个人词库；当前导出也为 7060 条，7039 个小狼毫迁移键缺失 0，Rime Q 原有 71 个键缺失 0。
+
+升级后 `explorer.exe`、ChatGPT 与 NVIDIA Overlay 仍驻留 9130 TIP；已重启 Explorer，重启后的 Explorer 未再加载旧 DLL。ChatGPT 与 Overlay 不为输入测试而停止，它们要在自身重启后才会加载 9131。因此任务栏实际可见性与远程控制的真实输入结果必须在升级后新建的普通编辑宿主中验收，隔离 TSF 测试不代替该结论。Windows Computer Use 仍因 `Trusted RPC service is not configured: sky` 无法代为目视。
+
+最终安装包为 `dist/RimeQ-0.4.0-windows-x64.exe`，构建 9131，大小 66250752 字节，SHA-256 `f99cfc59e2f3f8d11562e0c2fd9d19e271ea49063943ad9a70f012abda881d27`。尚未进行 Authenticode 签名，也未发布 Windows Release。
+
+## Windows 模式图标外观与宿主版本差异（构建 9132，2026-09-13）
+
+用户确认 9131 在记事本切换 Rime Q 时已经显示“中/A”，但 ChatGPT 聊天界面不显示。再次读取进程模块确认：记事本 PID 16184 与 Explorer PID 15960 加载 9131 TIP，ChatGPT PID 20792 仍加载 9130 TIP。后者没有 9131 的标准模式按钮实现；需要在自身完整退出后重新打开，再验证新版。未停止当前任务所在的 ChatGPT，不把模块路径检查记作其新版真实输入通过。用户本次尚未确认远程键盘的中文候选和上屏结果。
+
+9132 按用户要求将模式图标改为透明底、白色文字，按实际笔画边界分别居中，使用灰度抗锯齿并明确生成预乘 alpha 和透明掩码。尺寸随系统小图标指标调整。直接编译生产图标函数的临时渲染检查覆盖“中”和“A”在 16/20/24/32/48 像素下的十种结果：透明角点、白色像素和水平/垂直居中均通过，居中误差不超过半个像素。已查看原尺寸及放大图，证据在 `artifacts/mode-icons-9132/contact-sheet.png`；该图不代替系统任务栏实际显示验收。
+
+已通过 x64/x86 编译、协议检查及资源复用校验。9131 已通过的隔离输入状态机、个人词库和设置页测试不因本次纯图标外观变更重复运行。
+
+安装包 `dist/RimeQ-0.4.0-windows-x64.exe` 为 66252800 字节，SHA-256 `a6e13dddc17a6da1cb2bb1877f2bf07f9dc0b2b0b330a293af2cbcc802a29f50`，与 SHA256SUMS 一致；安装包解压及清单校验通过，Python 编译检查和 `git diff --check` 通过。用户已完成升级，实际安装目录为 `C:\Program Files\RimeQ\versions\0.4.0.9132-5b07e4d504744dd6927a5fc34b6a4bf6`，Broker 报告 9132/ready，Profile 验证 `hr=0x0`，已安装 x64 TIP 与构建产物摘要一致。
+
+用户确认已能看到白色模式图标，但偶尔变回蓝底黑字。读取所有可访问进程模块发现：ChatGPT PID 23332、设置与 Sublime 已加载 9132，Explorer PID 15960 仍加载带蓝底绘制代码的 9131。此时确有新旧版本混用；不能仅凭模块路径将用户看到的每次变色都判定为同一原因。确认没有 Explorer 文件窗口后重启该 Shell 进程，新的 Explorer PID 24232 已加载 9132。随后复查 ChatGPT、Explorer、设置、Sublime 与新记事本均加载 9132，没有发现旧 TIP；刷新后的图标稳定性仍待用户实际观察反馈。
+
+9132 已在本机独立 RichEdit50W 实际宿主中通过 x64/x86 各六组物理按键验收：首键及空格上屏、数字选词、取消、Shift 中英文切换、焦点变化、切换输入法后的首键。报告均记录实际加载 `0.4.0.9132`，证据为 `artifacts/windows-host-9132-x64.json` 和 `artifacts/windows-host-9132-x86-retry.json`。x86 首次因焦点变化在首键前停止，未向其他窗口输入；单独重试后通过。Windows Computer Use 文本模式也确认新建空白记事本正文有焦点，按 n 出现 Rime Q 候选，Esc 隐藏候选。截图模式返回 `SetIsBorderRequired failed: 不支持此接口 (0x80004002)`，因此没有将任务栏截图验收或用户远程工具的实际 Unicode 输入记为通过。
+
+## Windows CI 安装生命周期排查（2026-09-13）
+
+此前多轮 push 没有一次完成全部线上验证，不能作为客户端交付成功的证据：
+
+- `34736866118` 在 Windows Runner 的 tar 解压路径校验失败；`df244ab` 规范化路径并补充 3 项资源回归。
+- `34737208541`、`34737499548` 在安装快捷方式阶段失败；阶段日志确认资源与输入服务注册已完成，`06957d2` 改用原生 `IShellLinkW`。
+- `34737916802` 已通过首次安装与同版修复，随后 PowerShell 将未加括号的 `-or` 当作 `Test-Path` 参数；`56fb11d` 修正表达式。
+- `34738164317` 的构建、x64/x86 协议与生产 TIP、librime、学习、设置和 30 张 WPF 渲染通过，安装/修复/拒绝降级后执行到卸载。日志记录 `unregistered-personal-data-retained`，后续命令返回 1；原测试未捕获子进程输出，不能仅凭安装器成功日志断言注销已完成。
+
+为隔离失败，CI 将 `windows-install` 从 `windows-package` 拆出，下载同次运行的安装包并验证 SHA-256；失败时可只重跑安装作业，复用构建产物。命令封装同时捕获 stdout/stderr，只输出允许的状态行，失败信息包含程序、动作和退出码。注销检查记录 TSF 创建、枚举、枚举迭代及残留 Profile 的具体阶段，并传播迭代错误；安装测试只读核对 Rime Q 自己的 HKLM/HKCU、32/64 位 CTF/COM 注册键。
+
+本机 `./scripts/test_windows_lifecycle_process.ps1` 通过：两路输出捕获、错误动作与退出码、预期失败码、日志过滤、两路大输出无死锁。重编译的 x64 Control 对本机现用 Rime Q 正确报告 `profile-remains / 0x80004005`，普通启用只读检查返回 `0x0`；未卸载或停用现用输入法。PowerShell 解析、CI YAML 解析和客户端契约检查通过。
+
+已查询 Microsoft Learn 的 [EnumProfiles](https://learn.microsoft.com/en-us/windows/win32/api/msctf/nf-msctf-itfinputprocessorprofilemgr-enumprofiles)、[Unregister](https://learn.microsoft.com/en-us/windows/win32/api/msctf/nf-msctf-itfinputprocessorprofiles-unregister)、[Next](https://learn.microsoft.com/en-us/windows/win32/api/msctf/nf-msctf-ienumtfinputprocessorprofiles-next)，并核对 [Microsoft SampleIME 注销示例](https://github.com/microsoft/Windows-classic-samples/blob/main/Samples/IME/cpp/SampleIME/Register.cpp)。本机独立只读探针枚举 `0`、`0x0804`、`0x0409`、`0x0411`、`0x4321` 均返回成功，迭代以 `S_FALSE` 结束，未支持“语言不存在导致枚举失败”的假设。官方示例使用 `UnregisterProfile`，当前实现使用 `Unregister`，这一差异尚不构成已确认根因。最终线上结果待补充。
+
+### 用户级 Profile 残留的直接证据与隔离回归
+
+[34738787957](https://github.com/asmoyou/rime-Q/actions/runs/34738787957) 的打包和其他平台作业全部通过，独立安装作业明确失败在 `RimeQ-Control-check.exe --verify-absent`，输出 `tsf-absence stage=profile-remains hr=0x80004005`。此前首次安装、启用、已装引擎、同版修复、拒绝降级、停用和卸载器均返回预期退出码。卸载后 Rime Q 的 HKLM CTF/COM 注册在 32/64 位视图中均不存在，HKCU 的 CTF TIP 分支在两种视图中仍存在。这确认了用户级 Profile 残留；没有将它归因于未经验证的系统缓存。
+
+[InstallLayoutOrTip 官方说明](https://learn.microsoft.com/en-us/windows/win32/tsf/installlayoutortip)明确 `ILOT_UNINSTALL` 等同于禁用。修复保留现有系统注销 API，仅在系统注销后删除当前用户的 `Software\Microsoft\CTF\TIP\{C13A9B62-413B-45B8-9EF1-884522319760}`，逐一处理两个注册表视图；失败继续报告并尝试恢复系统注册。原始非提权 GUI 在管理员卸载成功后也执行自身用户的清理，覆盖 UAC 使用另一管理员账号的路径，不遍历其他用户配置。个人设置、词库、模型与其他输入法注册不在清理范围。
+
+`windows/tests/InstallerRegistryTests.cs` 使用 `HKCU\Software\RimeQ.Tests\Uninstall-随机标识` 下的隔离子树模拟残留状态，不注册或激活输入法。未实现清理时返回 1，报 `Uninstall left the user's disabled CTF profile`；实现后通过禁用 Profile 清理、重复执行、两个用户上下文隔离、其他输入法和个人设置原值保留、只读权限错误上报，最后删除自己的测试子树。该回归加入 `build_windows.py --smoke` 的开头，也可单独运行 `build-windows/Installer.Tests.exe`。线上生命周期脚本进一步要求 32/64 位 HKLM/HKCU 的 Rime Q CTF/COM 分支不存在，并继续要求真实 TSF 枚举无残留及个人文件哈希不变。完整线上验收结果仍待补充。
+
+独立编译并运行命令为 `python scripts/build_windows.py --installer-tests-only`，本机通过；该模式不构建引擎、词库或安装包，也不安装、停用或卸载现用客户端。
+
+### TSF Profile 注销接口回归
+
+[34739305842](https://github.com/asmoyou/rime-Q/actions/runs/34739305842) 进一步确认：上述修复后 HKLM/HKCU 的 32/64 位 CTF/COM 注册检查全部通过，但 `--verify-absent` 仍报告 `profile-remains`。因此删除注册表残留不足以完成 TSF 注销，前一项隔离注册表测试不能代替接口状态验收。
+
+核对 [UnregisterProfile 官方说明](https://learn.microsoft.com/en-us/windows/win32/api/msctf/nf-msctf-itfinputprocessorprofilemgr-unregisterprofile) 后，生产 `DllUnregisterServer` 改用该方法按 CLSID、语言和 Profile GUID 注销，不再调用旧的 `Unregister`。本机独立实验用 `TF_RP_LOCALPROCESS` 创建随机标识的临时 Profile：创建后可枚举，旧接口调用后仍可枚举，`UnregisterProfile(..., TF_URP_LOCALPROCESS)` 后不可枚举，重复调用成功。该实验只覆盖进程内注册作用域；正式安装的全局注销仍需线上完整验收。
+
+新增 `windows/tests/profile_tests.cpp`，使用与生产相同的注销函数，并验证另一个临时 Profile 保持可枚举。x64/x86 的 `windows_profile_lifecycle` 均通过，测试不注册全局输入法或激活输入源，临时 Profile 随测试清理。可单独编译 `rimeq_profile_tests` 目标，再执行 `ctest --test-dir build-windows/x64 -C Release -R windows_profile_lifecycle --output-on-failure`（x86 替换对应目录）。两种位数的常规 CTest 构建均包含此项。
+
+[34739757035](https://github.com/asmoyou/rime-Q/actions/runs/34739757035) 的安装、修复、拒绝降级、停用和卸载器均返回预期结果，但仅使用 Profile 注销后仍留下 HKLM CTF 服务目录，注册表检查失败；该次检查在首个残留处中断，尚不能从该运行确认最终枚举状态。最终注销顺序改为 `UnregisterProfile`、注销类别、`ITfInputProcessorProfiles::Unregister`、删除自己的 COM 注册，兼顾 TSF Profile 状态和完整服务注册清理。诊断收集全部注册状态并执行 TSF 检查后再汇总残留，保留原有通过条件。
+
+[34740058831](https://github.com/asmoyou/rime-Q/actions/runs/34740058831) 显示串联旧服务注销 API 后卸载器返回失败，这一尝试没有完成验收。改为保留 `UnregisterProfile` 和类别注销，再直接删除按自身 CLSID 限定的 HKLM CTF/COM 注册目录；不再二次调用旧服务注销 API。若另一个位数的注销已移除共享 Profile，仅在 TSF 重新枚举证明确实不存在后接受重复注销，枚举失败或仍有 Profile 均继续失败。
+
+新增独立 `windows-registration` CI 作业，仅编译小型原生测试，分别以 x64/x86 在一次性 Runner 中创建随机标识、默认禁用且隐藏的全局测试 Profile，验证全局注销后的枚举与服务目录、重复注销以及另一个测试 Profile 保留。它不构建词库或安装包，补充了此前进程内测试不覆盖全局作用域的缺口；本机拒绝该 `--global` 模式，日常 CTest 继续只测试进程内临时 Profile。全局回归与完整安装作业均需通过后才能交付。
+
+### WOW64 共享注册的两组件交互
+
+`34740525778` 的独立全局注册作业耗时 48 秒，x64/x86 各自的随机 Profile 测试通过，但完整卸载仍失败。`34740902782` 将独立测试对齐为旧注册 API、启用再停用，并补充实际 DLL 的 HRESULT 后，直接记录：x64 的 Profile 注销与服务目录清理均为 `0`，随后 x86 的 Profile 注销为 `80004005`。此前两个测试进程使用不同随机标识，漏掉了两个生产组件共用同一标识的交互。
+
+Microsoft 的 [WOW64 注册表共享说明](https://learn.microsoft.com/en-us/windows/win32/winprog64/shared-registry-keys)明确列出 `HKLM\SOFTWARE\Microsoft\CTF\TIP` 为 Shared，`HKLM\SOFTWARE\Classes\CLSID` 为 Redirected。两个位数不应各自完整注销同一共享 Profile。当前 Windows 产品仅提供 x64 系统安装包，因此改由 x64 组件统一注册/注销共享 Profile、类别和 CTF 目录；x86 组件仅注册/注销自己的 32 位 COM 项，避免第二次注销已经由 x64 移除的共享对象。
+
+新增 `scripts/test_windows_registration.ps1`，在独立 Runner 中直接加载同一次构建的 x64/x86 生产 DLL，使用同一 Rime Q 标识注册两轮以覆盖修复，再启用、停用、依次注销两个组件、清理当前用户的测试 Profile，验证 TSF 枚举与两种 COM 视图都无残留。独立作业现在构建实际 DLL 和 Control，但仍不构建词库或安装包。两个原生组件、本机进程内回归及脚本语法检查通过；两组件全局回归和完整安装的最终结果待补充。
+
+### 停止推送试错，准备本地隔离复现（2026-09-13）
+
+[34741288705](https://github.com/asmoyou/rime-Q/actions/runs/34741288705)（`ef49f40685be64272ebadd86c7fcfe5f9568211d`）的实际双 DLL 注册测试和 Windows 打包通过，完整安装作业仍失败。卸载器记录 x64 Profile 注销、x64 CTF/COM 清理及 x86 COM 清理均为 `hr=0`；HKLM/HKCU 两种视图中的自身 CTF/COM 分支均不存在，但 `RimeQ-Control-check.exe --verify-absent` 报 `profile-remains / 0x80004005`。此前的修复没有完成全部验收，剩余原因尚未确定。
+
+独立注册测试在相同 DLL 路径连续注册两次，然后启用、停用和注销。完整安装在首次启用后执行引擎测试，再将同版修复安装到新的 GUID 目录，拒绝降级后通过复制改名的 Control 停用、卸载并检查。这些是待隔离的流程差异，不能直接归因于系统缓存或修复目录。
+
+重新读取微软 [TF_INPUTPROCESSORPROFILE](https://learn.microsoft.com/en-us/windows/win32/api/msctf/ns-msctf-tf_inputprocessorprofile)、[Next](https://learn.microsoft.com/en-us/windows/win32/api/msctf/nf-msctf-ienumtfinputprocessorprofiles-next) 和 [EnumProfiles](https://learn.microsoft.com/en-us/windows/win32/api/msctf/nf-msctf-itfinputprocessorprofilemgr-enumprofiles) 文档。本机只读探针对比复用结构与每次调用前填入非零 GUID 的枚举，均正确返回键盘布局的空 CLSID；没有复现“上一次条目的 CLSID 残留导致误判”。这仅排查了本机枚举行为，不构成线上失败的根因结论。
+
+已下载同次 CI 的原始安装包并验证其随包校验值：SHA-256 `c7d01f9639431acc29b8feb43a0de6bfa1e4a6ec2fc814de5e47c8fe1c27eb09`。本机为 Windows 10 Pro `10.0.19045`，管理员只读清单确认没有现成 Hyper-V 虚拟机，Windows Sandbox 功能最初未启用。隔离复现配置与探针放在忽略目录 `build-windows/profile-probe/`，仅映射安装包/脚本的只读目录及专用日志输出目录，禁用网络和剪贴板。用户随后明确允许启用和使用 Sandbox；已执行 `Enable-WindowsOptionalFeature -Online -FeatureName Containers-DisposableClientVM -All -NoRestart`，返回 `State=Enabled`、`RestartNeeded=true`、无错误。未自动重启，Sandbox 复现尚未执行。
+
+安装生命周期脚本增加显式 `-WindowsSandbox` 入口，要求 Sandbox 的 `WDAGUtilityAccount`、Microsoft 虚拟机、管理员令牌且无现有 Rime Q 安装；不伪造 CI 环境变量。脚本语法、现有子进程诊断测试以及开发机拒绝保护均通过。未停用、卸载或替换现用 9132，未修改生产注销逻辑，未新增提交或推送。
+
+重启后从 `build-windows/profile-probe/rimeq-lifecycle.wsb` 继续，结果写入同目录的 `sandbox-output/`。基线先运行完整安装生命周期，再记录卸载后即时和 5 秒后的 Profile 类型、CLSID、Profile GUID、启用标志，以及原复制 Control 和新路径 Control 的缺失验证结果；这些检查保持原来的失败断言，不将等待或注册表缺失直接记为修复。
+
+### 原始 CI 包在 Windows 10 沙盒中的实测
+
+用户完成重启后，在两个全新的 Sandbox 中测试原始 `ef49f40` 安装包，没有修改生产代码。第一轮交互会话通过实际安装、启用、引擎、同版修复、拒绝降级、停用、卸载、TSF 无残留以及个人文件哈希保留。第二轮使用 Sandbox 内同一临时账户的 S4U 计划任务，日志明确记录 Windows `10.0.19041`、`SessionId=0`、`Interactive=false`，相同完整生命周期也通过。两轮即时及 5 秒后的检查均无自身 Profile，复制到新路径的 Control 也返回 `absent / 0x0`。证据分别在 `build-windows/profile-probe/sandbox-output/` 与 `sandbox-session0-output/`。
+
+这些结果说明该失败尚未在 Windows 10 的上述环境中复现，不能据此宣布 Server 2022 CI 已修复，也不能确定操作系统或会话方式就是根因。接下来使用微软官方 Server 2022 评估 ISO 构建离线临时 Hyper-V 测试机；镜像、虚拟磁盘、配置和证据均限定于 `build-windows/server2022-probe/`，测试入口要求专用虚拟机名称与标记且拒绝现有 Rime Q 安装，不伪造 CI 环境变量。
+
+### 原始 CI 包在 Server 2022 初始镜像中的实测
+
+使用微软官方评估 ISO（5044094976 字节，SHA-256 `3e4fa6d8507b554856fc9ca6079cc402df11a8b79344871669f0251535255325`），经 Windows Setup 标准安装创建离线 Hyper-V 测试机 `RimeQ-CI-2022-Validation`，来宾为 Windows Server 2022 Datacenter Evaluation `20348.587`、英文环境。安装前保存独立快照；测试只针对来宾的专用虚拟磁盘，未安装、停用、卸载或替换宿主机 9132。
+
+同一 `ef49f40` 原始包分别在交互会话（Session 1）与恢复安装前快照后的非交互会话（Session 0）通过完整安装、启用、引擎、同版修复、拒绝降级、停用、卸载与个人数据哈希保留检查。即时与延后检查中 TSF 均不可枚举自身 Profile，原复制路径及新路径的 Control 都返回 `absent / 0x0`。证据为 `build-windows/server2022-probe/baseline-output/`、`session0-output/` 和 `vm-response-inspect-baseline-01.json`。卸载后仍能找到自身 SortOrder 引用，但当前系统的 Profile 枚举已不存在；这不能直接说明线上残留的成因，也没有据此增加注册表清理。
+
+失败 CI 的镜像版本是 `20260907.297.1`，其[公开软件清单](https://github.com/actions/runner-images/blob/win22/20260907.297/images/windows/Windows2022-Readme.md)明确 OS 为 `20348.5499`。当前本地两轮结果尚未覆盖这个补丁版本，不作为 CI 故障已修复的结论。已依据[微软 KB5120242 说明](https://support.microsoft.com/en-us/servicing/os/windows-server/2026/08/kb5120242-windows-server-2022-security-update)下载对应累积更新及前置 KB5030216，并验证 Update Catalog 提供的校验值。前置更新后确认来宾为 `20348.1970`；随后用户要求停止消耗时间对齐补丁，将此项 CI 判定改为告警。测试机已保存并暂停，保留安装前快照和调查证据，没有完成 `20348.5499` 的测试，也未确定系统补丁就是根因。
+
+### CI 中将卸载后的 TSF 枚举差异单独报告为告警
+
+按用户要求，`windows-install` 显式传入 `-WarnOnTsfProfileRemains`。实际安装、启用、引擎、修复、拒绝降级、停用、卸载退出码，HKLM/HKCU 两种视图的 CTF/COM 清理、安装项清理与个人数据哈希检查仍须全部通过；这些检查通过后，才运行最终的 TSF 枚举检查。只有 `--verify-absent` 返回 1 且诊断明确为 `profile-remains / 0x80004005` 时生成 GitHub warning，注明尚未确认 TSF Profile 不存在。接口创建或枚举失败、其他 HRESULT、异常退出码和不完整诊断仍阻止 CI。独立全局注册回归及默认的本地严格模式保持原有判定。
+
+Control 在发现自身 CLSID 时额外输出实际 Profile GUID、类型、语言和标志；日志过滤器只允许这些受限字段，不放开完整子进程输出。生产注册、停用和注销逻辑没有修改。此项是已知失败的 CI 报告策略调整，不是将原故障声明为已修复。
+
+本地通过子进程诊断及告警分类回归，覆盖已知枚举差异、其他命令失败、其他退出码、API/权限错误、不完整诊断和 Profile 字段过滤。x64/x86 Control 均编译通过。新编译的 x64 Control 使用现用 Profile 做只读查询：严格模式拒绝“仍存在”，告警模式正常返回明确 warning，保留 GUID/类型/标志，且不输出“缺失验证通过”。没有为此停用或卸载宿主机输入法。

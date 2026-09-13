@@ -1,0 +1,26 @@
+#include <windows.h>
+#include "version.h"
+1 VERSIONINFO
+ FILEVERSION RIMEQ_FILE_VERSION
+ PRODUCTVERSION RIMEQ_FILE_VERSION
+ FILEFLAGSMASK 0x3fL
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE RIMEQ_FILETYPE
+BEGIN
+ BLOCK "StringFileInfo"
+ BEGIN
+  BLOCK "080404b0"
+  BEGIN
+   VALUE "CompanyName", "Rime Q contributors\0"
+   VALUE "FileDescription", "Rime Q\0"
+   VALUE "FileVersion", RIMEQ_VERSION "\0"
+   VALUE "ProductName", "Rime Q\0"
+   VALUE "ProductVersion", RIMEQ_VERSION "\0"
+   VALUE "LegalCopyright", "GPL-3.0-only\0"
+  END
+ END
+ BLOCK "VarFileInfo"
+ BEGIN
+  VALUE "Translation", 0x0804, 1200
+ END
+END

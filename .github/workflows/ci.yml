@@ -8,6 +8,12 @@ permissions:
   contents: read
 
 jobs:
+  client-parity:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/test_client_parity.py
+
   core:
     strategy:
       fail-fast: false
@@ -33,6 +39,95 @@ jobs:
       - name: Compile the Mac client
         if: runner.os == 'macOS'
         run: swift build -c release
+
+  windows-registration:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build isolated global registration regressions
+        shell: pwsh
+        run: |
+          cmake -S windows -B build-registration/x64 -A x64
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build build-registration/x64 --config Release --target rimeq_profile_tests RimeQTip RimeQControl
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake -S windows -B build-registration/x86 -A Win32
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build build-registration/x86 --config Release --target rimeq_profile_tests RimeQTip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify global TSF registration without installing the client
+        shell: pwsh
+        run: |
+          ./build-registration/x64/Release/rimeq_profile_tests.exe --global
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./build-registration/x86/Release/rimeq_profile_tests.exe --global
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify both production DLLs sharing the same input profile
+        run: ./scripts/test_windows_registration.ps1
+
+  windows-package:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Cache verified Windows dependency archives
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: windows-resources-${{ hashFiles('dependencies.lock.json') }}
+      - name: Build client and run isolated engine, TSF and UI regressions
+        run: python scripts/build_windows.py --smoke
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RimeQ-Windows-x64
+          path: |
+            dist/*-windows-*.exe
+            dist/*-windows-SHA256SUMS.txt
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: RimeQ-Windows-validation
+          path: |
+            artifacts/windows-ui/*.png
+          retention-days: 7
+
+  windows-install:
+    needs: windows-package
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: RimeQ-Windows-x64
+          path: dist
+      - name: Verify the package built by this workflow
+        shell: pwsh
+        run: |
+          $expected = (Get-Content 'dist/RimeQ-0.4.0-windows-SHA256SUMS.txt').Split(' ')[0]
+          $actual = (Get-FileHash 'dist/RimeQ-0.4.0-windows-x64.exe' -Algorithm SHA256).Hash
+          if ($actual -ne $expected) { throw 'Windows artifact checksum mismatch.' }
+      - name: Verify lifecycle command diagnostics in isolation
+        run: ./scripts/test_windows_lifecycle_process.ps1
+      - name: Install, repair, reject downgrade and retain personal data on uninstall
+        run: ./scripts/test_windows_install.ps1 -WarnOnTsfProfileRemains
+      - name: Collect Windows installation log
+        if: always()
+        shell: pwsh
+        run: |
+          $source = 'C:\Program Files\RimeQ\installation.log'
+          if (Test-Path -LiteralPath $source) {
+            New-Item -ItemType Directory -Force artifacts | Out-Null
+            Copy-Item -LiteralPath $source -Destination artifacts/windows-installation.log
+          }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: RimeQ-Windows-installation-validation
+          path: artifacts/windows-installation.log
+          retention-days: 7
 
   mac-package:
     runs-on: macos-14
