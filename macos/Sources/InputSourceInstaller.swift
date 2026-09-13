@@ -119,11 +119,11 @@ private struct InputSourceInstallIdentity {
                 as? [String: Any],
               let visibleModes = component["tsVisibleInputModeOrderedArrayKey"]
                 as? [String],
-              visibleModes == InputMode.identifiers,
+              visibleModes == [InputMode.chinese],
               let modeList = component["tsInputModeListKey"]
                 as? [String: Any],
-              Set(modeList.keys) == Set(visibleModes),
-              visibleModes.allSatisfy({ identifier in
+              Set(modeList.keys) == Set(InputMode.identifiers),
+              InputMode.identifiers.allSatisfy({ identifier in
                   guard let entry = modeList[identifier] as? [String: Any] else { return false }
                   return entry["TISInputSourceID"] as? String == identifier
                       && identifier.hasPrefix(bundleID + ".")
@@ -131,7 +131,7 @@ private struct InputSourceInstallIdentity {
             print("install: invalid bundle/input-mode metadata")
             return nil
         }
-        return InputSourceInstallIdentity(bundleID: bundleID, modeIDs: visibleModes)
+        return InputSourceInstallIdentity(bundleID: bundleID, modeIDs: InputMode.identifiers)
     }
 }
 

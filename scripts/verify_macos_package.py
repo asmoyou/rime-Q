@@ -54,14 +54,16 @@ def verify(package):
         bundle = plistlib.loads((contents / "Info.plist").read_bytes())
         identifier = "com.asmoyou.inputmethod.RimeQ"
         component = bundle["ComponentInputModeDict"]
-        assert component["tsVisibleInputModeOrderedArrayKey"] == [identifier + ".Hans", identifier + ".Latin"]
+        assert component["tsVisibleInputModeOrderedArrayKey"] == [identifier + ".Hans"]
         modes = component["tsInputModeListKey"]
         assert set(modes) == {identifier + ".Hans", identifier + ".Latin"}
         for suffix, icon in [(".Hans", "mode-chinese.pdf"), (".Latin", "mode-english.pdf")]:
             mode = modes[identifier + suffix]
             assert mode["TISInputSourceID"] == identifier + suffix
             assert mode["tsInputModeScriptKey"] == ("smRoman" if suffix == ".Latin" else "smUnicodeScript")
-            assert mode["tsInputModeDefaultStateKey"] and mode["tsInputModeIsVisibleKey"]
+            assert mode["tsInputModeDefaultStateKey"]
+            assert mode["tsInputModeIsVisibleKey"] == (suffix == ".Hans"), "Only one Rime Q source should appear in system UI"
+            assert mode["tsInputModeAlternateMenuTitleKey"] == "Rime Q"
             assert mode["tsInputModeMenuIconFileKey"] == icon
             assert mode["tsInputModeAlternateMenuIconFileKey"] == icon
             assert (contents / "Resources" / icon).read_bytes().startswith(b"%PDF-")
@@ -70,6 +72,8 @@ def verify(package):
         for language in ["en", "zh-Hans", "zh-Hant"]:
             strings = (contents / "Resources" / (language + ".lproj") / "InfoPlist.strings").read_text(encoding="utf-16")
             assert '"NSLocalNetworkUsageDescription"' in strings, "Missing localized LAN permission purpose"
+            for suffix in [".Hans", ".Latin"]:
+                assert f'"{identifier}{suffix}" = "Rime Q";' in strings, "Mode suffix must not duplicate the icon label"
         native_arches = set(subprocess.check_output(["lipo", "-archs", str(contents / "MacOS/RimeQ")], text=True).split())
         sync_arches = set(subprocess.check_output(["lipo", "-archs", str(contents / "MacOS/RimeQ.Sync")], text=True).split())
         assert native_arches == sync_arches, "Sync helper architectures differ from the native client"

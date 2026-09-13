@@ -73,11 +73,11 @@ def build_app(app, universal=False, resources=True):
         "InputMethodConnectionName": IDENTIFIER + "_Connection", "InputMethodServerControllerClass": "RimeQController",
         "InputMethodServerDelegateClass": "RimeQController", "TISInputSourceID": IDENTIFIER,
         "TICapsLockLanguageSwitchCapable": True, "tsInputMethodIconFileKey": "menu.pdf",
-        "ComponentInputModeDict": {"tsVisibleInputModeOrderedArrayKey": [mode, latin], "tsInputModeListKey": {
+        "ComponentInputModeDict": {"tsVisibleInputModeOrderedArrayKey": [mode], "tsInputModeListKey": {
             identifier: {"TISInputSourceID": identifier, "TISIntendedLanguage": "en" if english else "zh-Hans",
-                   "tsInputModeAlternateMenuTitleKey": "Rime Q — 英文" if english else "Rime Q — 中文",
+                   "tsInputModeAlternateMenuTitleKey": "Rime Q",
                    "tsInputModeDefaultStateKey": True, "TISIconIsTemplate": True,
-                   "tsInputModeIsVisibleKey": True, "tsInputModePrimaryInScriptKey": not english,
+                   "tsInputModeIsVisibleKey": not english, "tsInputModePrimaryInScriptKey": not english,
                    "tsInputModeScriptKey": "smRoman" if english else "smUnicodeScript",
                    "tsInputModeCharacterRepertoireKey": ["Latn"] if english else ["Hans", "Hant"],
                    "tsInputModeMenuIconFileKey": icon, "tsInputModeAlternateMenuIconFileKey": icon,
@@ -91,8 +91,8 @@ def build_app(app, universal=False, resources=True):
         localized = contents / "Resources" / (language + ".lproj")
         localized.mkdir(exist_ok=True)
         strings = {key: "Rime Q" for key in ["CFBundleName", "CFBundleDisplayName", IDENTIFIER, mode]}
-        strings[mode] = "Rime Q — Chinese" if language == "en" else "Rime Q — 中文"
-        strings[latin] = "Rime Q — English" if language == "en" else "Rime Q — 英文"
+        strings[mode] = "Rime Q"
+        strings[latin] = "Rime Q"
         strings["NSAppleEventsUsageDescription"] = metadata["NSAppleEventsUsageDescription"] if language == "en" else (
             "更新时用于退出仍在运行的旧版 Rime Q；仅当你选择注销账户时，才请求 macOS 显示注销确认。")
         strings["NSLocalNetworkUsageDescription"] = metadata["NSLocalNetworkUsageDescription"] if language == "en" else (
