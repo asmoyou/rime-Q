@@ -97,7 +97,7 @@ enum ControllerSmoke {
         let status = InputModeStatus.shared
         defer { input.deactivate(client); next.deactivate(nextClient) }
         func checkMode(_ english: Bool, _ label: String) throws {
-            try EngineSmoke.check(status.isVisible && status.button?.title == (english ? "英" : "中"), label)
+            try EngineSmoke.check(status.isVisible && status.button?.title == (english ? "A" : "中"), label)
         }
         func event(_ kind: NSEvent.EventType, _ flags: NSEvent.ModifierFlags = [], code: UInt16 = 56,
                    text: String = "", target: InputSession? = nil, host: MockTextClient? = nil) -> Bool {

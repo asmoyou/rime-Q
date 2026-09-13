@@ -289,7 +289,11 @@ namespace RimeQ {
         [STAThread]
         static int Main(string[] args) {
             if (args.Length == 2 && args[0] == "--verify-payload") {
-                try { Extract(Path.GetFullPath(args[1])); return 0; } catch { return 1; }
+                try { Extract(Path.GetFullPath(args[1])); return 0; }
+                catch (Exception error) {
+                    Console.Error.WriteLine("Payload verification failed: " + error.GetType().Name + ": " + error.Message);
+                    return 1;
+                }
             }
             if (args.Length > 0 && (args[0] == "--install-elevated" || args[0] == "--uninstall-elevated")) {
                 try {

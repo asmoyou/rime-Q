@@ -47,7 +47,7 @@ final class InputModeStatus: NSObject {
         }
         if displayedEnglish != english {
             let language = english ? "英文" : "中文"
-            button?.title = english ? "英" : "中"
+            button?.title = english ? "A" : "中"
             button?.toolTip = "Rime Q：\(language)输入（点按切换为\(english ? "中文" : "英文")）"
             button?.setAccessibilityValue(language)
             displayedEnglish = english

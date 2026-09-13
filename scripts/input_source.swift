@@ -38,10 +38,15 @@ if arguments.count == 1 {
         guard let source = sources.first(where: { stringProperty($0, kTISPropertyInputSourceID) == arguments[1] }) else {
             fputs("Input source not registered\n", stderr); exit(1)
         }
-        let enabled = TISEnableInputSource(source)
+        // Selection tests must never re-enable an input method. Repeated enable
+        // calls can reopen macOS's third-party input-method confirmation UI.
+        guard let enabled = TISGetInputSourceProperty(source, kTISPropertyInputSourceIsEnabled),
+              CFBooleanGetValue(Unmanaged<CFBoolean>.fromOpaque(enabled).takeUnretainedValue()) else {
+            fputs("Input source is not enabled; selection test stopped\n", stderr); exit(1)
+        }
         let selected = TISSelectInputSource(source)
-        if enabled != noErr || selected != noErr {
-            fputs("Input source selection failed: enable=\(enabled), select=\(selected)\n", stderr); exit(1)
+        if selected != noErr {
+            fputs("Input source selection failed: select=\(selected)\n", stderr); exit(1)
         }
     }
 }
