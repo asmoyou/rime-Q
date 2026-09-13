@@ -75,6 +75,9 @@ extern "C" HRESULT __stdcall DllRegisterServer() {
         hr = setString(key, nullptr, L"Rime Q Text Service");
         if (SUCCEEDED(hr)) hr = setString(key + L"\\InprocServer32", nullptr, path);
         if (SUCCEEDED(hr)) hr = setString(key + L"\\InprocServer32", L"ThreadingModel", L"Apartment");
+#ifdef _WIN64
+        // CTF\TIP is shared by WOW64; COM\CLSID is redirected. The x64
+        // component owns shared profiles/categories, while x86 registers COM only.
         ComPtr<ITfInputProcessorProfiles> profiles;
         if (SUCCEEDED(hr)) hr = CoCreateInstance(CLSID_TF_InputProcessorProfiles, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&profiles));
         if (SUCCEEDED(hr)) hr = profiles->Register(rq::clsid);
@@ -86,11 +89,13 @@ extern "C" HRESULT __stdcall DllRegisterServer() {
             hr = categoriesManager->RegisterCategory(rq::clsid, category, rq::clsid); if (FAILED(hr)) break;
         }
         if (SUCCEEDED(hr)) hr = profiles->EnableLanguageProfile(rq::clsid, rq::language, rq::profile, TRUE);
+#endif
     } catch (...) { hr = E_FAIL; }
     if (SUCCEEDED(init)) CoUninitialize(); return hr;
 }
 extern "C" HRESULT __stdcall DllUnregisterServer() {
     auto init = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+#ifdef _WIN64
     HRESULT hr = rq::unregisterProfile(rq::clsid, rq::language, rq::profile);
     traceRegistration("unregister-profile", hr);
     ComPtr<ITfCategoryMgr> manager;
@@ -99,5 +104,10 @@ extern "C" HRESULT __stdcall DllUnregisterServer() {
     // Only our CTF/COM service keys remain after profile and category removal.
     if (SUCCEEDED(hr)) hr = rq::removeServiceRegistry(rq::clsid);
     traceRegistration("remove-service-keys", hr);
-    manager.Reset(); if (SUCCEEDED(init)) CoUninitialize(); return hr;
+    manager.Reset();
+#else
+    HRESULT hr = rq::removeServiceRegistry(rq::clsid, false);
+    traceRegistration("remove-com-keys", hr);
+#endif
+    if (SUCCEEDED(init)) CoUninitialize(); return hr;
 }

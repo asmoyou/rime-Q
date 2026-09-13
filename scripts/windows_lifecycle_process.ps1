@@ -23,6 +23,7 @@ function Invoke-RimeQ([string]$File, [string]$Arguments, [int]$Expected = 0) {
             $output -split '\r?\n' | Where-Object {
                 $_ -match '^(enabled-or-completed|pending-or-failed) hr=0x[0-9a-f]+$' -or
                 $_ -match '^tsf-absence stage=[a-z-]+ hr=0x[0-9a-f]+$' -or
+                $_ -match '^tsf-[a-z0-9-]+$' -or
                 $_ -match '^PASS ' -or $_ -eq 'ready'
             } | ForEach-Object { Write-Output $_ }
         }

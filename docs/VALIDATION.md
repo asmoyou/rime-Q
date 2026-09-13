@@ -402,3 +402,11 @@ x64/x86 生产 TIP 测试新增组合 `Unicode << 16 | VK_PACKET` 的真实 TSF 
 [34740058831](https://github.com/asmoyou/rime-Q/actions/runs/34740058831) 显示串联旧服务注销 API 后卸载器返回失败，这一尝试没有完成验收。改为保留 `UnregisterProfile` 和类别注销，再直接删除按自身 CLSID 限定的 HKLM CTF/COM 注册目录；不再二次调用旧服务注销 API。若另一个位数的注销已移除共享 Profile，仅在 TSF 重新枚举证明确实不存在后接受重复注销，枚举失败或仍有 Profile 均继续失败。
 
 新增独立 `windows-registration` CI 作业，仅编译小型原生测试，分别以 x64/x86 在一次性 Runner 中创建随机标识、默认禁用且隐藏的全局测试 Profile，验证全局注销后的枚举与服务目录、重复注销以及另一个测试 Profile 保留。它不构建词库或安装包，补充了此前进程内测试不覆盖全局作用域的缺口；本机拒绝该 `--global` 模式，日常 CTest 继续只测试进程内临时 Profile。全局回归与完整安装作业均需通过后才能交付。
+
+### WOW64 共享注册的两组件交互
+
+`34740525778` 的独立全局注册作业耗时 48 秒，x64/x86 各自的随机 Profile 测试通过，但完整卸载仍失败。`34740902782` 将独立测试对齐为旧注册 API、启用再停用，并补充实际 DLL 的 HRESULT 后，直接记录：x64 的 Profile 注销与服务目录清理均为 `0`，随后 x86 的 Profile 注销为 `80004005`。此前两个测试进程使用不同随机标识，漏掉了两个生产组件共用同一标识的交互。
+
+Microsoft 的 [WOW64 注册表共享说明](https://learn.microsoft.com/en-us/windows/win32/winprog64/shared-registry-keys)明确列出 `HKLM\SOFTWARE\Microsoft\CTF\TIP` 为 Shared，`HKLM\SOFTWARE\Classes\CLSID` 为 Redirected。两个位数不应各自完整注销同一共享 Profile。当前 Windows 产品仅提供 x64 系统安装包，因此改由 x64 组件统一注册/注销共享 Profile、类别和 CTF 目录；x86 组件仅注册/注销自己的 32 位 COM 项，避免第二次注销已经由 x64 移除的共享对象。
+
+新增 `scripts/test_windows_registration.ps1`，在独立 Runner 中直接加载同一次构建的 x64/x86 生产 DLL，使用同一 Rime Q 标识注册两轮以覆盖修复，再启用、停用、依次注销两个组件、清理当前用户的测试 Profile，验证 TSF 枚举与两种 COM 视图都无残留。独立作业现在构建实际 DLL 和 Control，但仍不构建词库或安装包。两个原生组件、本机进程内回归及脚本语法检查通过；两组件全局回归和完整安装的最终结果待补充。

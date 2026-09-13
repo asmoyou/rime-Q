@@ -47,13 +47,13 @@ jobs:
       - name: Build isolated global registration regressions
         shell: pwsh
         run: |
-          cmake -S windows -B build-registration/x64 -A x64 -DRIMEQ_BUILD_TSF=OFF
+          cmake -S windows -B build-registration/x64 -A x64
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cmake --build build-registration/x64 --config Release --target rimeq_profile_tests
+          cmake --build build-registration/x64 --config Release --target rimeq_profile_tests RimeQTip RimeQControl
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cmake -S windows -B build-registration/x86 -A Win32 -DRIMEQ_BUILD_TSF=OFF
+          cmake -S windows -B build-registration/x86 -A Win32
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cmake --build build-registration/x86 --config Release --target rimeq_profile_tests
+          cmake --build build-registration/x86 --config Release --target rimeq_profile_tests RimeQTip
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verify global TSF registration without installing the client
         shell: pwsh
@@ -62,6 +62,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./build-registration/x86/Release/rimeq_profile_tests.exe --global
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify both production DLLs sharing the same input profile
+        run: ./scripts/test_windows_registration.ps1
 
   windows-package:
     runs-on: windows-2022

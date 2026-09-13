@@ -28,11 +28,12 @@ inline HRESULT unregisterProfile(REFCLSID classId, LANGID languageId, REFGUID pr
         if (item.clsid == classId && item.guidProfile == profileId) return removed;
     }
 }
-inline HRESULT removeServiceRegistry(REFCLSID classId) {
+inline HRESULT removeServiceRegistry(REFCLSID classId, bool sharedCtf = true) {
     wchar_t identity[40]{};
     if (!StringFromGUID2(classId, identity, _countof(identity))) return E_INVALIDARG;
-    for (auto prefix : {L"Software\\Microsoft\\CTF\\TIP\\", L"Software\\Classes\\CLSID\\"}) {
-        auto path = std::wstring(prefix) + identity;
+    const wchar_t* prefixes[] = {L"Software\\Microsoft\\CTF\\TIP\\", L"Software\\Classes\\CLSID\\"};
+    for (unsigned i = sharedCtf ? 0 : 1; i < _countof(prefixes); ++i) {
+        auto path = std::wstring(prefixes[i]) + identity;
         auto error = RegDeleteTreeW(HKEY_LOCAL_MACHINE, path.c_str());
         if (error != ERROR_SUCCESS && error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND)
             return HRESULT_FROM_WIN32(error);
