@@ -76,7 +76,11 @@ namespace RimeQ {
             Require(updates.Result.State == "failed", "Network error state");
             var restarted = new Updates(new HttpClient(handler)); await restarted.Check(false); Require(handler.Requests == 1, "Failure limit survives restart");
             Paths.Set("AutoUpdate", "0"); await restarted.Check(false); Require(handler.Requests == 1, "Disabled scheduler");
-            handler.Response = new TaskCompletionSource<HttpResponseMessage>(); var manual = restarted.Check(true); handler.Response.SetResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(Release()) }); await manual;
+            // This transport test uses the actual installed fixture version.
+            // Keep its advertised release newer when the product version moves.
+            var installedVersion = new Version(Paths.Version);
+            var futureTag = "v" + new Version(installedVersion.Major, installedVersion.Minor, installedVersion.Build + 1).ToString();
+            handler.Response = new TaskCompletionSource<HttpResponseMessage>(); var manual = restarted.Check(true); handler.Response.SetResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(Release(futureTag)) }); await manual;
             Require(handler.Requests == 2 && restarted.Result.State == "available", "Manual update bypass");
             var text = "测试词\tce shi ci\t3\n"; Require(DictionaryData.Parse(text).Single().Text == "测试词", "TSV import");
             Require(DictionaryData.Parse(DictionaryData.Format(DictionaryData.Parse(text))).Single().Weight == 3, "TSV roundtrip");
