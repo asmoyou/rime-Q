@@ -460,3 +460,14 @@ Control 在发现自身 CLSID 时额外输出实际 Profile GUID、类型、语�
 `main` 的 `53d6906` 在 [34749498372](https://github.com/asmoyou/rime-Q/actions/runs/34749498372) 完成全部 8 项检查。独立注册作业实际返回 TSF `absent / 0x0`；完整安装、启用、引擎、修复、拒绝降级、卸载注册表清理与数据保留通过，最后的 TSF 枚举残留按已授权策略报告告警，未将其声明为根因已修复。
 
 用户明确要求 CI 通过后完成 Release 发布。核对发现 Windows 构建为 0.4.0，macOS 构建仍为 0.3.1，而两端都查询同一 `releases/latest`；本次将 macOS 构建元数据同步到 0.4.0，并更新两端下载说明，避免最新发布的标签与 Mac 包内版本不一致。客户端生产逻辑没有因此修改。发布使用版本对齐后同一次通过 CI 的 Windows EXE 与 macOS universal PKG，并核对附件 SHA-256；本段不提前记录尚未完成的发布或运行验收。
+
+### 0.4.0 Release 发布与附件回下载验证（2026-09-13）
+
+[v0.4.0](https://github.com/asmoyou/rime-Q/releases/tag/v0.4.0) 已于 2026-09-13 10:15:54 UTC 发布，非草稿、非预发布，并设为最新版本。标签指向 `d96646efa576f4307e0cf851244acc083c0380f1`；该提交的 [34750970140](https://github.com/asmoyou/rime-Q/actions/runs/34750970140) 全部 8 项 CI 通过。macOS 实际已装应用输出 `Rime Q 0.4.0 (1789293983)`；Windows 安装、启用、引擎、修复、拒绝降级、卸载注册表清理和个人数据保留通过，最终 TSF 枚举残留仍单独告警。
+
+两个安装包直接取自该次 CI 产物，先验证 Actions ZIP 摘要和 Windows 随包校验文件，再上传 Release；GitHub 返回的附件大小与摘要、从 Release 完整回下载的文件以及下载到的 `SHA256SUMS.txt` 全部匹配：
+
+- `RimeQ-0.4.0-windows-x64.exe`：66372096 字节，文件版本 `0.4.0.9132`，SHA-256 `a840e819a846b0a1cd0136833dded9a74154863ba85fce558d0396f4dfcd9d30`。
+- `RimeQ-0.4.0-macos-universal.pkg`：69511182 字节，SHA-256 `a2573b2cf5bf9ccb7e1108d0962f3c5a2a595aeaac72fb195524d08fc3e96dfd`。
+
+发布后查询确认仓库当前为 **private**。有权限请求的 `releases/latest` 返回 `v0.4.0`，三个附件回下载校验通过；匿名仓库查询、Release 查询和下载链接均返回 404。因此本次是私有仓库中的正式 Release，不是已验证公开可下载的发布；两端客户端的匿名更新接口目前也无法取得发布信息。未改变仓库可见性。原始 CI 日志、发布说明、产物和回下载证据保留在忽略目录 `build-windows/release-v0.4.0/`。
