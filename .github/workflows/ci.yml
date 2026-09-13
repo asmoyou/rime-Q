@@ -56,6 +56,15 @@ jobs:
         run: python scripts/build_windows.py --smoke
       - name: Install, repair, reject downgrade and retain personal data on uninstall
         run: ./scripts/test_windows_install.ps1
+      - name: Collect Windows installation log
+        if: always()
+        shell: pwsh
+        run: |
+          $source = 'C:\Program Files\RimeQ\installation.log'
+          if (Test-Path -LiteralPath $source) {
+            New-Item -ItemType Directory -Force artifacts | Out-Null
+            Copy-Item -LiteralPath $source -Destination artifacts/windows-installation.log
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: RimeQ-Windows-x64
@@ -69,7 +78,7 @@ jobs:
           name: RimeQ-Windows-validation
           path: |
             artifacts/windows-ui/*.png
-            C:/Program Files/RimeQ/installation.log
+            artifacts/windows-installation.log
           retention-days: 7
 
   mac-package:

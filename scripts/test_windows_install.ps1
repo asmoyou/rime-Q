@@ -16,7 +16,13 @@ function Invoke-RimeQ([string]$File, [string]$Arguments, [int]$Expected = 0) {
     }
     $process = [Diagnostics.Process]::Start($info)
     if (-not $process.WaitForExit(60000)) { throw 'Rime Q lifecycle command timed out.' }
-    if ($process.ExitCode -ne $Expected) { throw "Unexpected Rime Q exit code: $($process.ExitCode), expected $Expected" }
+    if ($process.ExitCode -ne $Expected) {
+        $log = Join-Path $env:ProgramFiles 'RimeQ\installation.log'
+        if (Test-Path -LiteralPath $log) {
+            Get-Content -LiteralPath $log -Tail 20 | Where-Object { $_ -match '^[^ ]+ build=[0-9.]+ pid=[0-9]+ state=[a-z0-9-]+$' } | ForEach-Object { Write-Output $_ }
+        }
+        throw "Unexpected Rime Q exit code: $($process.ExitCode), expected $Expected"
+    }
     $process.Dispose()
 }
 

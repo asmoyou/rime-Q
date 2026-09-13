@@ -161,22 +161,25 @@ namespace RimeQ {
             SafePath(Root); Directory.CreateDirectory(Root); Log("install-start");
             var old = Installed(); if (old != null) RequireUpgrade(InstalledVersion(old), Current);
             var target = Path.Combine(Root, "versions", Current + "-" + Guid.NewGuid().ToString("N")); SafePath(target);
-            bool registered = false;
+            bool registered = false; string phase = "payload";
             try {
-                Directory.CreateDirectory(target); Extract(target);
+                Directory.CreateDirectory(target); Extract(target); Log("payload-verified");
                 // Recheck immediately before changing registration, after extraction and verification.
                 var check = Installed(); if (check != null) RequireUpgrade(InstalledVersion(check), Current);
-                registered = true; Register(target, false);
+                phase = "registration"; registered = true; Register(target, false); Log("input-services-registered");
+                phase = "uninstaller";
                 var setup = Path.Combine(Root, "RimeQ.Setup.exe");
                 var temporary = Path.Combine(Root, "RimeQ.Setup.next.exe"); File.Copy(Path.Combine(target, "RimeQ.Uninstall.exe"), temporary, true);
                 if (File.Exists(setup)) File.Replace(temporary, setup, null); else File.Move(temporary, setup);
-                SaveRegistry(target); Shortcuts(target, false); Log("installed-pending-user-activation");RetireLaunchers(target);
+                phase = "registry"; SaveRegistry(target);
+                phase = "shortcuts"; Shortcuts(target, false);
+                phase = "retirement"; Log("installed-pending-user-activation");RetireLaunchers(target);
                 // Loaded DLLs stay in their own old version directories. No overwrite or forced host termination.
                 if (old != null && !string.Equals(old, target, StringComparison.OrdinalIgnoreCase)) Log("previous-version-retained-until-uninstall");
             } catch {
                 if (registered) { try { Register(target, true); } catch { } }
                 if (old != null) { try { Register(old, false); SaveRegistry(old); } catch { Log("rollback-registration-failed"); } }
-                Log("install-failed"); throw;
+                Log("install-failed-" + phase); throw;
             }
         }
         static void Remove() {
