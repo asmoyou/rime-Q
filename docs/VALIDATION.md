@@ -396,3 +396,5 @@ x64/x86 生产 TIP 测试新增组合 `Unicode << 16 | VK_PACKET` 的真实 TSF 
 核对 [UnregisterProfile 官方说明](https://learn.microsoft.com/en-us/windows/win32/api/msctf/nf-msctf-itfinputprocessorprofilemgr-unregisterprofile) 后，生产 `DllUnregisterServer` 改用该方法按 CLSID、语言和 Profile GUID 注销，不再调用旧的 `Unregister`。本机独立实验用 `TF_RP_LOCALPROCESS` 创建随机标识的临时 Profile：创建后可枚举，旧接口调用后仍可枚举，`UnregisterProfile(..., TF_URP_LOCALPROCESS)` 后不可枚举，重复调用成功。该实验只覆盖进程内注册作用域；正式安装的全局注销仍需线上完整验收。
 
 新增 `windows/tests/profile_tests.cpp`，使用与生产相同的注销函数，并验证另一个临时 Profile 保持可枚举。x64/x86 的 `windows_profile_lifecycle` 均通过，测试不注册全局输入法或激活输入源，临时 Profile 随测试清理。可单独编译 `rimeq_profile_tests` 目标，再执行 `ctest --test-dir build-windows/x64 -C Release -R windows_profile_lifecycle --output-on-failure`（x86 替换对应目录）。两种位数的常规 CTest 构建均包含此项。
+
+[34739757035](https://github.com/asmoyou/rime-Q/actions/runs/34739757035) 的安装、修复、拒绝降级、停用和卸载器均返回预期结果，但仅使用 Profile 注销后仍留下 HKLM CTF 服务目录，注册表检查失败；该次检查在首个残留处中断，尚不能从该运行确认最终枚举状态。最终注销顺序改为 `UnregisterProfile`、注销类别、`ITfInputProcessorProfiles::Unregister`、删除自己的 COM 注册，兼顾 TSF Profile 状态和完整服务注册清理。诊断收集全部注册状态并执行 TSF 检查后再汇总残留，保留原有通过条件。

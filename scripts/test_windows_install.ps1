@@ -57,6 +57,7 @@ Copy-Item -LiteralPath (Join-Path $repaired 'RimeQ.Control.exe') -Destination $c
 Invoke-RimeQ $control '--deactivate'
 Invoke-RimeQ $setup '--uninstall-elevated --silent'
 $class = '{C13A9B62-413B-45B8-9EF1-884522319760}'
+$remaining = [Collections.Generic.List[string]]::new()
 foreach ($hive in @('LocalMachine', 'CurrentUser')) {
     foreach ($view in @('Registry64', 'Registry32')) {
         $root = [Microsoft.Win32.RegistryKey]::OpenBaseKey($hive, $view)
@@ -64,12 +65,16 @@ foreach ($hive in @('LocalMachine', 'CurrentUser')) {
             foreach ($path in @("Software\Microsoft\CTF\TIP\$class", "Software\Classes\CLSID\$class")) {
                 $key = $root.OpenSubKey($path)
                 Write-Output "Uninstall registration: $hive $view $path present=$($null -ne $key)"
-                if ($null -ne $key) { $key.Dispose(); throw "Uninstall registration remains: $hive $view $path" }
+                if ($null -ne $key) {
+                    Write-Output "Remaining CTF/COM subkeys: $($key.GetSubKeyNames() -join ',')"
+                    $key.Dispose(); $remaining.Add("$hive $view $path")
+                }
             }
         } finally { $root.Dispose() }
     }
 }
 Invoke-RimeQ $control '--verify-absent'
+if ($remaining.Count -ne 0) { throw "Uninstall registration remains: $($remaining -join '; ')" }
 if (Test-Path 'HKLM:\Software\RimeQ') { throw 'Uninstall registration remains.' }
 if ((Get-FileHash $learning).Hash -ne $learningHash -or (Get-FileHash $model).Hash -ne $modelHash) { throw 'Uninstall changed personal data.' }
 Write-Output 'PASS actual EXE install, enabled profile, installed engine, repair, downgrade rejection, unregister and personal-data retention. External host typing is a separate acceptance test.'
