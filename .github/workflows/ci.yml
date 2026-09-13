@@ -1,14 +1,45 @@
 name: Build and test
 on:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# Superseded PR commits must not keep expensive runners occupied. Main and
+# manual validation finish so release candidates retain complete evidence.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      core: ${{ steps.plan.outputs.core }}
+      sync: ${{ steps.plan.outputs.sync }}
+      mac: ${{ steps.plan.outputs.mac }}
+      windows: ${{ steps.plan.outputs.windows }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify CI routing and client parity
+        run: |
+          python3 scripts/test_ci_plan.py
+          python3 scripts/test_client_parity.py
+      - name: Select affected jobs
+        id: plan
+        run: python3 scripts/ci_plan.py
+
   sync-core:
+    needs: changes
+    if: needs.changes.outputs.sync == 'true'
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -36,8 +67,11 @@ jobs:
         with:
           name: RimeQ-sync-${{ matrix.os }}
           path: artifacts/lan-sync-process-report.json
+          retention-days: 3
 
   sync-sandboxes:
+    needs: changes
+    if: needs.changes.outputs.sync == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -49,14 +83,12 @@ jobs:
         with:
           name: RimeQ-sync-sandboxes
           path: artifacts/lan-sync-sandbox-report.json
-
-  client-parity:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - run: python3 scripts/test_client_parity.py
+          retention-days: 3
 
   core:
+    needs: changes
+    if: needs.changes.outputs.core == 'true'
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -78,11 +110,11 @@ jobs:
         run: cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows -A x64
       - run: cmake --build build --config Release --parallel
       - run: ctest --test-dir build -C Release --output-on-failure
-      - name: Compile the Mac client
-        if: runner.os == 'macOS'
-        run: swift build -c release
 
   windows-registration:
+    needs: changes
+    if: needs.changes.outputs.windows == 'true'
+    timeout-minutes: 15
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
@@ -108,6 +140,9 @@ jobs:
         run: ./scripts/test_windows_registration.ps1 -WarnOnTsfProfileRemains
 
   windows-package:
+    needs: changes
+    if: needs.changes.outputs.windows == 'true'
+    timeout-minutes: 25
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
@@ -124,10 +159,11 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: RimeQ-Windows-x64
+          compression-level: 0
           path: |
             dist/*-windows-*.exe
             dist/*-windows-SHA256SUMS.txt
-          retention-days: 7
+          retention-days: ${{ github.event_name == 'pull_request' && 3 || 7 }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -135,9 +171,10 @@ jobs:
           path: |
             artifacts/windows-ui/*.png
             artifacts/lan-sync-native-report.json
-          retention-days: 7
+          retention-days: ${{ github.event_name == 'pull_request' && 3 || 7 }}
 
   windows-install:
+    timeout-minutes: 10
     needs: windows-package
     runs-on: windows-2022
     steps:
@@ -149,8 +186,8 @@ jobs:
       - name: Verify the package built by this workflow
         shell: pwsh
         run: |
-          $expected = (Get-Content 'dist/RimeQ-0.4.0-windows-SHA256SUMS.txt').Split(' ')[0]
-          $actual = (Get-FileHash 'dist/RimeQ-0.4.0-windows-x64.exe' -Algorithm SHA256).Hash
+          $expected = (Get-Content 'dist/RimeQ-0.4.1-windows-SHA256SUMS.txt').Split(' ')[0]
+          $actual = (Get-FileHash 'dist/RimeQ-0.4.1-windows-x64.exe' -Algorithm SHA256).Hash
           if ($actual -ne $expected) { throw 'Windows artifact checksum mismatch.' }
       - name: Verify lifecycle command diagnostics in isolation
         run: ./scripts/test_windows_lifecycle_process.ps1
@@ -170,9 +207,12 @@ jobs:
         with:
           name: RimeQ-Windows-installation-validation
           path: artifacts/windows-installation.log
-          retention-days: 7
+          retention-days: ${{ github.event_name == 'pull_request' && 3 || 7 }}
 
   mac-package:
+    needs: changes
+    if: needs.changes.outputs.mac == 'true'
+    timeout-minutes: 25
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
@@ -190,7 +230,7 @@ jobs:
             artifacts/lan-sync-macos-native-report.json
             artifacts/macos-sync-window.png
             artifacts/sync-ui/
-          retention-days: 7
+          retention-days: ${{ github.event_name == 'pull_request' && 3 || 7 }}
       - name: Install the actual PKG at its fixed system path
         run: sudo installer -pkg dist/RimeQ-*-macos-universal.pkg -target /
       - name: Verify activation result or explicit pending fallback
@@ -306,5 +346,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: RimeQ-macOS
+          compression-level: 0
           path: dist/*.pkg
-          retention-days: 7
+          retention-days: ${{ github.event_name == 'pull_request' && 3 || 7 }}

@@ -1,6 +1,6 @@
 # Windows 客户端
 
-Windows 客户端源码位于 `windows/`，使用原生 TSF 接入，独立进程运行 librime，设置使用 WPF。版本 **0.4.0**；安装包名为 `RimeQ-0.4.0-windows-x64.exe`，下载入口为 [GitHub Releases](https://github.com/asmoyou/rime-Q/releases)。系统级安装与外部宿主验收的实际状态见 [验证记录](VALIDATION.md)，不要将隔离测试等同于所有应用可用。
+Windows 客户端源码位于 `windows/`，使用原生 TSF 接入，独立进程运行 librime，设置使用 WPF。版本 **0.4.1**；安装包名为 `RimeQ-0.4.1-windows-x64.exe`，下载入口为 [GitHub Releases](https://github.com/asmoyou/rime-Q/releases)。系统级安装与外部宿主验收的实际状态见 [验证记录](VALIDATION.md)，不要将隔离测试等同于所有应用可用。
 
 ## 支持范围与功能
 
@@ -31,7 +31,7 @@ python scripts/build_windows.py --smoke
 python scripts/build_windows.py --reuse-resources --smoke
 ```
 
-开发构建可加 `--no-package`；用 `--build N` 指定递增的 Windows 文件构建号，范围 1–65535。默认构建号见脚本。产物为 `dist/RimeQ-0.4.0-windows-x64.exe` 和对应 SHA256SUMS；`build-windows/stage` 是打包目录，不应直接注册为系统安装。
+开发构建可加 `--no-package`；用 `--build N` 指定递增的 Windows 文件构建号，范围 1–65535。默认构建号见脚本。产物为 `dist/RimeQ-0.4.1-windows-x64.exe` 和对应 SHA256SUMS；`build-windows/stage` 是打包目录，不应直接注册为系统安装。
 
 构建使用固定摘要下载运行库和解包工具，只提取 Weasel 分发包里的 OpenCC 数据，不安装、执行或注册 Weasel 程序。依赖见 [dependencies.lock.json](../dependencies.lock.json)；完整雾凇源码归档、运行库版本记录及许可随包提供。安装包不包含 `.gram` 模型。
 

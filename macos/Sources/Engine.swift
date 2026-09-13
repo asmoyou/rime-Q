@@ -33,9 +33,14 @@ enum Product {
 }
 
 enum Engine {
-    static var ready = false
+    static var ready = false {
+        didSet {
+            if ready != oldValue { NotificationCenter.default.post(name: readinessChanged, object: nil) }
+        }
+    }
     static var failure: String?
     static let willMaintain = Notification.Name("RimeQWillMaintainEngine")
+    static let readinessChanged = Notification.Name("RimeQEngineReadinessChanged")
     static var userDirectory: URL?
     static var sharedDirectory: URL?
     static var bundledShared: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/SharedSupport") }

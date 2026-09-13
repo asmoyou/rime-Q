@@ -1,6 +1,6 @@
 # 附近设备同步
 
-本文件描述 `codex/lan-dictionary-sync` 开发分支的实现。是否已通过测试以 `VALIDATION.md` 为准，尚未发布此功能。
+附近设备同步随 0.4.1 提供，默认关闭。已通过测试与待验证的边界以 `VALIDATION.md` 为准。
 
 Mac 接手续作入口：[剩余工作与真机验收计划](plans/2026-09-13-lan-sync-macos-handoff.md)，包含分支基线、现有测试、原生适配/授权/六设备实测步骤与完成条件。
 

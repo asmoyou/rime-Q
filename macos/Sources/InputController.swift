@@ -21,10 +21,12 @@ final class InputSession: NSObject {
         super.init()
         Self.instances.add(self)
         NotificationCenter.default.addObserver(self, selector: #selector(prepareMaintenance), name: Engine.willMaintain, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(engineReadinessChanged), name: Engine.readinessChanged, object: nil)
     }
 
     deinit {
         NotificationCenter.default.removeObserver(self)
+        InputModeStatus.shared.deactivate(ObjectIdentifier(self))
         if session != 0 { QRimeDestroySession(session) }
     }
 
@@ -37,6 +39,23 @@ final class InputSession: NSObject {
         shiftAlone = false
         generation &+= 1
         CandidatePanel.shared.hide(owner: ObjectIdentifier(self))
+        refreshModeStatus()
+    }
+
+    private var englishMode: Bool? {
+        guard Engine.ready, session != 0 else { return nil }
+        return QRimeGetOption(session, "ascii_mode")
+    }
+
+    private func refreshModeStatus() {
+        guard active else { return }
+        InputModeStatus.shared.update(self, english: englishMode)
+    }
+
+    @objc private func engineReadinessChanged() {
+        guard active else { return }
+        if Engine.ready { _ = ensureSession() }
+        refreshModeStatus()
     }
 
     private func owns(_ client: IMKTextInput) -> Bool {
@@ -64,6 +83,7 @@ final class InputSession: NSObject {
         marked = false
         shiftAlone = false
         _ = ensureSession()
+        InputModeStatus.shared.activate(self, english: englishMode)
     }
 
     func deactivate(_ sender: Any!) {
@@ -75,6 +95,7 @@ final class InputSession: NSObject {
         shiftAlone = false
         CandidatePanel.shared.hide(owner: ObjectIdentifier(self))
         if session != 0 { QRimeClear(session) }
+        InputModeStatus.shared.deactivate(ObjectIdentifier(self))
     }
 
     func commit(_ sender: Any!) {
@@ -90,17 +111,18 @@ final class InputSession: NSObject {
         // Password/secure input remains owned by the system's direct keyboard path.
         if IsSecureEventInputEnabled() {
             CandidatePanel.shared.hide(owner: ObjectIdentifier(self))
+            InputModeStatus.shared.update(self, english: nil)
             QRimeClear(session)
             return false
         }
+        defer { refreshModeStatus() }
         if event.type == .flagsChanged {
             guard event.keyCode == 56 || event.keyCode == 60 else { shiftAlone = false; return false }
             if event.modifierFlags.contains(.shift) {
                 shiftAlone = event.modifierFlags.intersection([.command, .control, .option]).isEmpty
             } else {
                 if shiftAlone {
-                    commitCurrent(client)
-                    QRimeSetOption(session, "ascii_mode", !QRimeGetOption(session, "ascii_mode"))
+                    toggleEnglish(nil)
                 }
                 shiftAlone = false
             }
@@ -190,7 +212,7 @@ final class InputSession: NSObject {
         let menu = NSMenu()
         let english = menu.addItem(withTitle: "英文输入", action: #selector(toggleEnglish), keyEquivalent: "")
         english.target = target ?? self
-        english.state = session != 0 && QRimeGetOption(session, "ascii_mode") ? .on : .off
+        english.state = englishMode == true ? .on : .off
         menu.addItem(.separator())
         let settings = menu.addItem(withTitle: "设置…", action: #selector(openSettings), keyEquivalent: "")
         settings.target = target ?? self
@@ -210,8 +232,13 @@ final class InputSession: NSObject {
     }
 
     @objc func toggleEnglish(_ sender: Any? = nil) {
-        if let owner { commitCurrent(owner) }
-        if ensureSession() { QRimeSetOption(session, "ascii_mode", !QRimeGetOption(session, "ascii_mode")) }
+        guard active, let owner, ensureSession() else { return }
+        let epoch = generation
+        commitCurrent(owner)
+        // insertText can synchronously deactivate us or restart the engine.
+        guard owns(owner), generation == epoch, ensureSession() else { return }
+        QRimeSetOption(session, "ascii_mode", !QRimeGetOption(session, "ascii_mode"))
+        refreshModeStatus()
     }
     @objc fileprivate func openSettings(_ sender: Any? = nil) { if let owner { commitCurrent(owner) }; SettingsWindow.shared.show() }
     @objc fileprivate func openData(_ sender: Any? = nil) { NSWorkspace.shared.open(Product.userRoot) }

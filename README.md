@@ -29,15 +29,15 @@
 | Windows 10 22H2 / Windows 11 x64 | 独立 EXE 安装包，含 x64/x86 TSF；安装与宿主验收状态见 [Windows 说明](docs/WINDOWS.md) |
 | Linux | 客户端规划中 |
 
-Windows：前往 [最新版本](https://github.com/asmoyou/rime-Q/releases/latest)，下载 `RimeQ-0.4.0-windows-x64.exe`。双击安装并完成管理员认证，然后在输入法列表选择 **Rime Q**。安装、升级和备份步骤见 [Windows 使用说明](docs/WINDOWS.md)。Windows 安装包尚未进行 Authenticode 签名。
+Windows：前往 [最新版本](https://github.com/asmoyou/rime-Q/releases/latest)，下载 `RimeQ-0.4.1-windows-x64.exe`。双击安装并完成管理员认证，然后在输入法列表选择 **Rime Q**。安装、升级和备份步骤见 [Windows 使用说明](docs/WINDOWS.md)。Windows 安装包尚未进行 Authenticode 签名。
 
 macOS：
 
-1. 前往 [最新版本](https://github.com/asmoyou/rime-Q/releases/latest)，下载 `RimeQ-0.4.0-macos-universal.pkg`。
+1. 前往 [最新版本](https://github.com/asmoyou/rime-Q/releases/latest)，下载 `RimeQ-0.4.1-macos-universal.pkg`。
 2. 双击安装包，按 macOS 安装器的提示完成安装。应用会安装到系统输入法目录，并在后台完成启用。
 3. 从菜单栏的输入法菜单选择 **Rime Q**，开始输入。
 
-当前版本为 **0.4.0**，新增 Windows 原生客户端。万象模型仍按需下载，不随安装包提供。macOS 安装包已做本地 ad-hoc 签名，尚未完成 Apple Developer ID 签名与公证。若 macOS 阻止打开，请确认文件来自本项目，再按“系统设置 → 隐私与安全性”的提示处理（[Apple 说明](https://support.apple.com/zh-cn/102445)）。macOS 实际宿主测试主要在 Intel Mac 上完成，Apple Silicon 包已构建，更多设备与应用的兼容性仍在持续验证。
+当前版本为 **0.4.1**，新增 Mac 菜单栏中英文状态显示，并提供默认关闭的附近设备同步。万象模型仍按需下载，不随安装包提供。macOS 安装包已做本地 ad-hoc 签名，尚未完成 Apple Developer ID 签名与公证。若 macOS 阻止打开，请确认文件来自本项目，再按“系统设置 → 隐私与安全性”的提示处理（[Apple 说明](https://support.apple.com/zh-cn/102445)）。macOS 实际宿主测试主要在 Intel Mac 上完成，Apple Silicon 包已构建，更多设备与应用的兼容性仍在持续验证。
 
 安装时，管理员认证用于写入系统输入法目录；安装器可能请求读取下载文件夹。升级较早版本时，也可能请求退出仍在运行的旧版 Rime Q。详见 [安装与授权说明](docs/PERMISSIONS.md)。
 
@@ -53,6 +53,8 @@ macOS：
 | `−` / `=` 或 Page Up / Page Down | 候选翻页 |
 | Esc | 取消当前组合 |
 | `[` / `]` | 取当前候选的首字 / 尾字 |
+
+Mac 输入时，菜单栏的独立“中 / 英”按钮显示当前模式，点按也可切换；切到其他输入法时隐藏。
 
 以下触发码在中文模式下使用，区分大小写；出现结果后，空格或数字键选取。
 
@@ -79,7 +81,7 @@ macOS：
 
 **个人词库** 管理自己的学习记录，支持搜索、排序、新增、编辑、删除、撤销和 UTF-8 TSV 导入导出。删除个人记录后，内置词库中的同名词仍可能出现。
 
-开发分支正在加入默认关闭的 **附近设备同步**：每台电脑加入一次，在局域网内合并个人词条与学习权重，支持多设备接力和离线补齐。现有公开 0.4.0 不包含此功能；实现范围、操作和测试边界见 [附近设备同步说明](docs/LAN_SYNC.md)。
+提供默认关闭的 **附近设备同步**：每台电脑加入一次，在局域网内合并个人词条与学习权重，支持多设备接力和离线补齐。实现范围、操作和测试边界见 [附近设备同步说明](docs/LAN_SYNC.md)。
 
 **词库与模型** 展示内置资源的来源、版本与许可，可以启停可选词表，导入独立的全拼 `.dict.yaml` 或 TSV/TXT 词表。编译在后台进行，成功后等当前输入结束再切换，失败时继续使用原词库。当前不支持直接导入 SCEL、双拼、形码或完整输入方案包。格式和限制见 [词库说明](docs/DICTIONARIES.md)。
 
@@ -103,7 +105,7 @@ macOS：
 
 ## 从源码构建
 
-Windows 客户端构建：`python scripts/build_windows.py --smoke`，产物为 `dist/RimeQ-0.4.0-windows-x64.exe`。原生 TSF、独立引擎服务、WPF 设置、个人词库、词库资源、可选模型及安装步骤见 [Windows 说明](docs/WINDOWS.md)。macOS 与 Windows 使用相同的设置页能力、词库与模型规则及操作流程，系统输入接入和原生控件分别适配；一致性契约见 [客户端功能一致性](docs/CLIENT_PARITY.md)。
+Windows 客户端构建：`python scripts/build_windows.py --smoke`，产物为 `dist/RimeQ-0.4.1-windows-x64.exe`。原生 TSF、独立引擎服务、WPF 设置、个人词库、词库资源、可选模型及安装步骤见 [Windows 说明](docs/WINDOWS.md)。macOS 与 Windows 使用相同的设置页能力、词库与模型规则及操作流程，系统输入接入和原生控件分别适配；一致性契约见 [客户端功能一致性](docs/CLIENT_PARITY.md)。
 
 macOS 客户端构建需要 macOS 13+、Xcode 工具链和 Python 3.10+。首次构建会下载并核验固定版本依赖。
 
@@ -113,7 +115,7 @@ cd rime-Q
 python3 scripts/build_macos.py --universal --smoke
 ```
 
-产物为 `dist/RimeQ-0.4.0-macos-universal.pkg`。已有资源缓存时可加 `--reuse-resources`；默认只保留 PKG，临时应用在打包后清理。
+产物为 `dist/RimeQ-0.4.1-macos-universal.pkg`。已有资源缓存时可加 `--reuse-resources`；默认只保留 PKG，临时应用在打包后清理。
 
 构建检查包括真实引擎与学习、快捷输入、词库管理、原生设置操作、候选皮肤、安装状态、更新版本比较和每日调度。CI 还会在独立运行环境安装实际 PKG，核验启用或明确的待启用处理，并验证卸载保留数据。
 
