@@ -1,0 +1,107 @@
+{
+  "url": "https://github.com/asmoyou/rime-Q/releases/tag/v0.4.2",
+  "tag": "v0.4.2",
+  "publishedAt": "2026-09-14T11:28:41Z",
+  "latestEndpointVerified": true,
+  "files": [
+    {
+      "name": "RimeQ-0.4.2-macos-universal.pkg",
+      "url": "https://github.com/asmoyou/rime-Q/releases/download/v0.4.2/RimeQ-0.4.2-macos-universal.pkg",
+      "bytes": 75985778,
+      "sha256": "e0b22c2cc95772bf066965ba3201aba34731a32b6127708908504baec8f16fd3"
+    },
+    {
+      "name": "RimeQ-0.4.2-windows-x64.exe",
+      "url": "https://github.com/asmoyou/rime-Q/releases/download/v0.4.2/RimeQ-0.4.2-windows-x64.exe",
+      "bytes": 70218752,
+      "sha256": "b1cf098d790dadf619959c718c13ba9ce6369723ee0c9cc562d9278751102dad"
+    },
+    {
+      "name": "RimeQ-0.4.2-macos-SHA256SUMS.txt",
+      "url": "https://github.com/asmoyou/rime-Q/releases/download/v0.4.2/RimeQ-0.4.2-macos-SHA256SUMS.txt",
+      "bytes": 98,
+      "sha256": "512d6179e072bad43bcfeed01827adcec9e2311bc6f4a8335817edb0828f7157"
+    },
+    {
+      "name": "RimeQ-0.4.2-windows-SHA256SUMS.txt",
+      "url": "https://github.com/asmoyou/rime-Q/releases/download/v0.4.2/RimeQ-0.4.2-windows-SHA256SUMS.txt",
+      "bytes": 95,
+      "sha256": "c02e1e239559f6bdaa8c2a029fdf1b58a989db2998a6456702cdd23bf52d4a5a"
+    }
+  ],
+  "commit": "d3f02c8896decb2a2ef82ed8ae561d218a3020cd",
+  "ci": "https://github.com/asmoyou/rime-Q/actions/runs/34837489766",
+  "jobs": [
+    {
+      "name": "changes",
+      "conclusion": "success"
+    },
+    {
+      "name": "mac-package",
+      "conclusion": "success"
+    },
+    {
+      "name": "windows-registration",
+      "conclusion": "success"
+    },
+    {
+      "name": "sync-core (macos-14)",
+      "conclusion": "success"
+    },
+    {
+      "name": "core (macos-14)",
+      "conclusion": "success"
+    },
+    {
+      "name": "sync-core (windows-2022)",
+      "conclusion": "success"
+    },
+    {
+      "name": "windows-package",
+      "conclusion": "success"
+    },
+    {
+      "name": "sync-sandboxes",
+      "conclusion": "success"
+    },
+    {
+      "name": "core (windows-2022)",
+      "conclusion": "success"
+    },
+    {
+      "name": "core (ubuntu-24.04)",
+      "conclusion": "success"
+    },
+    {
+      "name": "sync-core (ubuntu-24.04)",
+      "conclusion": "success"
+    },
+    {
+      "name": "windows-install",
+      "conclusion": "success"
+    }
+  ],
+  "macBuild": "1789384729",
+  "windowsFileVersion": "0.4.2.9132",
+  "macCIActivation": "pending; explicit single login retry verified",
+  "localHostValidation": {
+    "testedBuild": "1789378362",
+    "sourceCommit": "8724ebb",
+    "host": "TextEdit",
+    "document": "/tmp/rimeq-correction-acceptance-20260914.txt",
+    "passed": [
+      "zhognguo space commits 中国",
+      "nihso shows 你好（ni hao）",
+      "digit 2 commits 你好 without annotation",
+      "Escape cancels",
+      "mode status click and English passthrough",
+      "returns to Chinese"
+    ],
+    "preparation": "First attempt encountered a nonempty document containing 00中国; rerun explicitly canceled composition and reset only the dedicated test document before keys. Cause of the preexisting characters not established.",
+    "candidateScreenshot": "/tmp/rimeq-correction-host-candidates.png",
+    "limits": [
+      "No physical Caps Lock automation",
+      "CI release build separately verified by CI; this host test uses preceding build with same input code"
+    ]
+  }
+}
