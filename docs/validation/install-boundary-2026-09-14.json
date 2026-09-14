@@ -1,0 +1,19 @@
+{
+  "version": "0.4.1",
+  "build": "1789378362",
+  "bytes": 75962703,
+  "sha256": "85227e363ba02670c7da4d8986f93ec672527cfbc77f0f7ae501ebe05c3e3b51",
+  "installedBefore": "1789373931",
+  "beforeMenuVisible": false,
+  "beforeRuntimeReady": true,
+  "beforeModeEnabled": true,
+  "passed": [
+    "GUI and shell version comparison",
+    "universal build",
+    "package and signature verification",
+    "shipped installation and maintenance smoke",
+    "system Installer selects only newer-build update"
+  ],
+  "installation": "native authentication pending",
+  "capsLock": "user also reproduced with other input methods; no global preference changes"
+}

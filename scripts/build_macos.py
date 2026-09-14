@@ -248,7 +248,7 @@ def build(universal=False, resources=True, keep_app=False, smoke=False, sync_smo
         for action, title, description in [
             ("install", "安装", "首次安装。内置引擎和词库将安装到系统输入法目录。"),
             ("upgrade", "升级至", "检测到较旧版本。更新应用，保留个人词库、学习记录和设置。"),
-            ("repair", "重新安装", "检测到相同版本。重新安装以修复应用，保留个人词库和设置。")
+            ("update", "更新构建：", "版本号相同，安装包构建更新。更新应用，保留个人词库和设置。")
         ]:
             choices.append(f'<choice id="{action}" title="{title} Rime Q {VERSION}" description="{description}" enabled="false" selected="rimeqActionIs(\'{action}\')" visible="rimeqActionIs(\'{action}\')"><pkg-ref id="{IDENTIFIER}"/></choice>')
         distribution.write_text(f'''<?xml version="1.0" encoding="utf-8"?>
@@ -260,7 +260,7 @@ def build(universal=False, resources=True, keep_app=False, smoke=False, sync_smo
   <welcome file="welcome.html" mime-type="text/html"/>
   <conclusion file="conclusion.html" mime-type="text/html"/>
   <installation-check script="rimeqCheckInstallation()"/>
-  <choices-outline><line choice="install"/><line choice="upgrade"/><line choice="repair"/></choices-outline>
+  <choices-outline><line choice="install"/><line choice="upgrade"/><line choice="update"/></choices-outline>
   {''.join(choices)}
   <pkg-ref id="{IDENTIFIER}" version="{VERSION}" onConclusion="None">RimeQ-component.pkg</pkg-ref>
   <script><![CDATA[{checks}]]></script>

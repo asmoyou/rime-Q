@@ -215,10 +215,13 @@ func installationFlowSmoke() throws {
     try require(!InputSourceInstallRules.validConnectionName("RimeQ_Connection", bundleID: Product.identifier), "Legacy connection name accepted")
     try require(!InputSourceInstallRules.validConnectionName(nil, bundleID: Product.identifier), "Missing connection name accepted")
     var mutation = InputSourceInstallAttempt(), mutationCalls = 0
+    try require(!mutation.completed(verification: 0), "Existing roster hid an unperformed mutation")
     for attempt in 0..<8 {
         let status = mutation.run { mutationCalls += 1; return mutationCalls < 3 ? 75 : 0 }
         try require(status == (attempt < 2 ? 75 : 0), "Failed mutation was not retried")
     }
+    try require(!mutation.completed(verification: 75), "Mutation success hid a failed verification")
+    try require(mutation.completed(verification: 0), "Successful mutation and verification did not complete")
     try require(mutationCalls == 3, "Successful enable/disable was repeated while waiting for propagation")
     for failure in [InputSourceInstallPhase.leaveSource, .disableMode, .disableParent] {
         var phases: [InputSourceInstallPhase] = []

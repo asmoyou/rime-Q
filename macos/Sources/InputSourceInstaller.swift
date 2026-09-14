@@ -101,6 +101,7 @@ enum InputSourceInstallRules {
 /// Retry a failed mutation; once accepted, only poll its independent verification.
 struct InputSourceInstallAttempt {
     private(set) var status: Int32 = 75
+    func completed(verification: Int32) -> Bool { status == 0 && verification == 0 }
     mutating func run(_ action: () -> Int32) -> Int32 {
         if status != 0 { status = action() }
         return status
@@ -461,6 +462,11 @@ private func runInputSourceInstallPhase(_ phase: InputSourceInstallPhase, forceE
             : InputSourceInstallExit.retryable
 
     case .enableMode:
+        // The caller may retain a stale TIS snapshot after enabling the parent.
+        // Check the dependency in a fresh process before touching the child.
+        guard runInputSourceInstallSubprocess(.verifyParent, timeout: InputSourceInstallRules.subprocessTimeout) == InputSourceInstallExit.success else {
+            return InputSourceInstallExit.retryable
+        }
         guard let installed = inputSourceRoster(
                 identity: identity,
                 includeAllInstalled: true
@@ -470,12 +476,6 @@ private func runInputSourceInstallPhase(_ phase: InputSourceInstallPhase, forceE
                 includeAllInstalled: false
               ),
               uniqueParent(in: installed, identity: identity) != nil,
-              InputSourceInstallRules.parentDependencySatisfied(
-                parentInEnabledRoster: uniqueParent(
-                    in: enabled,
-                    identity: identity
-                ) != nil
-              ),
               let modes = allModes(in: installed, identity: identity) else {
             print("install: parent not ready or child mode is ambiguous")
             return InputSourceInstallExit.retryable
@@ -642,7 +642,7 @@ private func convergeInputSourceInstallBoundary(
             "install: boundary=\(label) attempt=\(index + 1)"
                 + " action=\(actionStatus) verify=\(verifyStatus)"
         )
-        if verifyStatus == InputSourceInstallExit.success {
+        if attempt.completed(verification: verifyStatus) {
             return true
         }
     }

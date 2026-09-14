@@ -38,6 +38,10 @@ if [ "$install_action" = downgrade ]; then
     echo "Rime Q: 已安装 $installed_version ($installed_build)，拒绝用 $package_version ($package_build) 覆盖较新版本。"
     exit 1
 fi
+if [ "$install_action" = current ]; then
+    echo "Rime Q: 已安装本安装包提供的最新版 $package_version ($package_build)，无需重复安装，未修改应用。"
+    exit 1
+fi
 echo "Rime Q: $install_action ${installed_version:-none} ($installed_build) -> $package_version ($package_build); personal data retained."
 
 check_duplicates() {

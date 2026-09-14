@@ -100,7 +100,7 @@ def verify(package):
         assert list(expanded.rglob("welcome.html")), "Missing installer introduction resource"
         installation_check = distribution.find("installation-check")
         assert installation_check is not None and installation_check.get("script") == "rimeqCheckInstallation()"
-        assert {choice.get("id") for choice in distribution.findall("choice")} == {"install", "upgrade", "repair"}
+        assert {choice.get("id") for choice in distribution.findall("choice")} == {"install", "upgrade", "update"}
         assert all(reference.get("onConclusion") not in {"RequireLogout", "RequireRestart", "RequireShutdown"}
                    for reference in distribution.findall("pkg-ref")), "Do not require session changes after successful activation"
     print("PKG verified: fixed system path, relocation disabled, install scripts, activation instructions and dependency sources/notices present")

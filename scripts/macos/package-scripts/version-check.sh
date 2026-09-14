@@ -21,7 +21,9 @@ rimeq_install_action() {
         printf '%s\n' downgrade
     elif [ "$release_order" -lt 0 ]; then
         printf '%s\n' upgrade
+    elif [ "$build_order" -lt 0 ]; then
+        printf '%s\n' update
     else
-        printf '%s\n' repair
+        printf '%s\n' current
     fi
 }
