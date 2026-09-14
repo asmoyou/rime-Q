@@ -180,6 +180,10 @@ namespace RimeQ {
             var modelRow = new Grid { MinHeight = 48, Margin = new Thickness(18,0,18,0) }; modelRow.ColumnDefinitions.Add(new ColumnDefinition()); modelRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             modelStatus.VerticalAlignment = VerticalAlignment.Center; modelStatus.Margin = new Thickness(0,6,12,6); modelRow.Children.Add(modelStatus); Grid.SetColumn(buttons,1); modelRow.Children.Add(buttons);
             Section("输入",Frame(Vertical(Setting("整句优化",controls,"使用万象语法模型，辅助连续输入时的组词。",76),Separator(),modelRow,modelProgress)),"万象模型按需下载。基础组词与个人学习无需模型，也能离线使用。");
+            Section("拼音纠错",Frame(Vertical(
+                Setting("相邻键容错",Check("相邻键容错","AdjacentKeyCorrection","1",toggle:true),"按错相邻字母时尝试出词，例如 nihso 可找到“你好”。",82),Separator(),
+                Setting("正确拼音提示",Check("正确拼音提示","CorrectionHints","1",toggle:true),"纠错候选显示“中国（zhong guo）”等注释，注释不会上屏。",82))),
+                "完全离线。更改在当前组合输入结束后生效。相邻键容错会增加计算量；关闭后仍保留 zhogn → zhong 等基础拼写规则。正常简拼和补全不标为手误。");
             var font = new ComboBox { Width = 96, ItemsSource = new[] {16,18,20,22}, SelectedItem = Appearance.FontSize }; AutomationProperties.SetName(font,"候选字号");
             var skin = Action(Appearance.Names[Appearance.Skin]+"  ›",() => ShowPage(4)); skin.Width = 96; skin.Margin = new Thickness(0); AutomationProperties.SetName(skin,"选择候选皮肤");
             var rows = Frame(Vertical(Setting("候选字号",font),Separator(),Setting("候选皮肤",skin)));

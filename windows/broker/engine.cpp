@@ -1,4 +1,5 @@
 #include "engine.h"
+#include "../../include/rimeq/rime_preferences.hpp"
 #include "sync_dictionary.h"
 #include "../../third_party/librime/rime_levers_api.h"
 #include "version.h"
@@ -61,7 +62,9 @@ void Engine::start(const fs::path& application, const fs::path& data, bool deplo
     api_->setup(&traits); api_->initialize(&traits); started_ = true;
     if (!api_->find_module("lua") || !api_->find_module("octagram")) throw std::runtime_error("Missing language plugins");
     if (deploy && api_->start_maintenance(true)) api_->join_maintenance_thread();
-    auto id = api_->create_session(); bool ok = id && api_->select_schema(id, "rime_q");
+    adjacentKeys_ = preference(L"AdjacentKeyCorrection", 1, root_) != 0;
+    correctionHints_ = preference(L"CorrectionHints", 1, root_) != 0;
+    auto id = api_->create_session(); bool ok = id && configureSession(id, false, adjacentKeys_, correctionHints_, false);
     if (!ok) { if (id) api_->destroy_session(id); throw std::runtime_error("Base input resources are unavailable"); }
     // Keep the validated session warm. Opening a client must not repeat cold schema loading.
     available_.push_back(id);
@@ -73,7 +76,7 @@ RimeSessionId Engine::session(uint64_t client) {
         id = available_.back(); available_.pop_back(); api_->set_option(id, "ascii_mode", preservedAscii_[client]); return id;
     }
     id = api_->create_session();
-    if (!id || !api_->select_schema(id, grammar_ ? "rime_q_grammar" : "rime_q")) {
+    if (!id || !configureSession(id, grammar_, adjacentKeys_, correctionHints_, false)) {
         if (id) api_->destroy_session(id); id = 0; throw std::runtime_error("Cannot create input session");
     }
     api_->set_option(id, "ascii_mode", preservedAscii_[client]); return id;
@@ -192,22 +195,42 @@ bool Engine::idle() {
     }
     return true;
 }
+bool Engine::configureSession(RimeSessionId id, bool grammar, bool adjacentKeys, bool hints, bool preserveOptions) {
+    const char* names[] = {"ascii_mode", "ascii_punct", "traditionalization", "emoji", "full_shape", "search_single_char"};
+    bool values[6]{};
+    for (int i = 0; i < 6; ++i) values[i] = api_->get_option(id, names[i]) != 0;
+    bool ok = rimeq::select_schema_with_preferences(api_, id, grammar ? "rime_q_grammar" : "rime_q", adjacentKeys, hints);
+    if (preserveOptions) for (int i = 0; i < 6; ++i) api_->set_option(id, names[i], values[i]);
+    return ok;
+}
+void Engine::setCorrectionPreferences(bool adjacentKeys, bool hints) {
+    if ((adjacentKeys_ == adjacentKeys && correctionHints_ == hints) || !idle()) return;
+    bool ok = true;
+    for (auto& item : sessions_) if (item.second && !configureSession(item.second, grammar_, adjacentKeys, hints)) ok = false;
+    for (auto id : available_) if (!configureSession(id, grammar_, adjacentKeys, hints)) ok = false;
+    if (!ok) {
+        for (auto& item : sessions_) if (item.second) configureSession(item.second, grammar_, adjacentKeys_, correctionHints_);
+        for (auto id : available_) configureSession(id, grammar_, adjacentKeys_, correctionHints_);
+        throw std::runtime_error("Cannot apply pinyin preferences");
+    }
+    adjacentKeys_ = adjacentKeys; correctionHints_ = hints;
+}
 void Engine::setGrammar(bool enabled) {
     if (grammar_ == enabled || !idle()) return;
     bool failed = false;
     for (auto& item : sessions_) {
         if (!item.second) continue;
         bool ascii = api_->get_option(item.second, "ascii_mode") != 0;
-        if (!api_->select_schema(item.second, enabled ? "rime_q_grammar" : "rime_q")) {
+        if (!configureSession(item.second, enabled, adjacentKeys_, correctionHints_)) {
             failed = true;
-            api_->select_schema(item.second, "rime_q");
+            configureSession(item.second, false, adjacentKeys_, correctionHints_);
         }
         api_->set_option(item.second, "ascii_mode", ascii);
     }
-    for (auto id : available_) if (!api_->select_schema(id, enabled ? "rime_q_grammar" : "rime_q")) failed = true;
+    for (auto id : available_) if (!configureSession(id, enabled, adjacentKeys_, correctionHints_)) failed = true;
     if (failed) {
-        for (auto& item : sessions_) if (item.second) api_->select_schema(item.second, "rime_q");
-        for (auto id : available_) api_->select_schema(id, "rime_q");
+        for (auto& item : sessions_) if (item.second) configureSession(item.second, false, adjacentKeys_, correctionHints_);
+        for (auto id : available_) configureSession(id, false, adjacentKeys_, correctionHints_);
     }
     grammar_ = enabled && !failed;
 }

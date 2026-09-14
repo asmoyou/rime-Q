@@ -162,6 +162,8 @@ final class InputSettingsViewController: NSViewController {
     let preferences: AppearancePreferences
     private let model: OptionalModel
     private let optimization = NSSwitch()
+    private let adjacentKeys = NSSwitch()
+    private let correctionHints = NSSwitch()
     private let font = NSPopUpButton()
     private let skinButton = NSButton()
     private let preview = CandidatePreviewView()
@@ -197,6 +199,17 @@ final class InputSettingsViewController: NSViewController {
         ])
         let inputRow = SettingsLayout.setting("整句优化", detail: "使用万象语法模型，辅助连续输入时的组词。",
             control: switches, height: 76)
+        adjacentKeys.target = self; adjacentKeys.action = #selector(changeAdjacentKeys)
+        adjacentKeys.setAccessibilityLabel("相邻键容错")
+        correctionHints.target = self; correctionHints.action = #selector(changeCorrectionHints)
+        correctionHints.setAccessibilityLabel("正确拼音提示")
+        let correction = SettingsCard([
+            SettingsLayout.setting("相邻键容错", detail: "按错相邻字母时尝试出词，例如 nihso 可找到“你好”。",
+                control: adjacentKeys, height: 82),
+            SettingsLayout.separator(),
+            SettingsLayout.setting("正确拼音提示", detail: "纠错候选显示“中国（zhong guo）”等注释，注释不会上屏。",
+                control: correctionHints, height: 82)
+        ])
         font.addItems(withTitles: ["16", "18", "20", "22"])
         font.target = self; font.action = #selector(changeFont)
         font.widthAnchor.constraint(equalToConstant: 96).isActive = true
@@ -209,11 +222,12 @@ final class InputSettingsViewController: NSViewController {
             SettingsLayout.setting("候选皮肤", control: skinButton)
         ])
         let appearance = SettingsLayout.vertical([rows, preview], spacing: 12)
-        let shortcuts = NSStackView(views: [shortcut("⇧ Shift", "中英文切换"), shortcut("数字键", "选择候选"), shortcut("− / =", "候选翻页")])
+        let shortcuts = NSStackView(views: [shortcut("⇧ Shift", "中英文切换"), shortcut("Caps Lock", "锁定大写"), shortcut("数字键", "选择候选"), shortcut("− / =", "候选翻页")])
         shortcuts.distribution = .fillEqually; shortcuts.spacing = 12; shortcuts.alignment = .top
         SettingsLayout.scrollPage([
             SettingsLayout.heading("输入与外观", subtitle: "按自己的习惯，调整输入与候选显示。"),
             SettingsLayout.section("输入", content: SettingsCard([inputRow, SettingsLayout.separator(), ModelSettingsView(model: model)]), note: "万象模型按需下载。基础组词与个人学习无需模型，也能离线使用。"),
+            SettingsLayout.section("拼音纠错", content: correction, note: "完全离线。更改在当前组合输入结束后生效。相邻键容错会增加计算量；关闭后仍保留 zhogn → zhong 等基础拼写规则。正常简拼和补全不标为手误。"),
             SettingsLayout.section("候选显示", content: appearance),
             SettingsLayout.section("常用按键", content: shortcuts),
             SettingsLayout.section("快捷输入", content: SettingsCard([
@@ -230,6 +244,8 @@ final class InputSettingsViewController: NSViewController {
     @objc func refresh() {
         guard isViewLoaded else { return }
         refreshModel()
+        adjacentKeys.state = preferences.adjacentKeyCorrection ? .on : .off
+        correctionHints.state = preferences.correctionHints ? .on : .off
         font.selectItem(withTitle: "\(Int(preferences.fontSize))")
         skinButton.title = preferences.skin.name + "  ›"
         preview.skin = preferences.skin; preview.fontSize = preferences.fontSize
@@ -240,6 +256,8 @@ final class InputSettingsViewController: NSViewController {
         optimization.isEnabled = model.available && !model.state.busy
     }
     @objc private func changeOptimization() { model.setEnabled(optimization.state == .on) }
+    @objc private func changeAdjacentKeys() { preferences.adjacentKeyCorrection = adjacentKeys.state == .on }
+    @objc private func changeCorrectionHints() { preferences.correctionHints = correctionHints.state == .on }
     @objc private func changeFont() { preferences.fontSize = CGFloat(Int(font.titleOfSelectedItem ?? "18") ?? 18) }
     @objc private func openSkins() { manageSkins?() }
     @objc private func explain(_ sender: NSButton) {

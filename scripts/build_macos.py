@@ -71,7 +71,7 @@ def build_app(app, universal=False, resources=True):
         "LSMinimumSystemVersion": "13.0", "LSUIElement": True, "NSPrincipalClass": "NSApplication",
         "InputMethodConnectionName": IDENTIFIER + "_Connection", "InputMethodServerControllerClass": "RimeQController",
         "InputMethodServerDelegateClass": "RimeQController", "TISInputSourceID": IDENTIFIER,
-        "TICapsLockLanguageSwitchCapable": True, "tsInputMethodIconFileKey": "menu.pdf",
+        "TICapsLockLanguageSwitchCapable": False, "tsInputMethodIconFileKey": "menu.pdf",
         "ComponentInputModeDict": {"tsVisibleInputModeOrderedArrayKey": [mode], "tsInputModeListKey": {
             mode: {"TISInputSourceID": mode, "TISIntendedLanguage": "zh-Hans",
                    "tsInputModeAlternateMenuTitleKey": "Rime Q", "tsInputModeDefaultStateKey": True,

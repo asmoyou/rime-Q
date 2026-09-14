@@ -85,8 +85,46 @@ enum ControllerSmoke {
         let old = second.document
         _ = key("a", into: second, through: other)
         try EngineSmoke.check(second.document == old && second.preedit.isEmpty, "inactive host received input")
+        try correctionPreferences()
         try modeStatus()
         print("PASS controller: marked text, space, mouse, cancellation, panel ownership, reentrant focus, mode status")
+    }
+
+    private static func correctionPreferences() throws {
+        let suite = "RimeQ.PinyinSmoke." + UUID().uuidString
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let preferences = AppearancePreferences(defaults: defaults)
+        try EngineSmoke.check(preferences.adjacentKeyCorrection && preferences.correctionHints, "Correction defaults are off")
+        let input = InputSession(preferences: preferences), client = MockTextClient()
+        defer { input.deactivate(client) }
+        func type(_ text: String) {
+            for character in text {
+                let key = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                    windowNumber: 0, context: nil, characters: String(character), charactersIgnoringModifiers: String(character),
+                    isARepeat: false, keyCode: character == " " ? 49 : 0)!
+                _ = input.process(key, client: client)
+            }
+        }
+        input.activate(client)
+        type("zhognguo")
+        preferences.adjacentKeyCorrection = false; preferences.correctionHints = false
+        let reloaded = AppearancePreferences(defaults: defaults)
+        try EngineSmoke.check(!reloaded.adjacentKeyCorrection && !reloaded.correctionHints, "Correction preferences did not persist")
+        type(" ")
+        try EngineSmoke.check(client.document == "中国", "Preference change lost current composition")
+        type("nihso")
+        try EngineSmoke.check(!CandidatePanel.shared.canvas.composition.candidates.contains { $0.text == "你好" }, "Deferred preference did not apply on next composition")
+        input.deactivate(client); input.activate(client)
+        preferences.adjacentKeyCorrection = true
+        type("nihso")
+        try EngineSmoke.check(CandidatePanel.shared.canvas.composition.candidates.contains { $0.text == "你好" && $0.comment.isEmpty }, "Re-enabled candidates or hidden hints failed")
+        input.deactivate(client); input.activate(client)
+        input.toggleEnglish(nil)
+        preferences.correctionHints = true
+        type("a")
+        try EngineSmoke.check(InputModeStatus.shared.button?.title == "A" && client.preedit.isEmpty, "Preference reload lost English mode")
+        print("PASS controller correction: persisted settings, deferred application, annotations and English preservation")
     }
 
     private static func modeStatus() throws {
@@ -124,6 +162,21 @@ enum ControllerSmoke {
         try EngineSmoke.check(!client.preedit.isEmpty, "Chinese icon disagrees with actual composition")
         _ = event(.keyDown, code: 49, text: " ")
         try EngineSmoke.check(client.document == "a你好", "Chinese mode did not commit text")
+
+        for char in "nihao" { _ = event(.keyDown, code: 0, text: String(char)) }
+        try EngineSmoke.check(!event(.flagsChanged, .capsLock, code: 57), "Caps Lock event was swallowed")
+        try EngineSmoke.check(client.document == "a你好你好" && client.preedit.isEmpty, "Caps Lock lost current composition")
+        try EngineSmoke.check(!event(.keyDown, .capsLock, code: 0, text: "A"), "Caps Lock uppercase was swallowed")
+        _ = event(.flagsChanged, [.capsLock, .shift])
+        try EngineSmoke.check(!event(.keyDown, [.capsLock, .shift], code: 0, text: "a"), "Caps Lock with Shift was swallowed")
+        _ = event(.flagsChanged, .capsLock)
+        // A bare Shift while locked must not toggle the engine either.
+        _ = event(.flagsChanged, [.capsLock, .shift]); _ = event(.flagsChanged, .capsLock)
+        try checkMode(false, "Caps Lock or Shift while locked changed engine mode")
+        _ = event(.flagsChanged, code: 57)
+        for char in "nihao" { _ = event(.keyDown, code: 0, text: String(char)) }
+        _ = event(.keyDown, code: 49, text: " ")
+        try EngineSmoke.check(client.document == "a你好你好你好", "Caps Lock release did not restore Chinese input")
 
         let menuItem = input.makeMenu().items[0]
         try EngineSmoke.check(NSApp.sendAction(menuItem.action!, to: menuItem.target, from: menuItem), "English menu action failed")

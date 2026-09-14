@@ -1,6 +1,7 @@
 #include "QRimeBridge.h"
 #include "../../third_party/librime/rime_api.h"
 #include "../../third_party/librime/rime_levers_api.h"
+#include "../../include/rimeq/rime_preferences.hpp"
 #include <dlfcn.h>
 #include <algorithm>
 #include <filesystem>
@@ -98,6 +99,10 @@ void QRimeDestroySession(uintptr_t session) { if (started && session) api->destr
 bool QRimeProcess(uintptr_t session, int key, int modifiers) { bool handled=started && session && api->process_key(session, key, modifiers); if(handled)++learning_revision; return handled; }
 bool QRimeSelect(uintptr_t session, size_t index) { bool handled=started && session && api->select_candidate_on_current_page(session, index); if(handled)++learning_revision; return handled; }
 bool QRimeSchema(uintptr_t session, const char* schema) { return started && session && schema && api->select_schema(session, schema); }
+bool QRimeSchemaPreferences(uintptr_t session, const char* schema, bool adjacentKeys, bool showHints) {
+    if (!started || !session || (api->get_input(session) && *api->get_input(session))) return false;
+    return rimeq::select_schema_with_preferences(api, session, schema, adjacentKeys, showHints);
+}
 void QRimeClear(uintptr_t session) { if (started && session) api->clear_composition(session); }
 bool QRimeCommitComposition(uintptr_t session) { return started && session && api->commit_composition(session); }
 void QRimeSetOption(uintptr_t session, const char* name, bool value) { if (started && session) api->set_option(session, name, value); }

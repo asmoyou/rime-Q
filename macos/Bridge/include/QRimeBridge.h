@@ -17,6 +17,7 @@ void QRimeDestroySession(uintptr_t session);
 bool QRimeProcess(uintptr_t session, int key, int modifiers);
 bool QRimeSelect(uintptr_t session, size_t index);
 bool QRimeSchema(uintptr_t session, const char* schema);
+bool QRimeSchemaPreferences(uintptr_t session, const char* schema, bool adjacentKeys, bool showHints);
 void QRimeClear(uintptr_t session);
 bool QRimeCommitComposition(uintptr_t session);
 const char* QRimeTakeCommit(uintptr_t session);

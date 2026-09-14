@@ -14,10 +14,13 @@ final class InputSession: NSObject {
     private var owner: IMKTextInput?
     private var shiftAlone = false
     private var appliedSchema = ""
+    private var appliedPinyin: PinyinPreferences?
+    private let preferences: AppearancePreferences
     private var generation: UInt = 0
     private var preservedEnglish = false
 
-    override init() {
+    init(preferences: AppearancePreferences = .shared) {
+        self.preferences = preferences
         super.init()
         Self.instances.add(self)
         NotificationCenter.default.addObserver(self, selector: #selector(prepareMaintenance), name: Engine.willMaintain, object: nil)
@@ -35,6 +38,7 @@ final class InputSession: NSObject {
         if session != 0 { preservedEnglish = QRimeGetOption(session, "ascii_mode"); QRimeDestroySession(session) }
         session = 0
         appliedSchema = ""
+        appliedPinyin = nil
         marked = false
         shiftAlone = false
         generation &+= 1
@@ -67,10 +71,18 @@ final class InputSession: NSObject {
         let created = session == 0
         if created { session = QRimeCreateSession() }
         guard session != 0 else { return false }
-        if appliedSchema != Product.schema {
+        let pinyin = preferences.pinyin
+        if appliedSchema != Product.schema || (appliedPinyin != pinyin && !Engine.snapshot(session).active) {
+            let optionNames: [String] = ["ascii_mode", "ascii_punct", "traditionalization", "emoji", "full_shape", "search_single_char"]
+            let savedOptions: [String: Bool] = appliedSchema.isEmpty ? [:] : Dictionary(uniqueKeysWithValues:
+                optionNames.map {
+                    ($0, QRimeGetOption(session, $0))
+                })
             QRimeClear(session)
-            guard QRimeSchema(session, Product.schema) else { return false }
+            guard QRimeSchemaPreferences(session, Product.schema, pinyin.adjacentKeys, pinyin.showHints) else { return false }
+            for (name, value) in savedOptions { QRimeSetOption(session, name, value) }
             appliedSchema = Product.schema
+            appliedPinyin = pinyin
         }
         if created { QRimeSetOption(session, "ascii_mode", preservedEnglish) }
         return true
@@ -117,9 +129,14 @@ final class InputSession: NSObject {
         }
         defer { refreshModeStatus() }
         if event.type == .flagsChanged {
+            if event.keyCode == 57 {
+                shiftAlone = false
+                if event.modifierFlags.contains(.capsLock) { commitCurrent(client) }
+                return false
+            }
             guard event.keyCode == 56 || event.keyCode == 60 else { shiftAlone = false; return false }
             if event.modifierFlags.contains(.shift) {
-                shiftAlone = event.modifierFlags.intersection([.command, .control, .option]).isEmpty
+                shiftAlone = event.modifierFlags.intersection([.command, .control, .option, .capsLock]).isEmpty
             } else {
                 if shiftAlone {
                     toggleEnglish(nil)
@@ -131,6 +148,12 @@ final class InputSession: NSObject {
         shiftAlone = false
         guard event.type == .keyDown else { return false }
         if !event.modifierFlags.intersection([.command, .control, .option]).isEmpty {
+            commitCurrent(client)
+            return false
+        }
+        // macOS owns the Caps Lock latch and produces the correct letter case,
+        // including Shift with Caps Lock. Resume the prior IME mode on release.
+        if event.modifierFlags.contains(.capsLock) {
             commitCurrent(client)
             return false
         }

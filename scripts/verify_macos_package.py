@@ -52,6 +52,7 @@ def verify(package):
         assert not (infos[0].parent / "Scripts/model-info.plist").exists(), "Obsolete bundled-model migration metadata"
         contents = infos[0].parent / "Payload/RimeQ.app/Contents"
         bundle = plistlib.loads((contents / "Info.plist").read_bytes())
+        assert bundle.get("TICapsLockLanguageSwitchCapable") is False, "Caps Lock must retain its uppercase-lock role"
         identifier = "com.asmoyou.inputmethod.RimeQ"
         component = bundle["ComponentInputModeDict"]
         assert component["tsVisibleInputModeOrderedArrayKey"] == [identifier + ".Hans"]

@@ -8,6 +8,8 @@ class Engine {
     HMODULE library_ = nullptr;
     RimeApi* api_ = nullptr;
     bool started_ = false, grammar_ = false;
+    bool adjacentKeys_ = true, correctionHints_ = true;
+    bool configureSession(RimeSessionId id, bool grammar, bool adjacentKeys, bool hints, bool preserveOptions = true);
     fs::path root_;
     std::string shared_, user_, prebuilt_, staging_, logs_, generation_;
     std::map<uint64_t, RimeSessionId> sessions_;
@@ -25,6 +27,7 @@ public:
     void disconnect(uint64_t client);
     bool idle();
     void setGrammar(bool enabled);
+    void setCorrectionPreferences(bool adjacentKeys, bool hints);
     bool grammar() const { return grammar_; }
     const std::string& generation() const { return generation_; }
     std::string version() const;

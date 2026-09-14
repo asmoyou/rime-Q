@@ -84,6 +84,11 @@ enum CandidateSkin: String, CaseIterable {
     var border: NSColor { text.withAlphaComponent(self == .midnight ? 0.16 : 0.1) }
 }
 
+struct PinyinPreferences: Equatable {
+    let adjacentKeys: Bool
+    let showHints: Bool
+}
+
 final class AppearancePreferences {
     static let shared = AppearancePreferences(defaults: .standard)
     static let didChange = Notification.Name("RimeQAppearanceDidChange")
@@ -97,6 +102,15 @@ final class AppearancePreferences {
         get { let value = defaults.double(forKey: "candidateFontSize"); return [16, 18, 20, 22].contains(value) ? value : 18 }
         set { guard [16, 18, 20, 22].contains(newValue) else { return }; defaults.set(Double(newValue), forKey: "candidateFontSize"); changed() }
     }
+    var adjacentKeyCorrection: Bool {
+        get { (defaults.object(forKey: "adjacentKeyCorrection") as? Bool) ?? true }
+        set { defaults.set(newValue, forKey: "adjacentKeyCorrection"); changed() }
+    }
+    var correctionHints: Bool {
+        get { (defaults.object(forKey: "correctionHints") as? Bool) ?? true }
+        set { defaults.set(newValue, forKey: "correctionHints"); changed() }
+    }
+    var pinyin: PinyinPreferences { .init(adjacentKeys: adjacentKeyCorrection, showHints: correctionHints) }
     private func changed() { NotificationCenter.default.post(name: Self.didChange, object: self) }
 }
 

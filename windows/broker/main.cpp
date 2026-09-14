@@ -84,6 +84,29 @@ int smoke(const rq::fs::path& app, const rq::fs::path& data, bool deploy) {
         require(found, "Correction candidate missing");
         test.process(1, {rq::Command::clear});
     }
+    auto corrected = [](const rq::State& state, const std::string& comment) {
+        return std::any_of(state.candidates.begin(), state.candidates.end(), [&](const auto& c) {
+            return c.text == "你好" && c.comment == comment;
+        });
+    };
+    s = type(1, "nihso");
+    test.setCorrectionPreferences(false, false);
+    require(corrected(test.process(1, {rq::Command::hello}), "（ni hao）"), "Preference changed active composition");
+    test.process(1, {rq::Command::clear});
+    test.setCorrectionPreferences(false, true);
+    s = type(1, "nihso"); require(!corrected(s, "（ni hao）"), "Adjacent-key correction was not disabled");
+    test.process(1, {rq::Command::clear});
+    s = type(1, "zhognguo"); require(s.candidates.front().text == "中国", "Base spelling rules were lost");
+    test.process(1, {rq::Command::clear});
+    test.process(2, {rq::Command::toggle});
+    test.setCorrectionPreferences(true, false);
+    require(test.process(2, {rq::Command::hello}).ascii, "Correction settings lost English mode");
+    test.process(2, {rq::Command::toggle});
+    s = type(1, "nihso"); require(corrected(s, ""), "Hidden hints changed candidates");
+    test.process(1, {rq::Command::clear});
+    test.disconnect(1); test.setCorrectionPreferences(true, true);
+    s = type(3, "nihso"); require(corrected(s, "（ni hao）"), "Cached session did not restore preferences");
+    test.process(3, {rq::Command::clear});
     for (const std::string text : {"rq", "sj", "nl", "cC1+2*3", "R123.45", "U62fc"}) {
         s = type(1, text); require(!s.candidates.empty(), "Lua produced no candidates");
         auto candidate = s.candidates.front().text;
@@ -201,6 +224,8 @@ int wmain(int argc, wchar_t** argv) {
                     if (ready) {
                         std::lock_guard<std::mutex> lock(engineMutex);
                         if (engine.idle()) {
+                            engine.setCorrectionPreferences(rq::preference(L"AdjacentKeyCorrection", 1, root) != 0,
+                                                            rq::preference(L"CorrectionHints", 1, root) != 0);
                             bool remove = rq::preference(L"RemoveModel", 0, root) != 0;
                             bool enabled = rq::preference(L"Grammar", 0, root) && verified && !remove;
                             bool linked = true;

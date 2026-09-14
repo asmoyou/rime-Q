@@ -12,6 +12,7 @@ enum LuaSmoke {
             defer { QRimeDestroySession(session) }
             try EngineSmoke.check(QRimeSchema(session, schema), "Lua test schema missing")
             QRimeSetOption(session, "ascii_mode", false)
+            try correctionPreferences(session: session, schema: schema)
             try correctionCases(session: session, schema: schema)
             let examples: [(String, String)] = [
                 ("rq", #"^\d{4}-\d{2}-\d{2}$"#), ("sj", #"^\d{2}:\d{2}$"#),
@@ -43,6 +44,37 @@ enum LuaSmoke {
             try EngineSmoke.check(String(cString: QRimeTakeCommit(session)) == "你好", "Lua utilities changed normal pinyin input")
             print("PASS Lua \(schema): date/time/week/ISO/timestamp/calendar/UUID/Unicode/amount/calculator/character selection; candidates commit correctly")
         }
+    }
+
+    private static func correctionPreferences(session: UInt, schema: String) throws {
+        let files = [Engine.sharedDirectory, Engine.userDirectory].compactMap { $0 }
+            .map { $0.appendingPathComponent("build/\(schema).schema.yaml") }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+        let originals = try files.map { try Data(contentsOf: $0) }
+        let other = QRimeCreateSession()
+        defer { QRimeDestroySession(other) }
+        try EngineSmoke.check(QRimeSchemaPreferences(other, schema, true, true), "Independent correction session failed")
+        QRimeSetOption(other, "ascii_mode", false)
+        for (enabled, hints) in [(false, true), (true, false), (true, true)] {
+            QRimeClear(session)
+            try EngineSmoke.check(QRimeSchemaPreferences(session, schema, enabled, hints), "Correction preference failed")
+            QRimeSetOption(session, "ascii_mode", false)
+            EngineSmoke.type("nihso", session: session)
+            let match = Engine.snapshot(session).candidates.first { $0.text == "你好" }
+            try EngineSmoke.check((match != nil) == enabled, "Adjacent-key switch did not affect candidates")
+            if enabled { try EngineSmoke.check(match?.comment == (hints ? "（ni hao）" : ""), "Hint switch did not affect annotation") }
+            try EngineSmoke.check(!QRimeSchemaPreferences(session, schema, !enabled, !hints), "Preferences discarded active composition")
+            QRimeClear(other); EngineSmoke.type("nihso", session: other)
+            try EngineSmoke.check(Engine.snapshot(other).candidates.contains { $0.text == "你好" && $0.comment == "（ni hao）" }, "Preferences leaked into another session")
+            QRimeClear(other)
+            QRimeClear(session); EngineSmoke.type("zhognguo", session: session)
+            try EngineSmoke.check(Engine.snapshot(session).candidates.first?.text == "中国", "Preference removed base spelling rules")
+        }
+        QRimeClear(session)
+        for (file, original) in zip(files, originals) {
+            try EngineSmoke.check(try Data(contentsOf: file) == original, "Preferences modified compiled schema on disk")
+        }
+        print("PASS correction preferences \(schema): real candidate/hint toggles, base rules, session isolation, active composition guard, unchanged YAML")
     }
 
     private static func correctionCases(session: UInt, schema: String) throws {

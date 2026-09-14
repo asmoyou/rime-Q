@@ -35,6 +35,7 @@ local function corrected(preedit, pinyin)
 end
 
 function M.func(input, env)
+    local hide_hints = env.engine.context:get_option('q_hide_correction_hints')
     for cand in input:iter() do
         local pinyin = cand.comment:match('^［(.-)］$')
         if pinyin and #pinyin > 0 then
@@ -45,7 +46,7 @@ function M.func(input, env)
             elseif corrected(cand.preedit, pinyin) or env.keep_comment then
                 comment = '（' .. pinyin .. '）'
             end
-            cand:get_genuine().comment = comment
+            cand:get_genuine().comment = hide_hints and '' or comment
         end
         yield(cand)
     end
