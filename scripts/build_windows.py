@@ -65,7 +65,7 @@ def csharp(output, sources, build, resources=(), main=None, console=False):
     if main: options.append('/main:' + main)
     metadata = ROOT / 'build-windows/AssemblyVersion.cs'
     metadata.write_text('using System.Reflection;\n[assembly: AssemblyTitle("Rime Q")]\n[assembly: AssemblyProduct("Rime Q")]\n'
-                        f'[assembly: AssemblyVersion("0.4.1.{build}")]\n[assembly: AssemblyFileVersion("0.4.1.{build}")]\n', encoding='utf-8')
+                        f'[assembly: AssemblyVersion("0.4.2.{build}")]\n[assembly: AssemblyFileVersion("0.4.2.{build}")]\n', encoding='utf-8')
     options.extend([metadata, *sources]); run(*options)
 
 
@@ -135,7 +135,7 @@ def build(args):
     if list(stage.rglob('*.gram')): raise RuntimeError('Optional model found in installation payload')
     files = {str(file.relative_to(stage)).replace('\\','/'): hashlib.sha256(file.read_bytes()).hexdigest()
              for file in sorted(stage.rglob('*')) if file.is_file() and file.name != 'payload.json'}
-    (stage / 'payload.json').write_text(json.dumps({'version':'0.4.1', 'build':args.build, 'files':files}, indent=2), encoding='utf-8')
+    (stage / 'payload.json').write_text(json.dumps({'version':'0.4.2', 'build':args.build, 'files':files}, indent=2), encoding='utf-8')
     payload = output / 'payload.zip'
     # Crate source notices may retain epoch timestamps. Clamp ZIP metadata to
     # its supported range while preserving the licensed source bytes.
@@ -143,13 +143,13 @@ def build(args):
         for file in sorted(stage.rglob('*')):
             if file.is_file(): archive.write(file, file.relative_to(stage))
     dist = ROOT / 'dist'; dist.mkdir(exist_ok=True)
-    setup = dist / 'RimeQ-0.4.1-windows-x64.exe'
+    setup = dist / 'RimeQ-0.4.2-windows-x64.exe'
     csharp(setup, [ROOT / 'windows/installer/Setup.cs'], args.build, [(payload, 'payload.zip')], main='RimeQ.Setup')
     import tempfile
     with tempfile.TemporaryDirectory(prefix='rimeq-package-') as verified:
         run(setup, '--verify-payload', verified)
     checksum = hashlib.sha256(setup.read_bytes()).hexdigest()
-    (dist / 'RimeQ-0.4.1-windows-SHA256SUMS.txt').write_text(checksum + '  ' + setup.name + '\n', encoding='utf-8')
+    (dist / 'RimeQ-0.4.2-windows-SHA256SUMS.txt').write_text(checksum + '  ' + setup.name + '\n', encoding='utf-8')
     print(f'Built {setup}\nSHA-256 {checksum}')
 
 

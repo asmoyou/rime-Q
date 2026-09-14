@@ -186,8 +186,8 @@ jobs:
       - name: Verify the package built by this workflow
         shell: pwsh
         run: |
-          $expected = (Get-Content 'dist/RimeQ-0.4.1-windows-SHA256SUMS.txt').Split(' ')[0]
-          $actual = (Get-FileHash 'dist/RimeQ-0.4.1-windows-x64.exe' -Algorithm SHA256).Hash
+          $expected = (Get-Content 'dist/RimeQ-0.4.2-windows-SHA256SUMS.txt').Split(' ')[0]
+          $actual = (Get-FileHash 'dist/RimeQ-0.4.2-windows-x64.exe' -Algorithm SHA256).Hash
           if ($actual -ne $expected) { throw 'Windows artifact checksum mismatch.' }
       - name: Verify lifecycle command diagnostics in isolation
         run: ./scripts/test_windows_lifecycle_process.ps1
@@ -270,52 +270,27 @@ jobs:
           '/Library/Input Methods/RimeQ.app/Contents/MacOS/RimeQ' --candidate-smoke
           '/Library/Input Methods/RimeQ.app/Contents/MacOS/RimeQ' --version
           test ! -e dist/RimeQ.app
-      - name: Verify same-version repair replaces the application
-        # The disposable runner is also used to exercise repair and downgrade rejection.
-        # These mutations must not be run against a user's live installation.
+      - name: Reject an identical package without changing the installed app or data
+        # The disposable runner exercises duplicate-install and downgrade guards.
         run: |
           rimeq_app='/Library/Input Methods/RimeQ.app'
-          rimeq_status="$HOME/Library/Application Support/RimeQ/installation-status.plist"
           rimeq_data="$HOME/Library/Application Support/RimeQ/rime"
           rimeq_model="$HOME/Library/Application Support/RimeQ/models/wanxiang-lts-zh-hans.gram"
-          mkdir -p "$rimeq_data"
-          mkdir -p "$(dirname "$rimeq_model")"
-          # A small sentinel tests installer file retention; model validation
-          # and reuse across app versions run separately in test_optional_model.py.
+          mkdir -p "$rimeq_data" "$(dirname "$rimeq_model")"
           printf 'model retention fixture\n' > "$rimeq_model"
           rimeq_model_hash="$(shasum -a 256 "$rimeq_model")"
-          touch "$rimeq_data/repair-retention-check"
-          rm -f "$rimeq_status"
-          sudo touch "$rimeq_app/Contents/Resources/rimeq-repair-probe"
-          sudo installer -pkg dist/RimeQ-*-macos-universal.pkg -target /
-          test ! -e "$rimeq_app/Contents/Resources/rimeq-repair-probe"
-          test -f "$rimeq_data/repair-retention-check"
+          rimeq_app_hash="$(shasum -a 256 "$rimeq_app/Contents/MacOS/RimeQ")"
+          touch "$rimeq_data/duplicate-retention-check"
+          if sudo installer -pkg dist/RimeQ-*-macos-universal.pkg -target / > /tmp/rimeq-duplicate-install.log 2>&1; then
+            echo '::error::An identical package was accepted for installation.'
+            exit 1
+          fi
+          cat /tmp/rimeq-duplicate-install.log
+          python3 -c 'from pathlib import Path; assert "已安装" in Path("/tmp/rimeq-duplicate-install.log").read_text(), "Missing duplicate-install explanation"'
+          test "$(shasum -a 256 "$rimeq_app/Contents/MacOS/RimeQ")" = "$rimeq_app_hash"
+          test -f "$rimeq_data/duplicate-retention-check"
           test "$(shasum -a 256 "$rimeq_model")" = "$rimeq_model_hash"
           codesign --verify --deep --strict "$rimeq_app"
-          for attempt in {1..45}; do
-            if test -f "$rimeq_status"; then
-              if test "$(plutil -extract state raw -o - "$rimeq_status")" != pending \
-                  || test "$(plutil -extract retryScheduled raw -o - "$rimeq_status")" = true; then
-                break
-              fi
-            fi
-            sleep 1
-          done
-          tail -100 "$HOME/Library/Application Support/RimeQ/installation.log"
-          test -f "$rimeq_status"
-          rimeq_state="$(plutil -extract state raw -o - "$rimeq_status")"
-          case "$rimeq_state" in
-            ready) ;;
-            pending)
-              test "$(plutil -extract retryScheduled raw -o - "$rimeq_status")" = true
-              test -f "$HOME/Library/LaunchAgents/com.asmoyou.rimeq.activation.plist"
-              echo '::notice::Repair retained the explicit pending activation/login-retry fallback.'
-              ;;
-            *) exit 1 ;;
-          esac
-          if test "$(plutil -extract state raw -o - "$rimeq_status")" = ready; then
-            "$rimeq_app/Contents/MacOS/RimeQ" --verify-runtime
-          fi
       - name: Reject a package older than the installed release
         run: |
           rimeq_info='/Library/Input Methods/RimeQ.app/Contents/Info.plist'
