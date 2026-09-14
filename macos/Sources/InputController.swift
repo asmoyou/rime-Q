@@ -16,10 +16,6 @@ final class InputSession: NSObject {
     private var appliedSchema = ""
     private var generation: UInt = 0
     private var preservedEnglish = false
-    private var modeNeedsApply = false
-    private static weak var focused: InputSession?
-    private var reportedMode: String?
-    private var pendingMode: (client: ObjectIdentifier, identifier: String)?
 
     override init() {
         super.init()
@@ -30,6 +26,7 @@ final class InputSession: NSObject {
 
     deinit {
         NotificationCenter.default.removeObserver(self)
+        InputModeStatus.shared.deactivate(ObjectIdentifier(self))
         if session != 0 { QRimeDestroySession(session) }
     }
 
@@ -51,32 +48,8 @@ final class InputSession: NSObject {
     }
 
     private func refreshModeStatus() {
-        guard active, Self.focused === self, let owner, let english = englishMode,
-              !IsSecureEventInputEnabled() else { return }
-        let identifier = InputMode.identifier(english: english)
-        guard reportedMode != identifier else { return }
-        // selectMode may synchronously call back into setValue or change focus.
-        reportedMode = identifier
-        owner.selectMode(identifier)
-    }
-
-    // Native input-menu selections arrive through IMK's input-mode property.
-    // Record pre-activation callbacks for their exact host; never echo them.
-    func selectInputMode(_ identifier: String, client sender: Any!) {
-        guard let english = InputMode.isEnglish(identifier), let client = sender as? IMKTextInput else { return }
-        guard active else {
-            pendingMode = (ObjectIdentifier(client as AnyObject), identifier)
-            return
-        }
-        guard owns(client), Self.focused === self else { return }
-        let epoch = generation
-        if englishMode != english { commitCurrent(client) }
-        guard owns(client), Self.focused === self, generation == epoch else { return }
-        preservedEnglish = english
-        modeNeedsApply = true
-        reportedMode = identifier
-        shiftAlone = false
-        if ensureSession() { QRimeSetOption(session, "ascii_mode", english) }
+        guard active else { return }
+        InputModeStatus.shared.update(self, english: englishMode)
     }
 
     @objc private func engineReadinessChanged() {
@@ -99,45 +72,30 @@ final class InputSession: NSObject {
             guard QRimeSchema(session, Product.schema) else { return false }
             appliedSchema = Product.schema
         }
-        if created || modeNeedsApply {
-            QRimeSetOption(session, "ascii_mode", preservedEnglish)
-            modeNeedsApply = false
-        }
+        if created { QRimeSetOption(session, "ascii_mode", preservedEnglish) }
         return true
     }
 
-    func activate(_ sender: Any!, mode: String? = nil) {
+    func activate(_ sender: Any!) {
         generation &+= 1
         owner = sender as? IMKTextInput
         active = true
         marked = false
         shiftAlone = false
-        Self.focused = self
-        let pending = owner.flatMap { client in
-            pendingMode.flatMap { $0.client == ObjectIdentifier(client as AnyObject) ? $0.identifier : nil }
-        }
-        pendingMode = nil
-        reportedMode = pending ?? mode
-        if let identifier = reportedMode, let english = InputMode.isEnglish(identifier) {
-            preservedEnglish = english
-            modeNeedsApply = true
-        }
         _ = ensureSession()
-        refreshModeStatus()
+        InputModeStatus.shared.activate(self, english: englishMode)
     }
 
     func deactivate(_ sender: Any!) {
         if let client = sender as? IMKTextInput, owns(client) { commitCurrent(client) }
         active = false
-        if Self.focused === self { Self.focused = nil }
-        reportedMode = nil
-        pendingMode = nil
         generation &+= 1
         owner = nil
         marked = false
         shiftAlone = false
         CandidatePanel.shared.hide(owner: ObjectIdentifier(self))
         if session != 0 { QRimeClear(session) }
+        InputModeStatus.shared.deactivate(ObjectIdentifier(self))
     }
 
     func commit(_ sender: Any!) {
@@ -153,6 +111,7 @@ final class InputSession: NSObject {
         // Password/secure input remains owned by the system's direct keyboard path.
         if IsSecureEventInputEnabled() {
             CandidatePanel.shared.hide(owner: ObjectIdentifier(self))
+            InputModeStatus.shared.update(self, english: nil)
             QRimeClear(session)
             return false
         }
@@ -293,14 +252,7 @@ final class InputSession: NSObject {
 @objc(RimeQController)
 final class RimeQController: IMKInputController {
     private let input = InputSession()
-    override func activateServer(_ sender: Any!) { input.activate(sender, mode: InputMode.current) }
-    override func setValue(_ value: Any!, forTag tag: Int, client sender: Any!) {
-        guard tag == Int(kTextServiceInputModePropertyTag), let identifier = value as? String else {
-            super.setValue(value, forTag: tag, client: sender)
-            return
-        }
-        input.selectInputMode(identifier, client: sender)
-    }
+    override func activateServer(_ sender: Any!) { input.activate(sender) }
     override func deactivateServer(_ sender: Any!) { input.deactivate(sender) }
     override func commitComposition(_ sender: Any!) { input.commit(sender) }
     override func recognizedEvents(_ sender: Any!) -> Int { input.eventMask(sender) }

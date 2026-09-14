@@ -7,9 +7,6 @@ final class MockTextClient: NSObject, IMKTextInput {
     var document = ""
     var preedit = ""
     var onInsert: (() -> Void)?
-    var selectedMode: String?
-    var modeSelections: [String] = []
-    var onSelectMode: ((String) -> Void)?
     func insertText(_ string: Any!, replacementRange: NSRange) {
         document += (string as? String) ?? (string as? NSAttributedString)?.string ?? ""
         preedit = ""
@@ -30,11 +27,7 @@ final class MockTextClient: NSObject, IMKTextInput {
     }
     func validAttributesForMarkedText() -> [Any]! { [] }
     func overrideKeyboard(withKeyboardNamed keyboardUniqueName: String!) {}
-    func selectMode(_ modeIdentifier: String!) {
-        selectedMode = modeIdentifier
-        modeSelections.append(modeIdentifier)
-        onSelectMode?(modeIdentifier)
-    }
+    func selectMode(_ modeIdentifier: String!) {}
     func supportsUnicode() -> Bool { true }
     func bundleIdentifier() -> String! { "com.asmoyou.rimeq.smoke-client" }
     func windowLevel() -> CGWindowLevel { 0 }
@@ -101,12 +94,11 @@ enum ControllerSmoke {
         let nextClient = MockTextClient()
         let input = InputSession()
         let next = InputSession()
+        let status = InputModeStatus.shared
         defer { input.deactivate(client); next.deactivate(nextClient) }
-        func checkMode(_ english: Bool, _ label: String, host: MockTextClient? = nil) throws {
-            try EngineSmoke.check((host ?? client).selectedMode == InputMode.identifier(english: english), label)
+        func checkMode(_ english: Bool, _ label: String) throws {
+            try EngineSmoke.check(status.isVisible && status.button?.title == (english ? "A" : "中"), label)
         }
-        client.onSelectMode = { input.selectInputMode($0, client: client) }
-        nextClient.onSelectMode = { next.selectInputMode($0, client: nextClient) }
         func event(_ kind: NSEvent.EventType, _ flags: NSEvent.ModifierFlags = [], code: UInt16 = 56,
                    text: String = "", target: InputSession? = nil, host: MockTextClient? = nil) -> Bool {
             let key = NSEvent.keyEvent(with: kind, location: .zero, modifierFlags: flags, timestamp: 0,
@@ -136,11 +128,8 @@ enum ControllerSmoke {
         let menuItem = input.makeMenu().items[0]
         try EngineSmoke.check(NSApp.sendAction(menuItem.action!, to: menuItem.target, from: menuItem), "English menu action failed")
         try checkMode(true, "menu toggle left a stale status")
-        let requests = client.modeSelections.count
-        client.selectedMode = InputMode.chinese // The system has already selected this mode.
-        input.selectInputMode(InputMode.chinese, client: client)
-        try checkMode(false, "native menu did not select Chinese")
-        try EngineSmoke.check(client.modeSelections.count == requests, "native callback caused a selection loop")
+        status.button?.performClick(nil)
+        try checkMode(false, "status button did not toggle the active session")
         _ = event(.flagsChanged, [.shift, .command])
         _ = event(.flagsChanged, .command)
         try checkMode(false, "modified Shift unexpectedly changed mode")
@@ -154,44 +143,29 @@ enum ControllerSmoke {
         try checkMode(true, "failed to prepare English focus test")
         next.activate(nextClient)
         input.deactivate(client)
-        try checkMode(false, "old deactivation changed the new session's mode", host: nextClient)
+        try checkMode(false, "old deactivation hid or changed the new session's status")
         input.activate(client)
         next.deactivate(nextClient)
         try checkMode(true, "focus return did not restore this session's English state")
-        let beforeMaintenance = client.modeSelections.count
         try Engine.maintain {
-            try EngineSmoke.check(client.modeSelections.count == beforeMaintenance, "maintenance changed native mode without an engine")
+            try EngineSmoke.check(!status.isVisible, "maintenance displayed an unavailable input mode")
         }
         try checkMode(true, "engine maintenance lost the English status")
         Engine.ready = false
-        try EngineSmoke.check(!event(.keyDown, code: 0, text: "b"), "unready engine swallowed a key")
-        client.selectedMode = InputMode.chinese
-        input.selectInputMode(InputMode.chinese, client: client)
+        try EngineSmoke.check(!status.isVisible && !event(.keyDown, code: 0, text: "b"), "unready engine showed a mode or swallowed a key")
         Engine.ready = true
-        try checkMode(false, "readiness recovery lost native menu selection")
-        input.toggleEnglish(nil)
+        try checkMode(true, "readiness recovery left status hidden")
 
         // Committing before a toggle may transfer focus synchronously. Neither
         // the old toggle nor its late cleanup may modify the new owner's mode.
         input.toggleEnglish(nil)
         for char in "nihao" { _ = event(.keyDown, code: 0, text: String(char)) }
         client.onInsert = { next.activate(nextClient); input.deactivate(client) }
-        input.toggleEnglish(nil)
-        try checkMode(false, "reentrant toggle changed the next host's mode", host: nextClient)
+        status.button?.performClick(nil)
+        try checkMode(false, "reentrant status click changed the next host's mode")
         next.deactivate(nextClient)
-        let previousRequests = client.modeSelections.count
-        input.toggleEnglish(nil)
-        try EngineSmoke.check(client.modeSelections.count == previousRequests, "inactive toggle selected a native mode")
-
-        // IMK may deliver its mode property before activateServer.
-        client.onInsert = nil
-        input.selectInputMode(InputMode.english, client: client)
-        input.activate(client, mode: InputMode.chinese)
-        if !event(.keyDown, code: 0, text: "z") { client.insertText("z", replacementRange: client.selectedRange()) }
-        try EngineSmoke.check(client.document.hasSuffix("z") && client.preedit.isEmpty, "pre-activation mode property was lost")
-        input.selectInputMode(InputMode.chinese, client: nextClient)
-        input.selectInputMode("unrelated.input.mode", client: client)
-        if !event(.keyDown, code: 0, text: "x") { client.insertText("x", replacementRange: client.selectedRange()) }
-        try EngineSmoke.check(client.document.hasSuffix("zx"), "foreign host/mode changed the engine")
+        try EngineSmoke.check(!status.isVisible, "leaving Rime Q left the mode status visible")
+        status.button?.performClick(nil)
+        try EngineSmoke.check(!status.isVisible, "stale status click reactivated input")
     }
 }

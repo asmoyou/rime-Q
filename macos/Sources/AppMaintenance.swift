@@ -141,7 +141,7 @@ enum AppMaintenance {
             }
         }
         let all = TISCreateInputSourceList(nil, true).takeRetainedValue() as! [TISInputSource]
-        for identifier in InputMode.identifiers + [Product.identifier] {
+        for identifier in InputMode.identifiers + InputMode.retiredIdentifiers + [Product.identifier] {
             for source in all where sourceString(source, kTISPropertyInputSourceID) == identifier {
                 guard TISDisableInputSource(source) == noErr else { throw error("输入法停用未完成，请稍后重试。") }
             }

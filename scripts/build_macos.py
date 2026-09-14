@@ -58,7 +58,6 @@ def build_app(app, universal=False, resources=True):
         (contents / directory).mkdir(parents=True, exist_ok=True)
     shutil.copy2(Path(binary_directory) / "RimeQ", contents / "MacOS/RimeQ")
     mode = IDENTIFIER + ".Hans"
-    latin = IDENTIFIER + ".Latin"
     metadata = {
         "CFBundleName": "Rime Q", "CFBundleDisplayName": "Rime Q", "CFBundleExecutable": "RimeQ",
         "CFBundleIdentifier": IDENTIFIER, "CFBundleVersion": str(int(time.time())), "CFBundleShortVersionString": VERSION,
@@ -74,15 +73,13 @@ def build_app(app, universal=False, resources=True):
         "InputMethodServerDelegateClass": "RimeQController", "TISInputSourceID": IDENTIFIER,
         "TICapsLockLanguageSwitchCapable": True, "tsInputMethodIconFileKey": "menu.pdf",
         "ComponentInputModeDict": {"tsVisibleInputModeOrderedArrayKey": [mode], "tsInputModeListKey": {
-            identifier: {"TISInputSourceID": identifier, "TISIntendedLanguage": "en" if english else "zh-Hans",
-                   "tsInputModeAlternateMenuTitleKey": "Rime Q",
-                   "tsInputModeDefaultStateKey": True, "TISIconIsTemplate": True,
-                   "tsInputModeIsVisibleKey": not english, "tsInputModePrimaryInScriptKey": not english,
-                   "tsInputModeScriptKey": "smRoman" if english else "smUnicodeScript",
-                   "tsInputModeCharacterRepertoireKey": ["Latn"] if english else ["Hans", "Hant"],
-                   "tsInputModeMenuIconFileKey": icon, "tsInputModeAlternateMenuIconFileKey": icon,
-                   "tsInputModePaletteIconFileKey": icon}
-            for identifier, english, icon in [(mode, False, "mode-chinese.pdf"), (latin, True, "mode-english.pdf")]}}
+            mode: {"TISInputSourceID": mode, "TISIntendedLanguage": "zh-Hans",
+                   "tsInputModeAlternateMenuTitleKey": "Rime Q", "tsInputModeDefaultStateKey": True,
+                   "tsInputModeIsVisibleKey": True, "tsInputModePrimaryInScriptKey": True,
+                   "tsInputModeKeyEquivalentModifiersKey": 4608,
+                   "tsInputModeScriptKey": "smUnicodeScript", "tsInputModeCharacterRepertoireKey": ["Hans", "Hant"],
+                   "tsInputModeMenuIconFileKey": "menu.pdf", "tsInputModeAlternateMenuIconFileKey": "menu.pdf",
+                   "tsInputModePaletteIconFileKey": "menu.pdf"}}}
     }
     (contents / "Info.plist").write_bytes(plistlib.dumps(metadata))
     (contents / "PkgInfo").write_bytes(b"APPL????")
@@ -91,8 +88,6 @@ def build_app(app, universal=False, resources=True):
         localized = contents / "Resources" / (language + ".lproj")
         localized.mkdir(exist_ok=True)
         strings = {key: "Rime Q" for key in ["CFBundleName", "CFBundleDisplayName", IDENTIFIER, mode]}
-        strings[mode] = "Rime Q"
-        strings[latin] = "Rime Q"
         strings["NSAppleEventsUsageDescription"] = metadata["NSAppleEventsUsageDescription"] if language == "en" else (
             "更新时用于退出仍在运行的旧版 Rime Q；仅当你选择注销账户时，才请求 macOS 显示注销确认。")
         strings["NSLocalNetworkUsageDescription"] = metadata["NSLocalNetworkUsageDescription"] if language == "en" else (
@@ -198,6 +193,9 @@ def isolated_smoke_app(app):
         finally:
             subprocess.run(["/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
                             "-u", str(preview)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            # Status-item autosave belongs only to this uniquely named preview.
+            subprocess.run(["defaults", "delete", preview_id],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def build(universal=False, resources=True, keep_app=False, smoke=False, sync_smoke=False):

@@ -109,6 +109,7 @@ private struct InputSourceInstallIdentity {
     let bundleID: String
     let modeIDs: [String]
     var modeID: String { modeIDs[0] }
+    var cleanupModeIDs: [String] { modeIDs + InputMode.retiredIdentifiers }
 
     static func load() -> InputSourceInstallIdentity? {
         guard let info = Bundle.main.infoDictionary,
@@ -233,7 +234,7 @@ private func inputSourceRoster(identity: InputSourceInstallIdentity,
         switch metadata.sourceID {
         case identity.bundleID:
             parent.append(match)
-        case let identifier where identity.modeIDs.contains(identifier):
+        case let identifier where identity.cleanupModeIDs.contains(identifier):
             mode.append(match)
         default:
             unexpected.append(match)
@@ -385,8 +386,8 @@ private func runInputSourceInstallPhase(_ phase: InputSourceInstallPhase) -> Int
               let roster = inputSourceRoster(identity: identity, includeAllInstalled: true) else { return InputSourceInstallExit.retryable }
         let matches = phase == .disableMode ? roster.mode : roster.parent
         if matches.isEmpty { return InputSourceInstallExit.success }
-        // Older installed versions may not yet expose the new Latin mode.
-        // Disable every present, unique owned child before disabling the parent.
+        // Include the retired Latin mode when repairing the dual-mode preview.
+        // Never enable it or require it for the current single-source bundle.
         for match in matches {
             let unique = phase == .disableMode
                 ? uniqueMode(in: roster, identity: identity, identifier: match.metadata.sourceID)

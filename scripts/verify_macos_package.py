@@ -56,13 +56,13 @@ def verify(package):
         component = bundle["ComponentInputModeDict"]
         assert component["tsVisibleInputModeOrderedArrayKey"] == [identifier + ".Hans"]
         modes = component["tsInputModeListKey"]
-        assert set(modes) == {identifier + ".Hans", identifier + ".Latin"}
-        for suffix, icon in [(".Hans", "mode-chinese.pdf"), (".Latin", "mode-english.pdf")]:
+        assert set(modes) == {identifier + ".Hans"}, "English switching must stay inside the single input source"
+        for suffix, icon in [(".Hans", "menu.pdf")]:
             mode = modes[identifier + suffix]
             assert mode["TISInputSourceID"] == identifier + suffix
-            assert mode["tsInputModeScriptKey"] == ("smRoman" if suffix == ".Latin" else "smUnicodeScript")
+            assert mode["tsInputModeScriptKey"] == "smUnicodeScript"
             assert mode["tsInputModeDefaultStateKey"]
-            assert mode["tsInputModeIsVisibleKey"] == (suffix == ".Hans"), "Only one Rime Q source should appear in system UI"
+            assert mode["tsInputModeIsVisibleKey"], "The single Rime Q source must be visible"
             assert mode["tsInputModeAlternateMenuTitleKey"] == "Rime Q"
             assert mode["tsInputModeMenuIconFileKey"] == icon
             assert mode["tsInputModeAlternateMenuIconFileKey"] == icon
@@ -72,7 +72,7 @@ def verify(package):
         for language in ["en", "zh-Hans", "zh-Hant"]:
             strings = (contents / "Resources" / (language + ".lproj") / "InfoPlist.strings").read_text(encoding="utf-16")
             assert '"NSLocalNetworkUsageDescription"' in strings, "Missing localized LAN permission purpose"
-            for suffix in [".Hans", ".Latin"]:
+            for suffix in [".Hans"]:
                 assert f'"{identifier}{suffix}" = "Rime Q";' in strings, "Mode suffix must not duplicate the icon label"
         native_arches = set(subprocess.check_output(["lipo", "-archs", str(contents / "MacOS/RimeQ")], text=True).split())
         sync_arches = set(subprocess.check_output(["lipo", "-archs", str(contents / "MacOS/RimeQ.Sync")], text=True).split())
