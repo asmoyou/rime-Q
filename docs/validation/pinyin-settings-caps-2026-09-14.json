@@ -1,0 +1,22 @@
+{
+  "version": "0.4.1",
+  "build": "1789373931",
+  "bytes": 75962606,
+  "sha256": "f1cf17489fca5433e05f97bd29f005c8103264b072172bab45428888c3e1d62e",
+  "passed": [
+    "universal build",
+    "real librime correction preferences",
+    "controller deferred settings and Caps Lock",
+    "settings rendering",
+    "23 native sync scenarios",
+    "package rules and signature"
+  ],
+  "pending": [
+    "native administrator authentication",
+    "new installed menu and real host input",
+    "physical Caps Lock",
+    "Windows runtime",
+    "arm64 runtime",
+    "downloaded grammar model runtime"
+  ]
+}

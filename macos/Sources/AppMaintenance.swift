@@ -24,6 +24,8 @@ final class UpdateQuitObserver: NSObject {
     @objc private func receive(_ notification: Notification) {
         guard UpdateQuitRequest.accepts(notification, appPath: Bundle.main.bundleURL.path,
                                        processID: ProcessInfo.processInfo.processIdentifier) else { return }
+        let sender = (notification.userInfo?["senderPID"] as? NSNumber)?.int32Value ?? 0
+        InstallationDiagnostics.append("update-quit-accepted senderPID=\(sender)")
         NSApp.terminate(nil)
     }
     deinit { DistributedNotificationCenter.default().removeObserver(self) }

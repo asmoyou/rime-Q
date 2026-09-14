@@ -7,9 +7,8 @@ import Carbon
 import Darwin
 import Foundation
 
-/// TIS source references are process-local snapshots.  Keep every mutating
-/// step in a short-lived process, then verify it from another process so an
-/// install never makes the child mode race its parent or reuses a stale ref.
+/// Mutations run in the LaunchServices-launched user application. Verification
+/// uses short-lived processes, whose TIS snapshots are independent of the caller.
 enum InputSourceInstallPhase: String, CaseIterable {
     case validateBundle = "--rimeq-tis-validate-bundle"
     case register = "--rimeq-tis-register"
@@ -96,6 +95,15 @@ enum InputSourceInstallRules {
     /// public TIS contract permits properties to be absent for some sources.
     static func modeReachedEnabledRoster(_ modeCount: Int) -> Bool {
         modeCount == 1
+    }
+}
+
+/// Retry a failed mutation; once accepted, only poll its independent verification.
+struct InputSourceInstallAttempt {
+    private(set) var status: Int32 = 75
+    mutating func run(_ action: () -> Int32) -> Int32 {
+        if status != 0 { status = action() }
+        return status
     }
 }
 
@@ -329,7 +337,7 @@ private func allModes(in roster: InputSourceInstallRoster,
     return modes.count == identity.modeIDs.count ? modes : nil
 }
 
-private func runInputSourceInstallPhase(_ phase: InputSourceInstallPhase) -> Int32 {
+private func runInputSourceInstallPhase(_ phase: InputSourceInstallPhase, forceEnable: Bool = false) -> Int32 {
     guard let identity = InputSourceInstallIdentity.load() else {
         return InputSourceInstallExit.failed
     }
@@ -415,7 +423,7 @@ private func runInputSourceInstallPhase(_ phase: InputSourceInstallPhase) -> Int
             print("install: cannot resolve a unique parent to enable")
             return InputSourceInstallExit.retryable
         }
-        if let enabled = inputSourceRoster(identity: identity, includeAllInstalled: false),
+        if !forceEnable, let enabled = inputSourceRoster(identity: identity, includeAllInstalled: false),
            uniqueParent(in: enabled, identity: identity) != nil { return InputSourceInstallExit.success }
         let status = TISEnableInputSource(parent.source)
         print(
@@ -474,7 +482,7 @@ private func runInputSourceInstallPhase(_ phase: InputSourceInstallPhase) -> Int
         }
         for mode in modes {
             let identifier = mode.metadata.sourceID
-            if uniqueMode(in: enabled, identity: identity, identifier: identifier) != nil { continue }
+            if !forceEnable, uniqueMode(in: enabled, identity: identity, identifier: identifier) != nil { continue }
             let status = TISEnableInputSource(mode.source)
             print("install: enable mode=\(status) id=\(identifier)")
             if status != noErr { return InputSourceInstallExit.retryable }
@@ -560,6 +568,8 @@ private func runInputSourceInstallSubprocess(
     let process = Process()
     let completed = DispatchSemaphore(value: 0)
     process.executableURL = executableURL
+    process.currentDirectoryURL = URL(fileURLWithPath: "/")
+    process.environment = ProcessInfo.processInfo.environment.filter { ["HOME", "USER", "LOGNAME", "TMPDIR", "PATH", "LANG"].contains($0.key) }
     process.arguments = [phase.rawValue]
     process.terminationHandler = { _ in completed.signal() }
     do {
@@ -595,25 +605,29 @@ private func convergeInputSourceInstallBoundary(
     _ label: String,
     action: InputSourceInstallPhase,
     verify: InputSourceInstallPhase,
-    deadlineUptime: TimeInterval
+    deadlineUptime: TimeInterval,
+    forceEnable: Bool = false
 ) -> Bool {
+    var attempt = InputSourceInstallAttempt()
     for (index, delay) in InputSourceInstallRules.retryDelays.enumerated() {
         var remaining = deadlineUptime - ProcessInfo.processInfo.systemUptime
         guard remaining > 0 else {
             print("install: total activation budget expired at \(label)")
             return false
         }
-        let actionStatus = runInputSourceInstallSubprocess(
-            action,
-            timeout: min(InputSourceInstallRules.subprocessTimeout, remaining)
-        )
+        // A successful mutation can take time to propagate. Do not repeat it
+        // while waiting for independent verification (especially enable/disable).
+        let actionStatus = attempt.run {
+            InstallationDiagnostics.append("activation-action \(action.rawValue) caller=user-app forceEnable=\(forceEnable)")
+            return runInputSourceInstallPhase(action, forceEnable: forceEnable)
+        }
         if delay > 0 {
             remaining = deadlineUptime - ProcessInfo.processInfo.systemUptime
             guard remaining > 0 else {
                 print("install: total activation budget expired at \(label)")
                 return false
             }
-            Thread.sleep(forTimeInterval: min(delay, remaining))
+            RunLoop.current.run(until: Date().addingTimeInterval(min(delay, remaining)))
         }
         remaining = deadlineUptime - ProcessInfo.processInfo.systemUptime
         guard remaining > 0 else {
@@ -647,7 +661,8 @@ func installInputSource(selectAfterEnabling: Bool = false, refreshEnabledSources
     guard InputSourceActivation.run(refresh: refreshEnabledSources, boundary: { label, action, verify in
         let restoring = action == .enableParent || action == .enableMode
         let boundaryDeadline = refreshEnabledSources && !restoring ? deadlineUptime - 12 : deadlineUptime
-        return convergeInputSourceInstallBoundary(label, action: action, verify: verify, deadlineUptime: boundaryDeadline)
+        return convergeInputSourceInstallBoundary(label, action: action, verify: verify,
+            deadlineUptime: boundaryDeadline, forceEnable: refreshEnabledSources && restoring)
     }) else { return false }
 
     if !selectAfterEnabling { return true }
