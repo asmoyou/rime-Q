@@ -11,7 +11,8 @@ enum InputMode {
 // controller cannot replace its state, hide it, or change its input mode.
 final class InputModeStatus: NSObject {
     static let shared = InputModeStatus()
-    private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    // Keep both labels the same width so switching does not move nearby items.
+    private let item = NSStatusBar.system.statusItem(withLength: 18)
     private weak var session: InputSession?
     private var owner: ObjectIdentifier?
     private var displayedEnglish: Bool?
@@ -48,8 +49,7 @@ final class InputModeStatus: NSObject {
 
     private func render(_ english: Bool?) {
         guard let english else {
-            // Automatic saving while hiding also discards the saved position.
-            // Detach it for our temporary hide; restore it before showing again.
+            // Preserve the saved position across our temporary hide/show cycle.
             item.autosaveName = nil
             item.isVisible = false
             displayedEnglish = nil
