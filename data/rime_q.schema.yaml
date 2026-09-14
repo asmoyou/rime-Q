@@ -25,7 +25,7 @@ engine:
     - lua_translator@*number_translator
     - lua_translator@*calc_translator
   filters:
-    - lua_filter@*corrector
+    - lua_filter@*q_corrector
     - reverse_lookup_filter@radical_reverse_lookup
     - lua_filter@*autocap_filter
     - lua_filter@*v_filter
@@ -42,3 +42,4 @@ translator:
   enable_user_dict: true
   enable_sentence: true
   enable_completion: true
+  enable_correction: true

@@ -1,0 +1,64 @@
+{
+  "base_commit": "2690f77a5a27859954ca18f0a8ff2e8f313273e9",
+  "version": "0.4.1",
+  "build": "1789368955",
+  "package": "dist/RimeQ-0.4.1-macos-universal.pkg",
+  "bytes": 75933941,
+  "sha256": "71077e5942dc0b09cacd019dc9fdcded7ed2be480eeef95ab047843c571e9549",
+  "lua_sha256": "3a1dabc9db46cacc96f5ad64f51d9172d8c8bdd8998f3a5c96bea3dd7f603725",
+  "compiled_schemas": [
+    "rime_q",
+    "rime_q_grammar"
+  ],
+  "installed": false,
+  "date": "2026-09-14",
+  "branch": "main",
+  "scope": "local working tree; not installed, committed, pushed or released",
+  "os": "15.7.9",
+  "architecture": "x86_64",
+  "cpu": "Intel(R) Core(TM) i7-8850H CPU @ 2.60GHz",
+  "passed": [
+    "universal build; x86_64 runtime",
+    "10 correction/full-pinyin/abbreviation/prefix/umlaut fixtures; comments and digit commits",
+    "space commit; supplemental partial selection",
+    "engine learning and process restart",
+    "controller focus/cancellation/mode switch/first key",
+    "candidate geometry and appearance",
+    "personal dictionary CRUD and configuration migration",
+    "installation, runtime, update and menu callback regressions",
+    "23 native sync scenarios",
+    "PKG rules, signatures, notices, model exclusion and compiled correction schemas",
+    "client parity contract"
+  ],
+  "not_verified": [
+    "installed TextEdit host input with this build",
+    "Windows runtime and CI",
+    "arm64 runtime",
+    "grammar model active; only inherited compiled schema verified"
+  ],
+  "benchmark": {
+    "scope": "synthetic QRimeProcess + QRimeRead; excludes IMK, drawing and end-to-end input",
+    "conditions": "separate temporary user directories; 30 cycles, first 5 warm-up cycles omitted; warm dictionary/OS caches; sequential runs after build and sync tests",
+    "inputs": [
+      "nihao",
+      "zhongguo",
+      "womenshiyongshurufa",
+      "jintiantianqihenhao",
+      "shijieshang"
+    ],
+    "baseline": {
+      "label": "baseline",
+      "samples": 1550,
+      "p50_ms": 0.9361824999999999,
+      "p95_ms": 2.045111,
+      "p99_ms": 2.790215
+    },
+    "correction": {
+      "label": "correction",
+      "samples": 1550,
+      "p50_ms": 1.192441,
+      "p95_ms": 6.483154,
+      "p99_ms": 9.21761
+    }
+  }
+}

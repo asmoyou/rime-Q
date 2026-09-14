@@ -195,7 +195,7 @@ namespace RimeQ {
         }
         string BaseFingerprint() {
             using(var sha=SHA256.Create()) {
-                foreach(var path in new[]{Path.Combine(Paths.App,"dictionaries.json"),Path.Combine(Paths.App,"data","rime_q.schema.yaml"),Path.Combine(Paths.App,"data","rime_q_grammar.schema.yaml"),Path.Combine(Paths.App,"data","rime_ice.dict.yaml")}) {
+                foreach(var path in new[]{Path.Combine(Paths.App,"dictionaries.json"),Path.Combine(Paths.App,"data","rime_q.schema.yaml"),Path.Combine(Paths.App,"data","rime_q_grammar.schema.yaml"),Path.Combine(Paths.App,"data","rime_ice.dict.yaml"),Path.Combine(Paths.App,"data","lua","q_corrector.lua")}) {
                     var bytes=File.ReadAllBytes(path); sha.TransformBlock(bytes,0,bytes.Length,bytes,0);
                 }
                 sha.TransformFinalBlock(new byte[0],0,0); return BitConverter.ToString(sha.Hash).Replace("-","").ToLowerInvariant();

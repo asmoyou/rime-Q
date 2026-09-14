@@ -156,7 +156,7 @@ final class DictionaryResources {
 
     private func bundledConfigurationFingerprint() throws -> String {
         var hash = SHA256()
-        for name in ["rime_q.schema.yaml", "rime_q_grammar.schema.yaml", "rime_ice.schema.yaml", "default.yaml", "default.custom.yaml", "lua/q_lunar.lua"] {
+        for name in ["rime_q.schema.yaml", "rime_q_grammar.schema.yaml", "rime_ice.schema.yaml", "default.yaml", "default.custom.yaml", "lua/q_lunar.lua", "lua/q_corrector.lua"] {
             hash.update(data: try Data(contentsOf: bundled.appendingPathComponent(name)))
         }
         return hash.finalize().map { String(format: "%02x", $0) }.joined()

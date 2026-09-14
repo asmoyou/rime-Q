@@ -56,6 +56,34 @@ int smoke(const rq::fs::path& app, const rq::fs::path& data, bool deploy) {
     type(1, "ni"); type(2, "hao");
     test.process(1, {rq::Command::clear}); s = test.process(2, {rq::Command::hello}); require(!s.preedit.empty(), "Session isolation failed");
     test.process(2, {rq::Command::clear});
+    struct CorrectionCase { const char* input; const char* text; const char* comment; };
+    for (const auto& fixture : {
+        CorrectionCase{"zhognguo", "中国", "（zhong guo）"},
+        CorrectionCase{"nihso", "你好", "（ni hao）"},
+        CorrectionCase{"geiyu", "给予", "（jǐ yǔ）"},
+        CorrectionCase{"nihao", "你好", ""},
+        CorrectionCase{"nh", "你好", ""},
+        CorrectionCase{"zhon", "中", ""},
+        CorrectionCase{"n'h", "你好", ""},
+        CorrectionCase{"zhg", "中国", ""},
+        CorrectionCase{"nue", "虐", ""}}) {
+        s = type(1, fixture.input);
+        bool found = false;
+        for (int page = 0; page < 20; ++page) {
+            for (size_t i = 0; i < s.candidates.size(); ++i) {
+                if (s.candidates[i].text != fixture.text) continue;
+                require(s.candidates[i].comment == fixture.comment, "Correction comment mismatch");
+                s = test.process(1, {rq::Command::key, static_cast<uint32_t>('1' + i), 0});
+                require(s.commit == fixture.text, "Correction digit commit mismatch");
+                found = true;
+                break;
+            }
+            if (found || s.lastPage) break;
+            s = test.process(1, {rq::Command::key, 0xff56, 0});
+        }
+        require(found, "Correction candidate missing");
+        test.process(1, {rq::Command::clear});
+    }
     for (const std::string text : {"rq", "sj", "nl", "cC1+2*3", "R123.45", "U62fc"}) {
         s = type(1, text); require(!s.candidates.empty(), "Lua produced no candidates");
         auto candidate = s.candidates.front().text;
