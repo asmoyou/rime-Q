@@ -1,4 +1,9 @@
 #include "render.h"
+#include <d2d1.h>
+#include <d2d1helper.h>
+#include <dwrite.h>
+#include <wincodec.h>
+#include <wrl/client.h>
 #include <cmath>
 
 namespace rq::visuals {
@@ -16,23 +21,162 @@ void roundRect(Graphics& g, RectF r, float radius, Color fill, Color border = Co
     GraphicsPath path; roundPath(path,r,radius); SolidBrush brush(fill); g.FillPath(&brush,&path);
     if (border.GetA()) { Pen pen(border,line); g.DrawPath(&pen,&path); }
 }
-struct Fonts {
-    Font text, secondaryFont, number;
-    explicit Fonts(float size) : text(L"Microsoft YaHei UI",size,FontStyleRegular,UnitPixel),
-        secondaryFont(L"Microsoft YaHei UI",12,FontStyleRegular,UnitPixel), number(L"Consolas",12,FontStyleRegular,UnitPixel) {}
+struct TextFont {
+    const wchar_t* family;
+    float size;
+    Font fallback;
+    TextFont(const wchar_t* familyValue,float sizeValue) : family(familyValue),size(sizeValue),
+        fallback(familyValue,sizeValue,FontStyleRegular,UnitPixel) {}
 };
-float width(Graphics& g, const std::wstring& text, const Font& font) {
+struct Fonts {
+    TextFont text, secondaryFont, number;
+    explicit Fonts(float size) : text(L"Microsoft YaHei UI",size),secondaryFont(L"Microsoft YaHei UI",12),number(L"Consolas",12) {}
+};
+uint32_t codepoint(const std::wstring& text,size_t offset,size_t& units) {
+    uint32_t first=text[offset]; units=1;
+    if(first>=0xD800 && first<=0xDBFF && offset+1<text.size()) {
+        uint32_t second=text[offset+1];
+        if(second>=0xDC00 && second<=0xDFFF) { units=2; return 0x10000+((first-0xD800)<<10)+(second-0xDC00); }
+    }
+    return first;
+}
+bool emojiBase(uint32_t value) {
+    return (value>=0x1F000 && value<=0x1FAFF) || (value>=0x2600 && value<=0x27BF) ||
+        (value>=0x2194 && value<=0x2199) || (value>=0x21A9 && value<=0x21AA) ||
+        (value>=0x231A && value<=0x231B) || value==0x2328 || value==0x23CF ||
+        (value>=0x23E9 && value<=0x23F3) || (value>=0x23F8 && value<=0x23FA) || value==0x24C2 ||
+        (value>=0x25AA && value<=0x25AB) || value==0x25B6 || value==0x25C0 || (value>=0x25FB && value<=0x25FE) ||
+        (value>=0x2934 && value<=0x2935) || (value>=0x2B05 && value<=0x2B07) ||
+        (value>=0x2B1B && value<=0x2B1C) || value==0x2B50 || value==0x2B55 ||
+        value==0x00A9 || value==0x00AE || value==0x203C || value==0x2049 || value==0x2122 || value==0x2139 ||
+        value==0x3030 || value==0x303D || value==0x3297 || value==0x3299;
+}
+bool emojiSuffix(uint32_t value) {
+    return value==0xFE0E || value==0xFE0F || value==0x20E3 || (value>=0x1F3FB && value<=0x1F3FF) ||
+        (value>=0xE0020 && value<=0xE007F);
+}
+void preferEmojiFont(const std::wstring& text,IDWriteTextLayout* layout) {
+    for(size_t position=0;position<text.size();) {
+        size_t units=0; uint32_t value=codepoint(text,position,units); size_t end=position+units;
+        bool regional=value>=0x1F1E6 && value<=0x1F1FF;
+        bool keycap=false, keycapBase=(value==L'#' || value==L'*' || (value>=L'0' && value<=L'9'));
+        if(keycapBase) {
+            size_t probe=end,part=0;
+            while(probe<text.size()) { auto next=codepoint(text,probe,part); if(next==0xFE0F) { probe+=part; continue; } keycap=next==0x20E3; break; }
+        }
+        if(!emojiBase(value) && !keycap) { position=end; continue; }
+        while(end<text.size()) {
+            size_t part=0; auto next=codepoint(text,end,part);
+            if(emojiSuffix(next) || (regional && next>=0x1F1E6 && next<=0x1F1FF)) { end+=part; regional=false; continue; }
+            if(next==0x200D) {
+                end+=part; if(end<text.size()) { codepoint(text,end,part); end+=part; } continue;
+            }
+            break;
+        }
+        DWRITE_TEXT_RANGE range{static_cast<UINT32>(position),static_cast<UINT32>(end-position)};
+        layout->SetFontFamilyName(L"Segoe UI Emoji",range); position=end;
+    }
+}
+struct TextLabel {
+    std::wstring text;
+    const TextFont* font;
+    RectF box;
+    Color color;
+    bool colorGlyphs;
+};
+class TextEngine {
+    Microsoft::WRL::ComPtr<IDWriteFactory> write_;
+    Microsoft::WRL::ComPtr<ID2D1Factory> draw_;
+    bool layout(const std::wstring& text,const TextFont& font,float widthValue,float heightValue,bool trimming,
+        Microsoft::WRL::ComPtr<IDWriteTextLayout>& result) const {
+        if(!write_ || text.empty() || widthValue<=0 || heightValue<=0) return false;
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
+        if(FAILED(write_->CreateTextFormat(font.family,nullptr,DWRITE_FONT_WEIGHT_NORMAL,DWRITE_FONT_STYLE_NORMAL,
+            DWRITE_FONT_STRETCH_NORMAL,font.size,L"zh-cn",format.GetAddressOf()))) return false;
+        format->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP); format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+        if(FAILED(write_->CreateTextLayout(text.c_str(),static_cast<UINT32>(text.size()),format.Get(),widthValue,heightValue,result.GetAddressOf()))) return false;
+        preferEmojiFont(text,result.Get());
+        if(trimming) {
+            Microsoft::WRL::ComPtr<IDWriteInlineObject> ellipsis;
+            DWRITE_TRIMMING options{DWRITE_TRIMMING_GRANULARITY_CHARACTER,0,0};
+            if(SUCCEEDED(write_->CreateEllipsisTrimmingSign(format.Get(),ellipsis.GetAddressOf()))) result->SetTrimming(&options,ellipsis.Get());
+        }
+        return true;
+    }
+public:
+    TextEngine() {
+        DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED,__uuidof(IDWriteFactory),reinterpret_cast<IUnknown**>(write_.GetAddressOf()));
+        D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED,draw_.GetAddressOf());
+    }
+    float width(const std::wstring& text,const TextFont& font) const {
+        Microsoft::WRL::ComPtr<IDWriteTextLayout> value;
+        if(!layout(text,font,32768,std::max(64.0f,font.size*3),false,value)) return -1;
+        DWRITE_TEXT_METRICS metrics{}; if(FAILED(value->GetMetrics(&metrics))) return -1;
+        return std::ceil(metrics.widthIncludingTrailingWhitespace);
+    }
+    bool draw(Graphics& graphics,float surfaceWidth,float surfaceHeight,const std::vector<TextLabel>& labels) const {
+        struct Apartment {
+            HRESULT result=CoInitializeEx(nullptr,COINIT_APARTMENTTHREADED);
+            ~Apartment() { if(SUCCEEDED(result)) CoUninitialize(); }
+        } apartment;
+        if(!draw_ || (FAILED(apartment.result) && apartment.result!=RPC_E_CHANGED_MODE)) return false;
+        Microsoft::WRL::ComPtr<IWICImagingFactory> images;
+        if(FAILED(CoCreateInstance(CLSID_WICImagingFactory,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(images.GetAddressOf())))) return false;
+        Matrix transform; graphics.GetTransform(&transform); REAL elements[6]{}; transform.GetElements(elements);
+        float scaleX=std::clamp(std::hypot(elements[0],elements[1]),.5f,8.0f);
+        float scaleY=std::clamp(std::hypot(elements[2],elements[3]),.5f,8.0f);
+        UINT pixelWidth=static_cast<UINT>(std::max(1.0f,std::ceil(surfaceWidth*scaleX)));
+        UINT pixelHeight=static_cast<UINT>(std::max(1.0f,std::ceil(surfaceHeight*scaleY)));
+        Microsoft::WRL::ComPtr<IWICBitmap> bitmap;
+        if(FAILED(images->CreateBitmap(pixelWidth,pixelHeight,GUID_WICPixelFormat32bppPBGRA,WICBitmapCacheOnLoad,bitmap.GetAddressOf()))) return false;
+        auto properties=D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_SOFTWARE,
+            D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM,D2D1_ALPHA_MODE_PREMULTIPLIED),96*scaleX,96*scaleY);
+        Microsoft::WRL::ComPtr<ID2D1RenderTarget> target;
+        if(FAILED(draw_->CreateWicBitmapRenderTarget(bitmap.Get(),properties,target.GetAddressOf()))) return false;
+        Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> brush;
+        if(FAILED(target->CreateSolidColorBrush(D2D1::ColorF(0,0),brush.GetAddressOf()))) return false;
+        target->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE); target->BeginDraw(); target->Clear(D2D1::ColorF(0,0));
+        for(const auto& item:labels) {
+            Microsoft::WRL::ComPtr<IDWriteTextLayout> textLayout;
+            if(!layout(item.text,*item.font,item.box.Width,item.box.Height,true,textLayout)) { target->EndDraw(); return false; }
+            D2D1_COLOR_F ink{item.color.GetR()/255.0f,item.color.GetG()/255.0f,item.color.GetB()/255.0f,item.color.GetA()/255.0f}; brush->SetColor(ink);
+            auto options=static_cast<D2D1_DRAW_TEXT_OPTIONS>(D2D1_DRAW_TEXT_OPTIONS_CLIP |
+                (item.colorGlyphs?D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT:D2D1_DRAW_TEXT_OPTIONS_NONE));
+            target->DrawTextLayout(D2D1::Point2F(item.box.X,item.box.Y),textLayout.Get(),brush.Get(),options);
+        }
+        if(FAILED(target->EndDraw())) return false;
+        WICRect rectangle{0,0,static_cast<INT>(pixelWidth),static_cast<INT>(pixelHeight)};
+        Microsoft::WRL::ComPtr<IWICBitmapLock> lock;
+        if(FAILED(bitmap->Lock(&rectangle,WICBitmapLockRead,lock.GetAddressOf()))) return false;
+        UINT size=0,stride=0; BYTE* pixels=nullptr;
+        if(FAILED(lock->GetStride(&stride)) || FAILED(lock->GetDataPointer(&size,&pixels)) || !pixels) return false;
+        Bitmap image(pixelWidth,pixelHeight,static_cast<INT>(stride),PixelFormat32bppPARGB,pixels);
+        return graphics.DrawImage(&image,RectF(0,0,surfaceWidth,surfaceHeight),0,0,static_cast<REAL>(pixelWidth),static_cast<REAL>(pixelHeight),UnitPixel)==Ok;
+    }
+};
+TextEngine& textEngine() { thread_local TextEngine value; return value; }
+float width(Graphics& g,const std::wstring& text,const TextFont& font) {
     if (text.empty()) return 0;
+    float direct=textEngine().width(text,font); if(direct>=0) return direct;
     StringFormat format(StringFormat::GenericTypographic()); format.SetFormatFlags(StringFormatFlagsNoWrap | StringFormatFlagsMeasureTrailingSpaces);
-    RectF bounds; g.MeasureString(text.c_str(), static_cast<INT>(text.size()),&font,PointF(0,0),&format,&bounds);
+    RectF bounds; g.MeasureString(text.c_str(),static_cast<INT>(text.size()),&font.fallback,PointF(0,0),&format,&bounds);
     return std::ceil(bounds.Width);
 }
-void label(Graphics& g,const std::wstring& text,const Font& font,RectF box,Color color) {
+void fallbackLabel(Graphics& g,const std::wstring& text,const TextFont& font,RectF box,Color color) {
     if (box.Width <= 0 || box.Height <= 0) return;
+    auto saved=g.Save(); g.SetClip(box,CombineModeIntersect);
     StringFormat format(StringFormat::GenericTypographic()); format.SetFormatFlags(StringFormatFlagsNoWrap);
     format.SetTrimming(StringTrimmingEllipsisCharacter); format.SetLineAlignment(StringAlignmentCenter);
-    SolidBrush ink(color); auto saved = g.Save(); g.SetClip(box,CombineModeIntersect);
-    g.DrawString(text.c_str(),static_cast<INT>(text.size()),&font,box,&format,&ink); g.Restore(saved);
+    SolidBrush ink(color); g.DrawString(text.c_str(),static_cast<INT>(text.size()),&font.fallback,box,&format,&ink); g.Restore(saved);
+}
+void labels(Graphics& g,float widthValue,float heightValue,const std::vector<TextLabel>& items) {
+    if(textEngine().draw(g,widthValue,heightValue,items)) return;
+    for(const auto& item:items) fallbackLabel(g,item.text,*item.font,item.box,item.color);
+}
+void label(Graphics& g,const std::wstring& text,const TextFont& font,RectF box,Color color,bool colorGlyphs=true) {
+    if(box.Width<=0 || box.Height<=0) return;
+    auto saved=g.Save(); g.TranslateTransform(box.X,box.Y);
+    labels(g,box.Width,box.Height,{{text,&font,RectF(0,0,box.Width,box.Height),color,colorGlyphs}}); g.Restore(saved);
 }
 const wchar_t* skinName(int id) { static const wchar_t* names[] = {L"随系统",L"纸白",L"雾蓝",L"青玉",L"浅樱",L"暮色",L"敲敲猫"}; return names[std::clamp(id,0,6)]; }
 }
@@ -58,14 +202,14 @@ Layout measure(Graphics& g,const State& state,const Style& style,float maximum) 
 void drawCandidates(Graphics& g,const State& state,const Style& style,const Layout& layout,bool surface) {
     if (layout.width <= 0 || layout.height <= 0) return;
     g.SetSmoothingMode(SmoothingModeAntiAlias); g.SetTextRenderingHint(TextRenderingHintAntiAliasGridFit);
-    auto p = palette(style); Fonts fonts(style.fontSize);
+    auto p = palette(style); Fonts fonts(style.fontSize); std::vector<TextLabel> text; text.reserve(state.candidates.size()*3);
     if (surface) roundRect(g,RectF(.5f,.5f,layout.width-1,layout.height-1),14,p.background,p.border);
     for (size_t i = 0; i < state.candidates.size(); ++i) {
         bool selected = i == state.highlighted; float y = 8 + i*layout.rowHeight;
         if (selected) roundRect(g,RectF(4,y,layout.width-8,layout.rowHeight),9,p.selection);
         auto textColor = style.highContrast && selected ? systemColor(COLOR_HIGHLIGHTTEXT) : p.text;
         Color secondary(style.highContrast?255:174,textColor.GetR(),textColor.GetG(),textColor.GetB());
-        label(g,std::to_wstring(i+1),fonts.number,RectF(10,y,layout.numberWidth+2,layout.rowHeight),secondary);
+        text.push_back({std::to_wstring(i+1),&fonts.number,RectF(10,y,layout.numberWidth+2,layout.rowHeight),secondary,!style.highContrast});
         const auto& item = state.candidates[i]; float available = std::max(0.0f,layout.width-layout.textX-10);
         float annotation = 0;
         if (!item.comment.empty()) {
@@ -73,9 +217,10 @@ void drawCandidates(Graphics& g,const State& state,const Style& style,const Layo
             annotation = std::min(width(g,wide(item.comment),fonts.secondaryFont),std::max(0.0f,available-minimum-8));
         }
         float textWidth = std::max(0.0f,available-(annotation>0?annotation+8:0));
-        label(g,wide(item.text),fonts.text,RectF(layout.textX,y,textWidth,layout.rowHeight),textColor);
-        if (annotation>0) label(g,wide(item.comment),fonts.secondaryFont,RectF(layout.width-10-annotation,y,annotation,layout.rowHeight),secondary);
+        text.push_back({wide(item.text),&fonts.text,RectF(layout.textX,y,textWidth,layout.rowHeight),textColor,!style.highContrast});
+        if (annotation>0) text.push_back({wide(item.comment),&fonts.secondaryFont,RectF(layout.width-10-annotation,y,annotation,layout.rowHeight),secondary,!style.highContrast});
     }
+    labels(g,layout.width,layout.height,text);
 }
 void drawCat(Graphics& g,const RectF& rect,int pose,bool dark) {
     auto saved = g.Save(); g.TranslateTransform(rect.X,rect.Y); g.ScaleTransform(rect.Width/96,rect.Height/64);
@@ -150,8 +295,8 @@ void drawPreview(Graphics& g,float widthValue,float heightValue,const Style& sty
     float x=std::floor((widthValue-layout.width)/2), y=mode==1?std::floor((heightValue-layout.height)/2):std::max(20.0f,std::floor((heightValue-layout.height-extra)/2)+extra-3);
     auto saved=g.Save(); g.TranslateTransform(x,y); drawCandidates(g,sample,opaque,layout,mode!=1); g.Restore(saved);
     if(style.skin==6) drawCat(g,RectF(layout.width<petWidth+8?x+(layout.width-petWidth)/2:x+layout.width-petWidth-4,y-petHeight+2,petWidth,petHeight),pose,style.dark);
-    else if(mode==0) { Font font(L"Microsoft YaHei UI",12,FontStyleRegular,UnitPixel); label(g,L"ni hao shi jie",font,RectF(x+4,y-24,160,20),rgb(style.dark?0xA5A8B0:0x73767C)); }
-    if(mode==0) { Font font(L"Microsoft YaHei UI",11,FontStyleRegular,UnitPixel); label(g,std::wstring(skinName(style.skin))+L" · "+std::to_wstring(int(style.fontSize)),font,RectF(14,heightValue-26,widthValue-28,20),rgb(style.dark?0xA5A8B0:0x73767C)); }
+    else if(mode==0) { TextFont font(L"Microsoft YaHei UI",12); label(g,L"ni hao shi jie",font,RectF(x+4,y-24,160,20),rgb(style.dark?0xA5A8B0:0x73767C)); }
+    if(mode==0) { TextFont font(L"Microsoft YaHei UI",11); label(g,std::wstring(skinName(style.skin))+L" · "+std::to_wstring(int(style.fontSize)),font,RectF(14,heightValue-26,widthValue-28,20),rgb(style.dark?0xA5A8B0:0x73767C)); }
 }
 void drawIcon(Graphics& g,float side) {
     g.SetSmoothingMode(SmoothingModeAntiAlias); g.SetTextRenderingHint(TextRenderingHintAntiAliasGridFit);

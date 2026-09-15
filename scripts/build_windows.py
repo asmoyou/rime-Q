@@ -129,8 +129,10 @@ def build(args):
         with tempfile.TemporaryDirectory(prefix='rimeq-settings-') as user:
             run(output / 'Settings.Tests.exe', stage, user, ROOT / 'artifacts/windows-ui')
         run('python', ROOT / 'scripts/test_windows_client.py')
-        with tempfile.TemporaryDirectory(prefix='rimeq-candidates-') as user:
-            run(output / 'x64/Release/rimeq_candidate_tests.exe', ROOT / 'artifacts/windows-ui', user)
+        for arch in ['x64', 'x86']:
+            with tempfile.TemporaryDirectory(prefix=f'rimeq-candidates-{arch}-') as user:
+                destination = ROOT / ('artifacts/windows-ui' if arch == 'x64' else 'artifacts/windows-ui-x86')
+                run(output / arch / 'Release/rimeq_candidate_tests.exe', destination, user)
     if args.no_package: return
     if list(stage.rglob('*.gram')): raise RuntimeError('Optional model found in installation payload')
     files = {str(file.relative_to(stage)).replace('\\','/'): hashlib.sha256(file.read_bytes()).hexdigest()
@@ -155,7 +157,7 @@ def build(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--build', type=int, default=9135)
+    parser.add_argument('--build', type=int, default=9136)
     parser.add_argument('--reuse-resources', action='store_true')
     parser.add_argument('--smoke', action='store_true')
     parser.add_argument('--no-package', action='store_true')
