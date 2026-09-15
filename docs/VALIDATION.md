@@ -720,3 +720,44 @@ Control 在发现自身 CLSID 时额外输出实际 Profile GUID、类型、语�
 本机补充结果：去除钥匙串后的 c2876aa 通用构建及六引擎 23 项原生回归通过，用时 196.02 秒。随后 d06ed19 修复摘要布局与 Swift 捕获，增量 Swift 编译通过；新构建 1789316865 的通用 PKG 校验通过，包含无钥匙串依赖及无 SecKeychain/SecItem 导入检查。对最终 PKG 解包后的独立预览执行 19 张截图与摘要宽度断言，全部通过并目视核对单设备深色结果。本机未为仅布局及捕获语法修正重跑已通过的六引擎回归；远端 CI 对最终代码运行完整原生回归。
 
 已提供用户测试包 `RimeQ-0.4.0-macos-universal-1789316865.pkg`，75,889,156 字节，SHA-256 `2a4289c1f70fa6e1c61b8f22d7c128dfc113dd954cdbc7db2614461ce9d0dd58`。采用带构建号的独立文件名，避免与之前仍包含旧身份迁移的开发包混淆。证据：[lan-sync-no-keychain-layout-2026-09-14.json](validation/lan-sync-no-keychain-layout-2026-09-14.json)。本任务未执行安装；交付后只读核对发现已安装版本为该构建，dist 中安装包已被外部移走或删除，未擅自恢复。仍等待用户使用反馈。d06ed19 的 CI Mac 编译已通过，完整包和安装检查在本段提交时仍运行中。
+## 2026-09-15 Windows 对齐远端 0.4.2 后的本地验证
+
+Windows 本机从干净的 `d7080df` 快进到公开 `main` 的 `8c08174`（20 个提交）。远端已包含 Windows 局域网同步基础适配与拼音纠错引擎/设置；本轮在未发布源码中对齐默认关闭、独立创建/加入/邀请引导、等待取消、倒计时、搜索/设备选项及 Caps Lock 组合提交。未安装覆盖当前输入法，未创建新版 Release。
+
+本机 Windows x64、Visual Studio 2022 Build Tools MSVC 19.44、Windows SDK 10.0.26100、Rust 首次 release 构建，资源按 dependencies.lock.json 摘要获取；未测输入延迟。命令 `python scripts/build_windows.py --no-package --smoke` 完成 x64/x86 编译、协议与注册隔离测试、真实 librime 选词/Lua/纠错/Caps Lock 引擎提交、学习库跨进程回读、六个隔离引擎数据库、五个同步原生场景及 30 张 WPF 设置渲染。最后的 `scripts/test_windows_client.py` 因用户现有 Rime Q Broker 占用同名管道而按预检拒绝运行，整条 smoke **未完成**；没有为了测试终止现用服务。
+
+`python scripts/test_windows_sync_ui.py` 随后使用六个独立回环服务及隔离偏好，默认关闭、加入表单与全角数字校验、六设备列表/搜索/暂停/恢复、邀请倒计时与复制可用状态四组通过。四张 WPF 合成图已目视复核，邀请图遮盖了配对码，加入图使用测试电脑名；窗口复用设置页资源样式，不读取正式个人词库或操作用户剪贴板。`python scripts/test_lan_sync.py --binary build-windows/stage/RimeQ.Sync.exe` 的 12 项隔离 TLS 场景通过，包含取消加入清理对端请求及再次配对。x64/x86 的新命令协议往返、客户端源码契约 `python scripts/test_client_parity.py` 及 `git diff --check` 通过。
+
+尚待验收：真实已装 Windows TSF 宿主的物理 Caps Lock、首次/切换后首键、不同宿主焦点与上屏；实际本地网络发现、防火墙授权、UI 取消加入的端到端操作、跨 macOS/Windows 真机配对及持续输入。由于现有 Broker 占用测试管道，本轮改动后的独立 TSF 测试没有执行，不能把引擎提交测试说成真实宿主验收。尚未运行新提交的 CI 或制作发布包。
+
+## 2026-09-15 Windows 0.4.2.9133 本机升级与同步交互
+
+在上述未发布改动上补齐 Mac/Windows 连接信息三行格式、Windows 粘贴的大小与字段校验、已有组错误时固定可用的重试入口、多个局域网地址的选择，以及未加入时的双入口选择项。邀请收到加入请求后不再复制已消费的连接信息。macOS 源码的复制/粘贴字段相同；未声称视觉像素级一致或真机网络已通过。
+
+`python scripts/test_windows_sync_ui.py` 的五组隔离场景通过：关闭状态不创建身份、服务缺失及重试失败后入口仍可见、加入表单、六设备列表/暂停/恢复/搜索、邀请倒计时。新增 Mac 格式/Windows 格式双向解析、CRLF、缺字段及超长文本断言；五张 WPF 合成图产生且未接触用户剪贴板。`python scripts/test_client_parity.py`、`git diff --check` 通过。此前同一同步组件的 12 项回环 TLS 测试未受本次 UI 修改影响，未重复执行。
+
+`python scripts/build_windows.py --reuse-resources --build 9133` 完成 x64/x86 编译及各两项协议/生命周期测试；正式安装包 `dist/RimeQ-0.4.2-windows-x64.exe` 为 70,225,408 字节，文件版本 `0.4.2.9133`，SHA-256 `0756926a00cc4f7946b9710b893e15d2b10b722687236b7ea76378f7abc9c1c6`，与摘要文件一致。构建器解包验证载荷并拒绝 `.gram`；已装目录的许可、离线帮助和无 `.gram` 复核通过。
+
+本机安装已升级到 `C:\Program Files\RimeQ\versions\0.4.2.9133-dcaff4097bc3496fa6931289dcc9d3f7`，HKLM 活动目录及 x64/x86 COM 路径均指向该目录。运行中的设置与 Broker 同样来自此目录，Broker 固定文件构建号为 9133；已装 `RimeQ.Control.exe --verify` 返回 `hr=0x0`，Broker `--ping` 返回 `ready`。已装设置、Broker、双架构 TIP 和同步组件的 SHA-256 分别与新构建载荷一致；个人 `%APPDATA%\RimeQ\rime` 仍在，未执行卸载或改写其他输入法数据。没有升级前后的个人数据哈希快照，不能单凭目录存在证明每条学习记录未变。
+
+新起的独立空白 RichEdit50W x64 和 x86 宿主各六组物理按键检查通过，实际加载的 TIP 均为 `0.4.2.9133`。覆盖首键/空格、数字选词、Esc、Shift 中英文、编辑框焦点变化及切离/切回后的首键；每次发键前核对测试窗口、编辑焦点与输入 Profile。报告为 `artifacts/windows-host-9133-x64.json` 和 `artifacts/windows-host-9133-x86.json`。已装设置的可访问性树确认个人词库页有“附近设备同步…”入口；本机 Computer Use 的截图返回 `SetIsBorderRequired failed (0x80004002)`，元素坐标不可用，未直接点击并截取已装同步窗口。隔离 WPF 图及文件哈希不替代这一项验收。
+
+未执行物理 Caps Lock、多网卡真实地址菜单、Windows 防火墙授权、两台电脑的 macOS/Windows 粘贴与配对、实际词库连续合并、不同第三方宿主及新版本的完整 smoke（现用 Broker 仍占用独立客户端测试同名管道）。这次只在本机升级，不代表已 push、CI 或公开发布 0.4.2。
+
+## 2026-09-15 Windows 个人词库按钮排版修复
+
+用户反馈个人词库页的“新增…”和“附近设备同步…”排版混乱。9133 的 840 宽 WPF 合成图可复现：两按钮纵向堆在标题右侧，工具行只包含搜索、排序、刷新；macOS 源码把“新增…”放在标题操作位，“附近设备同步…”放在搜索工具行末尾。本轮 Windows 将标题操作位只保留新增，把同步移入单行工具栏，搜索框为弹性列且至少 160 点。深色渲染还发现排序框选中文字对比不足，沿用现有 TextColor 资源修正 ComboBox 文字色。
+
+隔离 `Settings.Tests.exe` 通过个人词库读取/刷新、第三方词库启停等既有测试及新增的页面几何断言：在 840/1000/1240 宽、浅/深色下新增位于工具行上方，搜索、排序、刷新、同步依次排列，不重叠或越过内容区。30 张 WPF 设置图生成，已目视核对个人词库页的 840 浅/深色和 1000 浅色图；证据在 `artifacts/windows-ui/settings-1-840-light.png`、`settings-1-840-dark.png`、`settings-1-1000-light.png`。这仍是隔离 WPF 渲染，不替代已装应用实际窗口。
+
+旧 9133 包已保留为 `dist/RimeQ-0.4.2-windows-x64-9133.exe`，SHA-256 与上节一致。`python scripts/build_windows.py --reuse-resources --build 9134` 完成 x64/x86 编译及各两项协议/注册生命周期测试，正式安装包版本 `0.4.2.9134`，70,225,408 字节，SHA-256 `dd5638d202d6780e374142db244366effd5cfd96a0bef8ef1214eb8a626efcfb`；摘要文件与磁盘一致，构建器解包校验载荷。已打开正常升级窗口，窗口准确识别已装 `0.4.2.9133` 并显示“升级”。记录时 HKLM 活动目录、设置和 Broker 进程仍是 9133；Windows 原生管理员认证尚未完成，**不得把 9134 记为已安装或已做真实宿主输入验收**。未为本次布局修复触碰个人词库数据、卸载现用输入法或执行发布。
+
+## 2026-09-15 Windows 默认应用模式与交付复核
+
+后续只读核对 HKLM 活动版本为 `0.4.2.9134`，安装目录为 `C:\Program Files\RimeQ\versions\0.4.2.9134-77bd7e7338824b9b9e9bdc5b28638227`；这修正了上节记录时仍待安装的状态，不代表本节的主题修复已经安装。当前 Windows 应用模式为浅色，与深色任务栏模式分开；设置主窗口原有模式变化监听，独立同步与引导窗口新增订阅，关闭时解除。未修改用户主题注册表。
+
+`python scripts/test_windows_sync_ui.py` 六组隔离回环场景通过，包含窗口深/浅资源往返断言和深色未入组入口截图；目视核对 `artifacts/sync-ui-off-dark.png`、`sync-ui-off.png`，按钮与文字清晰。个人词库 `artifacts/windows-ui/settings-1-840-dark.png` 的排版也再次目视复核。`python scripts/test_client_parity.py` 和 `git diff --check` 通过。隔离资源断言不是系统设置的真实切换测试；已安装 9134 尚不包含独立窗口监听，系统模式动态切换和新构建已装窗口仍待验收。
+
+`python scripts/build_windows.py --reuse-resources --build 9135` 完成 x64/x86 编译、各两项协议/注册生命周期测试及安装包实际载荷校验；`dist/RimeQ-0.4.2-windows-x64.exe` 文件版本为 `0.4.2.9135`，SHA-256 `5631c6c2fe6d70df1c165a2d26042fdb9e2b9247fdbbf9a64b7edbd482898440`，与摘要文件一致。9134 开发包单独保存在 `dist/RimeQ-0.4.2-windows-x64-9134.exe`，没有覆盖旧产物。隔离安装规则测试和 `Settings.Tests.exe` 的 30 张 WPF 渲染通过。CI 默认构建号同步到 9135，以便远端产物与本机候选版本一致。
+
+本机 `python scripts/test_ci_plan.py` 11 项中 10 项通过，1 项无法运行：测试刻意创建文件名包含换行的文件，Windows 文件系统报 `OSError: [Errno 22] Invalid argument`。CI 将在 Linux 运行此测试；本机失败不是产品主题功能的失败，也不能预先记为 CI 通过。

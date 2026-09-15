@@ -20,6 +20,7 @@ int main() {
         require(rq::wide("😀").size() == 2 && rq::utf8(rq::wide("简体😀")) == "简体😀");
         rejects([] { rq::wide(std::string("\xff")); });
         auto request = rq::request(rq::encode({rq::Command::key, 'a', 4})); require(request.key == 'a' && request.modifiers == 4);
+        require(rq::request(rq::encode({rq::Command::commit})).command == rq::Command::commit);
         auto unknown = rq::encode({static_cast<rq::Command>(100), 0, 0}); rejects([&] { rq::request(unknown); });
         std::cout << "PASS: framing, truncation, bounds, Unicode, protocol version and commands\n"; return 0;
     } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }

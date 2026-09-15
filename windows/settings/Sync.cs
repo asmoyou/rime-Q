@@ -27,17 +27,28 @@ namespace RimeQ {
         internal static event Action Changed;
         static bool busy,starting;
         static string revision,version;
+        static string startupFailure;
         static JavaScriptSerializer Json(){return new JavaScriptSerializer {MaxJsonLength=96*1024*1024,RecursionLimit=64};}
-        internal static async Task EnsureStarted() {
-            if(File.Exists(Path.Combine(Root,"control.json")))try{await Call<SyncStatus>(new {action="status"});return;}catch(IOException){}catch(SocketException){}catch(TimeoutException){}
-            if(starting){for(int i=0;i<30&&starting;i++)await Task.Delay(100);return;}
+        internal static async Task<SyncStatus> DisplayStatus() {
+            if(File.Exists(Path.Combine(Root,"control.json")))
+                try{return await Call<SyncStatus>(new {action="status"});}catch(IOException){}catch(SocketException){}catch(TimeoutException){}
+            if(Paths.Get("SyncStarted","0")!="1")
+                return new SyncStatus {members=new List<SyncMember>(),pending=new List<SyncPending>(),discovered=new List<SyncNearby>()};
+            await EnsureStarted();
+            return await Call<SyncStatus>(new {action="status"});
+        }
+        internal static async Task EnsureStarted(bool retry=false) {
+            if(retry)startupFailure=null;
+            if(File.Exists(Path.Combine(Root,"control.json")))try{await Call<SyncStatus>(new {action="status"});startupFailure=null;return;}catch(IOException){}catch(SocketException){}catch(TimeoutException){}
+            if(startupFailure!=null)throw new IOException(startupFailure);
+            if(starting){for(int i=0;i<40&&starting;i++)await Task.Delay(100);if(startupFailure!=null)throw new IOException(startupFailure);return;}
             starting=true;
             try{
                 if(!File.Exists(Path.Combine(Paths.App,"RimeQ.Sync.exe")))throw new IOException("同步组件缺失，请安装包含此功能的完整版本。");
                 Paths.Start("RimeQ.Sync.exe","serve --root \""+Root+"\"");
-                for(int i=0;i<40;i++){await Task.Delay(100);try{await Call<SyncStatus>(new {action="status"});return;}catch(IOException){}catch(SocketException){}catch(TimeoutException){}}
+                for(int i=0;i<40;i++){await Task.Delay(100);try{await Call<SyncStatus>(new {action="status"});startupFailure=null;return;}catch(IOException){}catch(SocketException){}catch(TimeoutException){}}
                 throw new IOException("同步服务未能启动，请稍后重试。");
-            }finally{starting=false;}
+            }catch(Exception error){startupFailure=error.Message;throw;}finally{starting=false;}
         }
         internal static async Task<T> Call<T>(object request) {
             var serializer=Json();var descriptor=serializer.Deserialize<SyncDescriptor>(File.ReadAllText(Path.Combine(Root,"control.json"),Encoding.UTF8));
@@ -61,6 +72,11 @@ namespace RimeQ {
         }
         static async Task ReadExact(Stream stream,byte[] bytes){int offset=0;while(offset<bytes.Length){int count=await stream.ReadAsync(bytes,offset,bytes.Length-offset);if(count==0)throw new EndOfStreamException();offset+=count;}}
         static string Friendly(string message){
+            if(message.Contains("pairing cancelled"))return "已取消加入同步组。";
+            if(message.Contains("invalid name"))return "设备或同步组名称无效，请缩短名称并去掉换行等特殊字符。";
+            if(message.Contains("only local network addresses"))return "请选择局域网地址。两台电脑需要在能互相连接的本地网络中。";
+            if(message.Contains("no open invitation")||message.Contains("invitation expired"))return "邀请已结束或配对码已过期，请在原设备重新生成。";
+            if(message.Contains("pairing was not approved"))return "原设备未确认加入，或确认已超时。请重新邀请。";
             if(message.Contains("pairing")||message.Contains("invitation"))return "配对未完成。请检查六位配对码，并在原设备确认；过期后重新生成邀请。";
             if(message.Contains("removed")||message.Contains("unauthorized"))return "设备已被移除或未获授权，请重新加入同步组。";
             if(message.Contains("only the group creator"))return "请在创建同步组的电脑上移除设备。";

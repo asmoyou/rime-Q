@@ -134,6 +134,7 @@ State Engine::process(uint64_t client, const Request& request) {
         return s;
     }
     auto id = session(client); bool handled = false;
+    std::string spelling;
     switch (request.command) {
     case Command::key:
         if (request.key > 0x10ffff || (request.modifiers & ~uint32_t(1 | 2 | 4 | 8 | 0x40000000)))
@@ -142,13 +143,24 @@ State Engine::process(uint64_t client, const Request& request) {
     case Command::select:
         if (request.key < 9) handled = api_->select_candidate_on_current_page(id, request.key) != 0; break;
     case Command::clear: api_->clear_composition(id); handled = true; break;
+    case Command::commit:
+        spelling = safe(api_->get_input(id));
+        if (!spelling.empty()) {
+            handled = api_->commit_composition(id) != 0;
+            if (!handled) { api_->clear_composition(id); handled = true; }
+        }
+        break;
     case Command::toggle:
         // Follow the pinned schema's commit_code behavior, preserving typed spelling.
         api_->process_key(id, 0xffe1, 0); api_->process_key(id, 0xffe1, 0x40000000); handled = true; break;
     default: break;
     }
     if(handled && request.command!=Command::hello) ++learningRevision_;
-    auto result=read(id, handled);preservedAscii_[client]=result.ascii;return result;
+    auto result=read(id, handled);
+    if (request.command == Command::commit && handled && result.commit.empty()) {
+        result.commit = spelling;result.preedit.clear();result.candidates.clear();
+    }
+    preservedAscii_[client]=result.ascii;return result;
 }
 void Engine::disconnect(uint64_t client) {
     if (!started_) return;

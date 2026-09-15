@@ -120,9 +120,14 @@ int smoke(const rq::fs::path& app, const rq::fs::path& data, bool deploy) {
     s = test.process(1, {rq::Command::toggle}); require(s.ascii && s.commit == "nihao", "English toggle must preserve typed spelling");
     s = test.process(1, {rq::Command::key, 'a', 0}); require(!s.handled, "English key swallowed");
     test.process(1, {rq::Command::toggle});
+    type(1, "nihao");
+    s = test.process(1, {rq::Command::commit});
+    require(s.handled && s.commit == "你好" && s.preedit.empty() && !s.ascii, "Caps Lock commit changed Chinese mode or lost composition");
+    s = test.process(1, {rq::Command::key, 'n', 0}); require(s.handled && !s.ascii, "First key after Caps Lock was lost");
+    test.process(1, {rq::Command::clear});
     test.disconnect(1); test.disconnect(2);
     auto exported = test.process(99, {rq::Command::exportDictionary}); require(exported.handled, "Personal dictionary export failed");
-    std::cout << "PASS librime " << test.version() << ": pinyin, space/number/mouse selection, isolated sessions, cancel, Shift policy, Lua commits\n";
+    std::cout << "PASS librime " << test.version() << ": pinyin, space/number/mouse selection, isolated sessions, Caps Lock commit, Shift policy, Lua commits\n";
     return 0;
 }
 int learning(const rq::fs::path& app, const rq::fs::path& data, bool write) {

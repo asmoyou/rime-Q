@@ -28,6 +28,9 @@ namespace RimeQ {
             timer.Tick += (s,e) => { timer.Stop(); frame.Continue = false; }; timer.Start(); Dispatcher.PushFrame(frame);
         }
         static void Require(bool ok, string message) { if (!ok) throw new Exception(message); }
+        static Rect Bounds(FrameworkElement element,FrameworkElement ancestor) {
+            return element.TransformToAncestor(ancestor).TransformBounds(new Rect(element.RenderSize));
+        }
         static void Reject(Action action) { bool rejected = false; try { action(); } catch { rejected = true; } Require(rejected, "Expected rejection"); }
         static async Task RejectAsync(Func<Task> action) { bool rejected = false; try { await action(); } catch { rejected = true; } Require(rejected, "Expected async rejection"); }
         static bool CanRender() {
@@ -204,6 +207,21 @@ namespace RimeQ {
                         settings.Window.UpdateLayout();root.Measure(dimensions); root.Arrange(new Rect(0,0,width,height)); root.UpdateLayout();
                         Require(Math.Abs(root.ActualWidth-width)<1 && Math.Abs(root.ActualHeight-height)<1,"Render does not match the requested client size");
                         Require(((FrameworkElement)settings.Window.FindName("Page")).ActualWidth>500,"Sidebar squeezed the content");
+                        if(page==1) {
+                            var header=(StackPanel)settings.Window.FindName("PageAction");
+                            var add=Descendants<Button>(header).Single(button=>AutomationProperties.GetName(button)=="新增…");
+                            Require(header.Children.Count==1,"Personal dictionary header should contain only Add");
+                            var contents=(StackPanel)settings.Window.FindName("Page");
+                            var tools=contents.Children.OfType<Grid>().Single(grid=>AutomationProperties.GetName(grid)=="个人词库工具栏");
+                            var search=Descendants<TextBox>(tools).Single();var sort=Descendants<ComboBox>(tools).Single();
+                            var refresh=Descendants<Button>(tools).Single(button=>AutomationProperties.GetName(button)=="刷新");
+                            var sync=Descendants<Button>(tools).Single(button=>AutomationProperties.GetName(button)=="附近设备同步…");
+                            var a=Bounds(add,root);var s=Bounds(search,root);var o=Bounds(sort,root);
+                            var r=Bounds(refresh,root);var y=Bounds(sync,root);var row=Bounds(tools,root);
+                            Require(a.Bottom<s.Top && s.Width>=160 && s.Right<=o.Left+1 && o.Right<=r.Left+1 && r.Right<=y.Left+1 && y.Right<=row.Right+1,
+                                "Personal dictionary actions overlap or escape the toolbar: "+width+" "+(dark?"dark":"light"));
+                            Require(Math.Abs(s.Top-y.Top)<=6,"Personal dictionary toolbar controls are not aligned");
+                        }
                         if(canRender) {
                             var bitmap = new RenderTargetBitmap(width, height, 96,96,PixelFormats.Pbgra32);bitmap.Render(root);
                             Require(HasVisiblePixel(bitmap,width,height),"WPF render is transparent: page="+page+" size="+width+"x"+height);

@@ -65,6 +65,7 @@
     <Style TargetType="ComboBoxItem"><Setter Property="Foreground" Value="{DynamicResource TextColor}"/><Setter Property="Padding" Value="8,4"/></Style>
     <Style TargetType="ComboBox">
       <Setter Property="MinHeight" Value="28"/><Setter Property="FontSize" Value="12"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextColor}"/>
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBox">
         <Grid>
           <ToggleButton x:Name="Drop" Focusable="False" IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">

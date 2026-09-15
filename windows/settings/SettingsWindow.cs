@@ -190,9 +190,9 @@ namespace RimeQ {
             var preview = Preview(Appearance.Skin,Appearance.FontSize,PreviewHeight(Appearance.Skin,Appearance.FontSize)); preview.Margin = new Thickness(0,12,0,0);
             font.SelectionChanged += (s,e) => { if(font.SelectedItem != null) { Paths.Set("FontSize",font.SelectedItem.ToString()); preview.CandidateSize = (int)font.SelectedItem; preview.Height = PreviewHeight(preview.Skin,preview.CandidateSize); } };
             Section("候选显示",Vertical(rows,preview));
-            var shortcuts = new UniformGrid { Columns = 3 };
-            string[] keys = {"Shift / Ctrl+Space","数字键","− / ="}, details = {"中英文切换","选择候选","候选翻页"};
-            for(int i=0;i<3;++i) { var key = Text(keys[i],12); key.FontFamily = new FontFamily("Consolas"); key.FontWeight = FontWeights.Medium; var detail = Text(details[i],12,"secondary"); detail.Margin = new Thickness(0,8,0,0); var card = Frame(Vertical(key,detail),16); card.Margin = new Thickness(0,0,i<2?12:0,0); shortcuts.Children.Add(card); }
+            var shortcuts = new UniformGrid { Columns = 4 };
+            string[] keys = {"Shift / Ctrl+Space","Caps Lock","数字键","− / ="}, details = {"中英文切换","锁定大写","选择候选","候选翻页"};
+            for(int i=0;i<4;++i) { var key = Text(keys[i],12); key.FontFamily = new FontFamily("Consolas"); key.FontWeight = FontWeights.Medium; var detail = Text(details[i],12,"secondary"); detail.Margin = new Thickness(0,8,0,0); var card = Frame(Vertical(key,detail),16); card.Margin = new Thickness(0,0,i<3?12:0,0); shortcuts.Children.Add(card); }
             Section("常用按键",shortcuts);
             Section("快捷输入",Frame(Text("rq 日期 · sj 时间 · xq 星期 · nl 农历\ncC1+2 计算器 · R123.45 金额大写 · U62fc Unicode\nuuid 随机标识 · [ / ] 取候选首字 / 尾字",12,"secondary"),16),"中文模式下输入，空格或数字键选取结果。完整用法见“使用说明”。");
             RefreshModel();

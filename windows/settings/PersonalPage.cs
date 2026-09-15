@@ -15,12 +15,22 @@ using Microsoft.Win32;
 namespace RimeQ {
     internal sealed partial class SettingsWindow {
         void Personal() {
-            var tools=new StackPanel { Orientation=Orientation.Horizontal,Margin=new Thickness(0,0,0,12) };
-            dictionarySearch=new TextBox { ToolTip="搜索词条或拼音",MinWidth=220 };
+            var tools=new Grid { Margin=new Thickness(0,0,0,12) };
+            tools.ColumnDefinitions.Add(new ColumnDefinition());
+            for(int i=0;i<3;i++)tools.ColumnDefinitions.Add(new ColumnDefinition { Width=GridLength.Auto });
+            AutomationProperties.SetName(tools,"个人词库工具栏");
+            dictionarySearch=new TextBox { ToolTip="搜索词条或拼音",MinWidth=160 };
             AutomationProperties.SetName(dictionarySearch,"搜索个人学习记录");
             dictionarySort=new ComboBox { Width=132,ItemsSource=new[]{"按学习权重","按词条","按拼音"},SelectedIndex=0,Margin=new Thickness(0,0,8,0) };
-            var refresh=Async("刷新",LoadDictionary); var add=Async("新增…",()=>EditDictionary(null)); add.Margin=new Thickness(0);pageAction.Children.Add(Action("附近设备同步…",ShowDeviceSync));pageAction.Children.Add(add);
-            tools.Children.Add(SearchField(dictionarySearch,"搜索词条或拼音"));tools.Children.Add(dictionarySort);tools.Children.Add(refresh);page.Children.Add(tools);
+            var refresh=Async("刷新",LoadDictionary);
+            var add=Async("新增…",()=>EditDictionary(null));add.Margin=new Thickness(0);pageAction.Children.Add(add);
+            var sync=Action("附近设备同步…",ShowDeviceSync);sync.Margin=new Thickness(0);
+            var search=SearchField(dictionarySearch,"搜索词条或拼音");
+            foreach(var control in new FrameworkElement[]{search,dictionarySort,refresh,sync})control.VerticalAlignment=VerticalAlignment.Center;
+            tools.Children.Add(search);
+            Grid.SetColumn(dictionarySort,1);tools.Children.Add(dictionarySort);
+            Grid.SetColumn(refresh,2);tools.Children.Add(refresh);
+            Grid.SetColumn(sync,3);tools.Children.Add(sync);page.Children.Add(tools);
 
             dictionary=new DataGrid { Height=390,AutoGenerateColumns=false,CanUserAddRows=false,CanUserDeleteRows=false,IsReadOnly=true,
                 SelectionMode=DataGridSelectionMode.Extended,SelectionUnit=DataGridSelectionUnit.FullRow,HeadersVisibility=DataGridHeadersVisibility.Column,

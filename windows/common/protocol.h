@@ -10,7 +10,7 @@ namespace rq {
 constexpr uint32_t protocolVersion = 1;
 constexpr uint32_t maxFrame = 65536;
 enum class Command : uint32_t { hello = 1, key, select, clear, toggle, shutdown,
-    exportDictionary, importDictionary, ping, syncProbe, syncExport, syncApply };
+    exportDictionary, importDictionary, ping, syncProbe, syncExport, syncApply, commit };
 struct Request { Command command = Command::hello; uint32_t key = 0, modifiers = 0; };
 struct Candidate { std::string text, comment; };
 struct State {
@@ -48,7 +48,7 @@ inline std::vector<uint8_t> encode(const Request& r) {
 inline Request request(const std::vector<uint8_t>& bytes) {
     Reader r{bytes}; if (r.number() != protocolVersion) throw std::runtime_error("Protocol mismatch");
     Request q; q.command = static_cast<Command>(r.number()); q.key = r.number(); q.modifiers = r.number(); r.end();
-    if (q.command < Command::hello || q.command > Command::syncApply) throw std::runtime_error("Unknown command");
+    if (q.command < Command::hello || q.command > Command::commit) throw std::runtime_error("Unknown command");
     return q;
 }
 inline std::vector<uint8_t> encode(const State& s) {

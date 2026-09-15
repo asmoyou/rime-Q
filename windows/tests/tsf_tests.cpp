@@ -226,6 +226,14 @@ int wmain(int argc, wchar_t** argv) {
         key(second, '1'); require(second.store->text == L"好", "Number selection or first key after focus failed");
         second.store->denyWrite = true; key(second, 'N', false); second.store->denyWrite = false;
         key(second, 'H'); key(second, 'A'); key(second, 'O'); key(second, VK_SPACE); require(second.store->text == L"好好", "Write-lock failure advanced engine");
+        for (char c : std::string("NIHAO")) key(second,c);
+        key(second,VK_CAPITAL,false);
+        require(second.store->text == L"好好你好" && modeText()==L"中", "Caps Lock did not complete composition in the same mode");
+        keyboard[VK_CAPITAL]=1;SetKeyboardState(keyboard);
+        key(second,'A',false);require(second.store->text == L"好好你好", "Caps Lock swallowed host uppercase key");
+        keyboard[VK_CAPITAL]=0;SetKeyboardState(keyboard);
+        key(second,'N');key(second,'I');key(second,'H');key(second,'A');key(second,'O');key(second,VK_SPACE);
+        require(second.store->text == L"好好你好你好" && modeText()==L"中", "Caps Lock release did not restore Chinese input");
         key(second, VK_SHIFT); BOOL shiftEaten = FALSE; keys->OnKeyUp(second.context.Get(), VK_SHIFT, 0, &shiftEaten);
         key(second, 'A', false); require(second.store->text == L"好好"&&compartment(openClose.Get())==0&&modeText()==L"英","English key or mode presentation mismatch");
         BOOL preservedEaten=FALSE;check(keys->OnPreservedKey(second.context.Get(),rq::modeToggleKey,&preservedEaten),"Ctrl+Space mode toggle");

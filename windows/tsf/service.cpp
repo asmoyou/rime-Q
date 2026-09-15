@@ -495,6 +495,7 @@ class Service final : public ITfTextInputProcessorEx, public ITfKeyEventSink, pu
         if (!ready_ || !current(context) || disabled(context)) return false;
         if (GetKeyState(VK_CONTROL) < 0 || GetKeyState(VK_MENU) < 0 || GetKeyState(VK_LWIN) < 0 || GetKeyState(VK_RWIN) < 0) return false;
         if (virtualKey == VK_SHIFT || virtualKey == VK_LSHIFT || virtualKey == VK_RSHIFT) return true;
+        if (virtualKey == VK_CAPITAL) return !state_.preedit.empty();
         if (state_.ascii || (GetKeyState(VK_CAPITAL) & 1)) return false;
         auto character=virtualKey==VK_PACKET?translate(key,lparam):0;
         if ((virtualKey >= 'A' && virtualKey <= 'Z') || (character >= 'A' && character <= 'Z') || (character >= 'a' && character <= 'z')) return true;
@@ -610,7 +611,9 @@ public:
     HRESULT STDMETHODCALLTYPE OnKeyDown(ITfContext* context, WPARAM key, LPARAM lparam, BOOL* eaten) override {
         if (!eaten) return E_POINTER; *eaten = FALSE;
         if (!interested(context, key, lparam)) return S_OK;
-        auto virtualKey=LOWORD(key);if (virtualKey == VK_SHIFT || virtualKey == VK_LSHIFT || virtualKey == VK_RSHIFT) { if (!shift_) { shift_ = true; shiftUsed_ = false; } *eaten = TRUE; return S_OK; }
+        auto virtualKey=LOWORD(key);
+        if (virtualKey == VK_CAPITAL) { perform(context, {rq::Command::commit}); return S_OK; }
+        if (virtualKey == VK_SHIFT || virtualKey == VK_LSHIFT || virtualKey == VK_RSHIFT) { if (!shift_) { shift_ = true; shiftUsed_ = false; } *eaten = TRUE; return S_OK; }
         auto translated = translate(key, lparam); if (!translated) return S_OK;
         uint32_t modifiers = (GetKeyState(VK_SHIFT) < 0 ? 1u : 0u);
         *eaten = perform(context, {rq::Command::key, translated, modifiers}); return S_OK;

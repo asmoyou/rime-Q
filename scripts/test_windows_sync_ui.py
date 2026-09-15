@@ -20,12 +20,18 @@ def main():
         try:
             for i in range(6):
                 parent=Path(temporary)/f'node-{i}';parent.mkdir()
-                nodes.append(Node(ROOT/'sync/target/debug/rimeq-sync.exe',parent/'sync',f'Test device {i}'))
+                nodes.append(Node(ROOT/'build-windows/stage/RimeQ.Sync.exe',parent/'sync',f'Test device {i}'))
+            unused=Path(temporary)/'unused';(unused/'sync').mkdir(parents=True)
+            (unused/'sync'/'isolated-test-only').touch()
+            subprocess.run([str(test),str(ROOT/'build-windows/stage'),str(unused),str(ROOT/'artifacts/sync-ui-off.png'),'off'],check=True,timeout=30)
+            subprocess.run([str(test),str(ROOT/'build-windows/stage'),str(unused),str(ROOT/'artifacts/sync-ui-off-dark.png'),'off-dark'],check=True,timeout=30)
+            subprocess.run([str(test),str(unused),str(unused),str(ROOT/'artifacts/sync-ui-error.png'),'error'],check=True,timeout=30)
             subprocess.run([str(test),str(ROOT/'build-windows/stage'),str(nodes[0].root.parent),str(ROOT/'artifacts/sync-ui-join.png'),'join'],check=True,timeout=30)
             nodes[0].call('create',group='我的电脑 · 沙盒测试',name=nodes[0].name)
             for node in nodes[1:]:pair(nodes[0],node)
             until(lambda:len(nodes[0].call('status')['members'])==6,'six members not present')
             subprocess.run([str(test),str(ROOT/'build-windows/stage'),str(nodes[0].root.parent),str(ROOT/'artifacts/sync-ui-six.png'),'group'],check=True,timeout=40)
+            subprocess.run([str(test),str(ROOT/'build-windows/stage'),str(nodes[0].root.parent),str(ROOT/'artifacts/sync-ui-invite.png'),'invite'],check=True,timeout=40)
         finally:
             for node in nodes:node.stop()
 
