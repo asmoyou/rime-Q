@@ -763,3 +763,13 @@ Windows 本机从干净的 `d7080df` 快进到公开 `main` 的 `8c08174`（20 �
 本机 `python scripts/test_ci_plan.py` 11 项中 10 项通过，1 项无法运行：测试刻意创建文件名包含换行的文件，Windows 文件系统报 `OSError: [Errno 22] Invalid argument`。CI 将在 Linux 运行此测试；本机失败不是产品主题功能的失败，也不能预先记为 CI 通过。
 
 首轮目标提交 `b582138` 的 [CI 运行](https://github.com/asmoyou/rime-Q/actions/runs/34992096680) 中，Windows package smoke 在生产 TSF 测试的英文模式断言失败，输出 `English key or mode presentation mismatch`。该测试在旧预期 `好好` 前新增了两次 Caps Lock 提交，真实累积文本已被上一条断言验证为 `好好你好你好`；旧预期没有同步更新。仅修正英文模式断言的文本预期，仍检查外部英文键未被吞、模式 compartment 为英文且任务栏显示“英”。需等待修正提交的 CI 重新运行，不能把首轮记为通过。
+
+修正提交 `46d67b4` 的 [CI 运行](https://github.com/asmoyou/rime-Q/actions/runs/34993170857) 全部相关作业通过：Windows x64/x86 生产 TSF、设置渲染、同步核心与实际安装/修复/降级拒绝/卸载保留数据，以及 Mac 通用构建、PKG 实际安装、待启用状态处理、引擎和卸载保留数据。Mac CI 允许明确的待启用登录重试，不代表在 CI 宿主立即可用；跨系统真机配对仍未验证。
+
+## 2026-09-16 跨平台 0.4.3 发布候选
+
+旧公开 v0.4.2 标签指向 `d3f02c8`，不能用旧标签对应本轮 Windows 对齐提交。两端当前源码版本统一提升到 0.4.3；Windows 默认构建号为 9135，Mac 构建号仍按构建时间递增。下载说明和 CI 安装检查的文件名随版本更新，历史 0.4.2 验证记录保留原样。
+
+本机 `python scripts/build_windows.py --reuse-resources --build 9135` 完成 x64/x86 编译、两种架构各两项协议/注册生命周期检查及实际载荷校验。候选 `dist/RimeQ-0.4.3-windows-x64.exe` 为 70,225,920 字节，文件版本 `0.4.3.9135`，SHA-256 `3616b3363cfc2270d6b16d4f2121e168543cfa137647fd0ac47780eea9287311`，与摘要文件相同；stage 内设置程序集固定版本为 0.4.3.9135，Broker 与两种 TIP 的固定文件版本也为 0.4.3.9135（Broker 的字符串 FileVersion 只显示 0.4.3）。隔离安装规则和真实 librime 拼音/Lua/Caps Lock smoke 通过，客户端契约与差异检查通过。
+
+第一次 `Settings.Tests.exe` 在专用 `settings-043-fixture` 目录应用第三方词库时 `File.Replace` 报“无法删除要被替换的文件”；随后换用全新 `settings-043-fixture-b` 目录重测通过，包含词库编译/启停、更新比较和 30 张 WPF 页面渲染。未据一次替换失败推断根因，也未删除失败的隔离目录。新版本尚未做本机已装系统模式真实切换；UAC 等待中时 HKLM 仍是 0.4.2.9134。0.4.3 CI、版本标签与公开附件尚待完成，不能把当前本地包称为已发布产物。
