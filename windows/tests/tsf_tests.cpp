@@ -235,7 +235,7 @@ int wmain(int argc, wchar_t** argv) {
         key(second,'N');key(second,'I');key(second,'H');key(second,'A');key(second,'O');key(second,VK_SPACE);
         require(second.store->text == L"好好你好你好" && modeText()==L"中", "Caps Lock release did not restore Chinese input");
         key(second, VK_SHIFT); BOOL shiftEaten = FALSE; keys->OnKeyUp(second.context.Get(), VK_SHIFT, 0, &shiftEaten);
-        key(second, 'A', false); require(second.store->text == L"好好"&&compartment(openClose.Get())==0&&modeText()==L"英","English key or mode presentation mismatch");
+        key(second, 'A', false); require(second.store->text == L"好好你好你好"&&compartment(openClose.Get())==0&&modeText()==L"英","English key or mode presentation mismatch");
         BOOL preservedEaten=FALSE;check(keys->OnPreservedKey(second.context.Get(),rq::modeToggleKey,&preservedEaten),"Ctrl+Space mode toggle");
         require(preservedEaten&&compartment(openClose.Get())==1&&(compartment(conversionMode.Get())&TF_CONVERSIONMODE_NATIVE)&&modeText()==L"中","Preserved key did not restore Chinese mode");
         POINT point{};RECT rect{};check(modeButton->OnClick(TF_LBI_CLK_LEFT,point,&rect),"Mode bar click to English");

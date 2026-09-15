@@ -761,3 +761,5 @@ Windows 本机从干净的 `d7080df` 快进到公开 `main` 的 `8c08174`（20 �
 `python scripts/build_windows.py --reuse-resources --build 9135` 完成 x64/x86 编译、各两项协议/注册生命周期测试及安装包实际载荷校验；`dist/RimeQ-0.4.2-windows-x64.exe` 文件版本为 `0.4.2.9135`，SHA-256 `5631c6c2fe6d70df1c165a2d26042fdb9e2b9247fdbbf9a64b7edbd482898440`，与摘要文件一致。9134 开发包单独保存在 `dist/RimeQ-0.4.2-windows-x64-9134.exe`，没有覆盖旧产物。隔离安装规则测试和 `Settings.Tests.exe` 的 30 张 WPF 渲染通过。CI 默认构建号同步到 9135，以便远端产物与本机候选版本一致。
 
 本机 `python scripts/test_ci_plan.py` 11 项中 10 项通过，1 项无法运行：测试刻意创建文件名包含换行的文件，Windows 文件系统报 `OSError: [Errno 22] Invalid argument`。CI 将在 Linux 运行此测试；本机失败不是产品主题功能的失败，也不能预先记为 CI 通过。
+
+首轮目标提交 `b582138` 的 [CI 运行](https://github.com/asmoyou/rime-Q/actions/runs/34992096680) 中，Windows package smoke 在生产 TSF 测试的英文模式断言失败，输出 `English key or mode presentation mismatch`。该测试在旧预期 `好好` 前新增了两次 Caps Lock 提交，真实累积文本已被上一条断言验证为 `好好你好你好`；旧预期没有同步更新。仅修正英文模式断言的文本预期，仍检查外部英文键未被吞、模式 compartment 为英文且任务栏显示“英”。需等待修正提交的 CI 重新运行，不能把首轮记为通过。
