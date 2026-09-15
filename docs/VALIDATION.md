@@ -773,3 +773,11 @@ Windows 本机从干净的 `d7080df` 快进到公开 `main` 的 `8c08174`（20 �
 本机 `python scripts/build_windows.py --reuse-resources --build 9135` 完成 x64/x86 编译、两种架构各两项协议/注册生命周期检查及实际载荷校验。候选 `dist/RimeQ-0.4.3-windows-x64.exe` 为 70,225,920 字节，文件版本 `0.4.3.9135`，SHA-256 `3616b3363cfc2270d6b16d4f2121e168543cfa137647fd0ac47780eea9287311`，与摘要文件相同；stage 内设置程序集固定版本为 0.4.3.9135，Broker 与两种 TIP 的固定文件版本也为 0.4.3.9135（Broker 的字符串 FileVersion 只显示 0.4.3）。隔离安装规则和真实 librime 拼音/Lua/Caps Lock smoke 通过，客户端契约与差异检查通过。
 
 第一次 `Settings.Tests.exe` 在专用 `settings-043-fixture` 目录应用第三方词库时 `File.Replace` 报“无法删除要被替换的文件”；随后换用全新 `settings-043-fixture-b` 目录重测通过，包含词库编译/启停、更新比较和 30 张 WPF 页面渲染。未据一次替换失败推断根因，也未删除失败的隔离目录。新版本尚未做本机已装系统模式真实切换；UAC 等待中时 HKLM 仍是 0.4.2.9134。0.4.3 CI、版本标签与公开附件尚待完成，不能把当前本地包称为已发布产物。
+
+## 2026-09-16 0.4.3 CI 与公开发布核验
+
+目标提交 `0b208b5cc8d3a39a4124ffe74b28651ce7fabf75` 当时与远端 `main` 一致，[CI 运行](https://github.com/asmoyou/rime-Q/actions/runs/34995164430) 的 12 个作业全部通过。Windows 包 smoke 通过生产 TIP、引擎与 WPF 检查；安装作业实际安装、修复、拒绝降级、卸载并检查个人数据保留。Mac 通用构建实际生成 `RimeQ-0.4.3-macos-universal.pkg`，CI 安装后版本输出 `Rime Q 0.4.3 (1789489781)`，并通过签名、引擎、同包拒绝、降级拒绝及卸载数据保留检查。Mac 启用检查的 CI 契约接受实际就绪或明确的待启用登录重试，不将其等同于全部真实宿主可用。
+
+新 [v0.4.3 Release](https://github.com/asmoyou/rime-Q/releases/tag/v0.4.3) 为公开状态，标签解引用指向上述提交；四个附件均由该次 CI 产物生成。Windows `RimeQ-0.4.3-windows-x64.exe` 为 70,226,944 字节，固定文件版本 `0.4.3.9135`，SHA-256 `9dd770073c7466471178d86095dbc34235aa3a4dc1e9ca5525fde37e015b0703`；Mac `RimeQ-0.4.3-macos-universal.pkg` 为 75,985,584 字节，SHA-256 `35769ca4040a20bc3fcb8442d98b0c2b8bb2807da0cca2fd6f250f5988bca4c4`。各自的 SHA256SUMS 随包公开。Windows 下载的 CI 包再次解包校验：440 个载荷文件，四个程序固定版本一致，第三方声明在包内且无 `.gram`。
+
+无需登录的公开链接已实际下载两个安装包及两份摘要：重新计算的 SHA 与摘要内容和 CI 文件一一相同；GitHub Releases `latest` API 返回 `v0.4.3`、非草稿、四个附件。尚未做本机 0.4.3 安装与系统默认应用模式现场切换：只读 HKLM 活动版本仍是 `0.4.2.9134`，先前打开的 0.4.2.9135 开发包安装窗口尚待用户取消。发布成功不能替代这台机器的管理员认证、已装界面和真实输入验收；跨 Mac/Windows 两台真机同步仍待验证。
