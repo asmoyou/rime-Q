@@ -51,6 +51,9 @@ namespace RimeQ {
                     Require(retry.Visibility==Visibility.Visible,"Retry disappeared after another failure");
                 }
                 if(joined){
+                    Require(Find<TextBlock>(view.Window).Any(t=>t.Text.StartsWith("最近成功同步：")),"Last success time missing");
+                    Require(Find<TextBlock>(view.Window).Any(t=>t.Text.StartsWith("最近成功同步：")&&!t.Text.EndsWith("尚无成功记录")),"Persisted success time not displayed");
+                    Require(Find<TextBlock>(view.Window).Any(t=>t.Text.Contains("台设备已确认"))&&Find<ProgressBar>(view.Window).Any(),"Confirmation count/progress bar missing");
                     Require(Find<TextBlock>(view.Window).Any(t=>t.Text.Contains("6 台设备")),"Six-device summary missing");
                     Require(Find<TextBlock>(view.Window).Count(t=>t.Text.StartsWith("Test device "))==6,"Device rows missing");
                     var toggle=Find<Button>(view.Window).Single(b=>Convert.ToString(b.Content)=="暂停同步");

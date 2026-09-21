@@ -29,7 +29,9 @@ def main():
             subprocess.run([str(test),str(ROOT/'build-windows/stage'),str(nodes[0].root.parent),str(ROOT/'artifacts/sync-ui-join.png'),'join'],check=True,timeout=30)
             nodes[0].call('create',group='我的电脑 · 沙盒测试',name=nodes[0].name)
             for node in nodes[1:]:pair(nodes[0],node)
-            until(lambda:len(nodes[0].call('status')['members'])==6,'six members not present')
+            until(lambda:all(len(node.call('status')['members'])==6 for node in nodes),'six members not present on every node')
+            for node in nodes:node.call('capture',rows=[])
+            until(lambda:nodes[0].call('status')['progress']['confirmed']==6 and nodes[0].call('status')['last_sync_at']>0,'confirmation telemetry not present')
             subprocess.run([str(test),str(ROOT/'build-windows/stage'),str(nodes[0].root.parent),str(ROOT/'artifacts/sync-ui-six.png'),'group'],check=True,timeout=40)
             subprocess.run([str(test),str(ROOT/'build-windows/stage'),str(nodes[0].root.parent),str(ROOT/'artifacts/sync-ui-invite.png'),'invite'],check=True,timeout=40)
         finally:

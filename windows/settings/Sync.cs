@@ -15,10 +15,11 @@ namespace RimeQ {
     internal sealed class SyncJob {public string id {get;set;} public List<SyncRow> before {get;set;} public List<SyncRow> after {get;set;}}
     internal sealed class SyncJobResult {public SyncJob job {get;set;}}
     internal sealed class SyncGroup {public string id {get;set;} public string name {get;set;}}
-    internal sealed class SyncMember {public string id {get;set;} public string name {get;set;} public bool self {get;set;} public bool removed {get;set;} public bool online {get;set;} public bool applied {get;set;} public long last_seen {get;set;} public bool needs_upgrade {get;set;}}
+    internal sealed class SyncMember {public string id {get;set;} public string name {get;set;} public bool self {get;set;} public bool removed {get;set;} public bool online {get;set;} public bool applied {get;set;} public long last_seen {get;set;} public long last_sync_at {get;set;} public bool needs_upgrade {get;set;}}
+    internal sealed class SyncProgress {public string stage {get;set;} public long elapsed_seconds {get;set;} public int confirmed {get;set;} public int total {get;set;} public string transfer {get;set;} public long transfer_seconds {get;set;}}
     internal sealed class SyncPending {public string id {get;set;} public string name {get;set;}}
     internal sealed class SyncNearby {public string address {get;set;} public string name {get;set;} public string invite {get;set;}}
-    internal sealed class SyncStatus {public string id {get;set;} public SyncGroup group {get;set;} public bool enabled {get;set;} public List<SyncMember> members {get;set;} public List<SyncPending> pending {get;set;} public List<SyncNearby> discovered {get;set;} public int port {get;set;} public bool waiting_input {get;set;} public Dictionary<string,long> version {get;set;} public string network_error {get;set;} public string revision {get;set;} public bool can_remove {get;set;}}
+    internal sealed class SyncStatus {public string id {get;set;} public SyncGroup group {get;set;} public bool enabled {get;set;} public List<SyncMember> members {get;set;} public List<SyncPending> pending {get;set;} public List<SyncNearby> discovered {get;set;} public int port {get;set;} public bool waiting_input {get;set;} public Dictionary<string,long> version {get;set;} public string network_error {get;set;} public string revision {get;set;} public bool can_remove {get;set;} public long last_sync_at {get;set;} public SyncProgress progress {get;set;}}
     internal sealed class SyncInvitation {public string invite {get;set;} public string code {get;set;} public int expires_in {get;set;} public int port {get;set;}}
     internal sealed class SyncDescriptor {public string address {get;set;} public string token {get;set;}}
     internal static class DeviceSync {
@@ -31,6 +32,22 @@ namespace RimeQ {
         static string startupFailure;
         static readonly Stopwatch retryClock=Stopwatch.StartNew();
         static long retryAfter;
+        static readonly Stopwatch stageClock=Stopwatch.StartNew();
+        static string stage;
+        static void Stage(string value){if(stage!=value){stage=value;stageClock.Restart();if(Changed!=null)Changed();}}
+        internal static string SuccessTime(long seconds){return seconds<=0?"尚无成功记录":DateTimeOffset.FromUnixTimeSeconds(seconds).ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");}
+        internal static string ProgressText(SyncStatus status){
+            var p=status.progress;
+            if(!status.enabled)return "已暂停同步 · 本机输入和学习照常保留";
+            bool local=!string.IsNullOrEmpty(stage);
+            string text=local?stage:p==null?"正在读取同步进度":p.stage;
+            long seconds=local?stageClock.ElapsedMilliseconds/1000:p==null?0:p.elapsed_seconds;
+            bool waiting=local||p!=null&&p.confirmed<p.total&&p.total>1;
+            if(waiting)text+=" · 已持续 "+seconds+" 秒";
+            if(waiting&&seconds>=30)text+=" · 等待较久，请查看设备状态或重试";
+            if(p!=null){text+="\n当前已知变更："+p.confirmed+" / "+p.total+" 台设备已确认";if(!string.IsNullOrEmpty(p.transfer))text+="\n"+p.transfer+" · "+p.transfer_seconds+" 秒";}
+            return text;
+        }
         // Assigned only by the isolated coordinator test, never by application settings.
         internal static Func<int,Task<BrokerState>> EngineRequest=Broker.Request;
         static JavaScriptSerializer Json(){return new JavaScriptSerializer {MaxJsonLength=96*1024*1024,RecursionLimit=64};}
@@ -98,42 +115,48 @@ namespace RimeQ {
             if(busy||Paths.Get("SyncStarted","0")!="1"||(!force&&retryClock.ElapsedMilliseconds<retryAfter))return;busy=true;
             try{
                 await EnsureStarted();var status=await Call<SyncStatus>(new {action="status"});if(!status.enabled||status.group==null)return;
-                var probe=await EngineRequest(10);if(!probe.Ready||!probe.Handled){LastState="等待当前输入结束";return;}
+                var probe=await EngineRequest(10);if(!probe.Ready||!probe.Handled){LastState="等待当前输入结束";Stage(probe.Ready?"等待当前输入结束":"等待输入引擎就绪");return;}
                 var remote=status.revision;
-                if(!force&&LastError==null&&probe.Message==revision&&remote==version&&!status.waiting_input){LastState=lastAppliedState;return;}
-                var exported=await EngineRequest(11);if(!exported.Handled){LastState="等待当前输入结束";return;}
+                if(!force&&LastError==null&&probe.Message==revision&&remote==version&&!status.waiting_input){LastState=lastAppliedState;Stage(null);return;}
+                Stage("正在读取本机学习记录");
+                var exported=await EngineRequest(11);if(!exported.Handled){LastState="等待当前输入结束";Stage(LastState);return;}
                 var path=Path.Combine(Root,"engine","current.tsv");var actual=ToSync(DictionaryData.Parse(File.ReadAllText(path,new UTF8Encoding(false,true))));
+                Stage("正在合并同步记录");
                 var job=(await Call<SyncJobResult>(new {action="pending_apply",rows=actual})).job;
                 if(job!=null&&Same(actual,job.after)){await Call<object>(new {action="acknowledge",id=job.id,rows=actual});job=null;}
                 if(job==null)job=(await Call<SyncJobResult>(new {action="capture",rows=actual})).job;
                 if(job!=null){
+                    Stage("正在写入本机词库");
                     if(!Same(actual,job.before))throw new IOException("同步恢复期间词库已有新修改。已保留本机记录和恢复快照，请在同步页面处理。");
                     Paths.AtomicText(Path.Combine(Root,"engine","before.tsv"),DictionaryData.Format(FromSync(actual)));
                     Paths.AtomicText(Path.Combine(Root,"engine","after.tsv"),DictionaryData.Format(FromSync(job.after)));
                     var applied=await EngineRequest(12);
-                    if(!applied.Handled){if(applied.Message=="sync-stale"){await Call<object>(new {action="abort_unapplied",id=job.id});revision=null;return;}if(applied.Message=="sync-busy"){LastState="等待当前输入结束";return;}throw new IOException("同步写入未能完整完成，已保留备份，将在下次检查时恢复。");}
+                    if(!applied.Handled){if(applied.Message=="sync-stale"){await Call<object>(new {action="abort_unapplied",id=job.id});revision=null;Stage("本机有新修改，等待重新合并");return;}if(applied.Message=="sync-busy"){LastState="等待当前输入结束";Stage(LastState);return;}throw new IOException("同步写入未能完整完成，已保留备份，将在下次检查时恢复。");}
+                    Stage("正在校验写入并确认");
                     actual=ToSync(DictionaryData.Parse(File.ReadAllText(path,new UTF8Encoding(false,true))));
                     await Call<object>(new {action="acknowledge",id=job.id,rows=actual});revision=applied.Message;
                 }else revision=exported.Message;
-                version=remote;LastError=null;retryAfter=0;LastState=lastAppliedState="本机学习记录已完整应用";
-            }catch(Exception error){LastError=error.Message;LastState="同步暂未完成，30 秒后自动重试";retryAfter=retryClock.ElapsedMilliseconds+30000;}finally{busy=false;if(Changed!=null)Changed();}
+                version=remote;LastError=null;retryAfter=0;LastState=lastAppliedState="本机学习记录已完整应用";Stage(null);
+            }catch(Exception error){LastError=error.Message;LastState="同步暂未完成，30 秒后自动重试";Stage("同步失败，等待自动重试");retryAfter=retryClock.ElapsedMilliseconds+30000;}finally{busy=false;if(Changed!=null)Changed();}
         }
         internal static async Task RecoverLocal(){
             if(busy)throw new IOException("正在同步，请稍后重试。");busy=true;
             try{
                 var job=(await Call<SyncJobResult>(new {action="pending_apply"})).job;
                 if(job==null)return;
+                Stage("正在读取本机学习记录");
                 var exported=await EngineRequest(11);if(!exported.Handled)throw new IOException("请结束当前输入后重试。");
                 var actual=ToSync(DictionaryData.Parse(File.ReadAllText(Path.Combine(Root,"engine","current.tsv"),new UTF8Encoding(false,true))));
                 var backup=Path.Combine(Root,"backups");Directory.CreateDirectory(backup);var tag=Guid.NewGuid().ToString("N");
                 Paths.AtomicText(Path.Combine(backup,"recovery-local-"+tag+".tsv"),DictionaryData.Format(FromSync(actual)));
                 Paths.AtomicText(Path.Combine(backup,"recovery-target-"+tag+".tsv"),DictionaryData.Format(FromSync(job.after)));
-                await Call<object>(new {action="recover_local",id=job.id,rows=actual});revision=null;version=null;LastError=null;retryAfter=0;
-            }finally{busy=false;}
+                Stage("正在恢复并确认本机词库");
+                await Call<object>(new {action="recover_local",id=job.id,rows=actual});revision=null;version=null;LastError=null;retryAfter=0;Stage(null);
+            }catch(Exception error){LastError=error.Message;Stage("恢复未完成，请查看错误并重试");throw;}finally{busy=false;}
         }
         internal static async Task Leave(){
             Paths.Set("SyncStarted","0");while(busy)await Task.Delay(100);
-            try{await Call<object>(new {action="leave"});revision=null;version=null;LastError=null;LastState=null;lastAppliedState=null;retryAfter=0;}
+            try{await Call<object>(new {action="leave"});revision=null;version=null;LastError=null;LastState=null;lastAppliedState=null;retryAfter=0;Stage(null);}
             catch{Paths.Set("SyncStarted","1");throw;}
         }
         internal static void Stop(){try{Task.Run(()=>Call<object>(new {action="shutdown"})).Wait(1500);}catch(Exception){}}

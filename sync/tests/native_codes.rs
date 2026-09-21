@@ -56,7 +56,7 @@ fn v1_pending_upgrade_keeps_excluded_learning_and_remote_changes() {
         let store=Store::memory(Identity::generate()).unwrap();store.create_group("Synthetic","A").unwrap();
         let old=Row {key:Key::pinyin("Legacy","ce shi").unwrap(),weight:7};
         let native=Row {key:Key::pinyin("Native","amazon").unwrap(),weight:19};
-        store.capture(&[old.clone()]).unwrap();store.prepare_apply().unwrap();
+        store.capture(std::slice::from_ref(&old)).unwrap();store.prepare_apply().unwrap();
         store.change(vec![Change {key:old.key.clone(),weight:Some(11)}]).unwrap();
         let pending=store.prepare_apply().unwrap().unwrap();
         let mut legacy=serde_json::to_value(&pending).unwrap();legacy.as_object_mut().unwrap().remove("protocol");

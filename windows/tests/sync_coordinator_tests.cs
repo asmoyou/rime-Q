@@ -22,6 +22,8 @@ namespace RimeQ {
             return new BrokerState {Ready=true,Handled=fields[0]=="ok",Message=fields.Length>1?fields[1]:""};
         }
         static Task<BrokerState> Request(int command){
+            if(command==11)Require(DeviceSync.ProgressText(new SyncStatus {enabled=true}).Contains("正在读取本机学习记录"),"Export stage not observable");
+            if(command==12)Require(DeviceSync.ProgressText(new SyncStatus {enabled=true}).Contains("正在写入本机词库"),"Apply stage not observable");
             ++calls;if(command==10&&failProbe)throw new IOException("Synthetic engine failure");
             if(command==11)++exports;
             var result=Send(command==10?"probe":command==11?"export":"apply");
@@ -38,6 +40,9 @@ namespace RimeQ {
         static SyncRow Row(string text,string code,int weight=1){return new SyncRow {key=new SyncKey {@namespace="rime_q/full-pinyin/v1",text=text,code=code},weight=weight};}
         static async Task Change(SyncRow row,int? weight){await DeviceSync.Call<object>(new {action="fixture_change",changes=new[]{new {key=row.key,weight=weight}}});}
         static async Task Run(){
+            var stalled=new SyncStatus {enabled=true,progress=new SyncProgress {stage="等待其他设备应用并确认",confirmed=1,total=2,elapsed_seconds=31}};
+            Require(DeviceSync.ProgressText(stalled).Contains("等待较久")&&DeviceSync.ProgressText(stalled).Contains("1 / 2"),"Stalled confirmation is not visible");
+            stalled.enabled=false;Require(DeviceSync.ProgressText(stalled).StartsWith("已暂停同步"),"Pause was hidden by stale progress");
             var local=Row("合成全拼","ce shi",5);var english=Row("SyntheticEnglish","amazon",17);var abbreviated=Row("合成简码","u",19);
             var seed=new[]{local,english,abbreviated,Row("SyntheticAcronym","NASA",3),Row("SyntheticCase","iPhone",21),Row("SyntheticLong","internationalization",22)};
             Write(seed);
@@ -48,12 +53,14 @@ namespace RimeQ {
             Require(DeviceSync.Same(complete.rows,seed),"Native learning rows were silently excluded or rewritten in sync");
             var status=await DeviceSync.Call<SyncStatus>(new {action="status"});
             Require(status.members.Single(m=>m.self).applied,"Local receipt not applied");
+            Require(status.last_sync_at==0&&DeviceSync.SuccessTime(0)=="尚无成功记录","Single-node capture claimed cross-device success");
             Require(Read().Count==6,"Initial capture lost local records");
             var remote=Row("合成远端","yuan duan",7);
             await Change(local,null);await Change(remote,7);await DeviceSync.Tick(true);
             Require(DeviceSync.LastError==null,"Remote apply failed: "+DeviceSync.LastError);
             Require(DeviceSync.Same(Read(),seed.Where(r=>r!=local).Concat(new[]{remote})),"Remote changes lost native data or ignored deletion");
             failProbe=true;await DeviceSync.Tick(true);Require(DeviceSync.LastError!=null,"Synthetic error not reported");int before=calls;
+            Require(DeviceSync.ProgressText(status).Contains("同步失败，等待自动重试"),"Retry phase missing");
             await DeviceSync.Tick();await DeviceSync.Tick();Require(calls==before,"Failure retries did not back off");
             failProbe=false;await DeviceSync.Tick(true);Require(calls>before&&DeviceSync.LastError==null,"Manual sync did not bypass backoff or clear stale error");
             // Applied engine data but no receipt: next run acknowledges the complete snapshot.
@@ -71,7 +78,8 @@ namespace RimeQ {
             Require(DeviceSync.LastError==null&&Read().Any(r=>r.key.code=="amazon"),"RecoverLocal rejected or erased engine-only records");
             await Change(english,23);await Change(abbreviated,null);await DeviceSync.Tick(true);
             Require(DeviceSync.LastError==null&&Read().Single(r=>r.key.code=="amazon").weight==23&&!Read().Any(r=>r.key.code=="u"),"Native-code update/deletion did not reach engine");
-            Send("begin");before=exports;await DeviceSync.Tick(true);Require(exports==before,"Active composition was exported");Send("cancel");
+            Send("begin");before=exports;await DeviceSync.Tick(true);Require(exports==before,"Active composition was exported");
+            Require(DeviceSync.ProgressText(status).Contains("等待当前输入结束"),"Input wait phase missing");Send("cancel");
             Console.WriteLine("PASS real coordinator + Rust + librime: complete native codes and case, applied receipt, remote deletion/update, retry backoff, manual retry, interrupted-write recovery, recover-local, active input guard");
         }
         static int Main(string[] args){

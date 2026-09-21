@@ -155,6 +155,56 @@ def reject_unauthorized(inviter, guest):
                 pass
 
 
+def check_observability(binary, root):
+    """No user data: receipts, not transport or status reads, define success."""
+    nodes = [Node(binary, root / f"progress-{i}", f"Progress {i}") for i in range(2)]
+    a, b = nodes
+    try:
+        a.call("create", group="Progress", name=a.name)
+        assert a.call("status")["last_sync_at"] == 0
+        assert a.call("status")["progress"]["stage"] == "等待添加其他设备"
+        pair(a, b)
+        assert a.call("status")["last_sync_at"] == 0, "Connection alone reported success"
+        for n in nodes:
+            n.call("capture", rows=[])
+        until(lambda: all(n.call("status")["last_sync_at"] > 0 for n in nodes), "Confirmed empty dictionaries have no success time")
+        times = [n.call("status")["last_sync_at"] for n in nodes]
+        time.sleep(1.1)
+        for i, n in enumerate(nodes):
+            n.call("capture", rows=[])
+            n.call("sync_now")
+            assert n.call("status")["last_sync_at"] == times[i], "No-op check rewrote success time"
+            assert n.call("status")["progress"]["confirmed"] == 2
+        b.stop(); b.start()
+        assert b.call("status")["last_sync_at"] == times[1], "Restart lost persisted time"
+        a.call("add_peer", address=b.address())
+        b.call("pause")
+        change(a, "合成进度", 7)
+        waiting = a.call("status")
+        assert waiting["last_sync_at"] == times[0]
+        assert waiting["progress"]["confirmed"] == 1
+        time.sleep(1.1)
+        assert a.call("status")["progress"]["elapsed_seconds"] >= 1
+        b.call("resume"); a.call("sync_now"); b.call("sync_now")
+        until(lambda: len(rows(b)) == 1, "Transfer did not arrive")
+        job = b.call("capture", rows=[])["job"]
+        assert job and b.call("status")["last_sync_at"] == times[1], "Transfer counted as engine application"
+        try:
+            b.call("acknowledge", id=job["id"], rows=[])
+            raise AssertionError("Invalid acknowledgement accepted")
+        except RuntimeError:
+            pass
+        assert b.call("status")["last_sync_at"] == times[1], "Failure changed success time"
+        b.call("acknowledge", id=job["id"], rows=job["after"])
+        until(lambda: all(n.call("status")["last_sync_at"] > times[i] for i, n in enumerate(nodes)), "New confirmed version did not update time")
+        assert all(n.call("status")["progress"]["confirmed"] == 2 for n in nodes)
+        b.call("leave"); b.stop(); b.start()
+        assert b.call("status")["last_sync_at"] == 0, "New identity retained former group time"
+    finally:
+        for n in nodes:
+            n.stop()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--binary", required=True, type=Path)
@@ -166,6 +216,8 @@ def main():
     cases = []
     start = time.monotonic()
     with tempfile.TemporaryDirectory(prefix="rimeq-lan-process-") as temporary:
+        check_observability(args.binary.resolve(), Path(temporary))
+        cases.append("confirmation_times_noop_failure_restart_leave_and_stage_duration")
         nodes = []
         try:
             for i in range(args.nodes):

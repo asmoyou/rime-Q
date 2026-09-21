@@ -65,7 +65,8 @@ import QRimeBridge
                 case "tick":
                     defaults.set(true, forKey: "SyncStarted")
                     try wait { await sync.tick(force: command["force"] as? Bool ?? true) }
-                    response = ["error": sync.lastError as Any? ?? NSNull(), "composition": InputSession.hasComposition, "document": client.document]
+                    response = ["error": sync.lastError as Any? ?? NSNull(), "composition": InputSession.hasComposition, "document": client.document,
+                                "progress": sync.progressText(["enabled": true])]
                 case "preference": response = ["started": defaults.bool(forKey: "SyncStarted")]
                 case "disabled":
                     defaults.set(false, forKey: "SyncStarted")

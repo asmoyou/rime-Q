@@ -159,6 +159,7 @@ def run(binary, output):
                 until(lambda: nodes[-1].call('status')['rows'] == len(expected), 'update not received during input', 60)
                 result = engines[-1].tick()
                 assert result['composition'] and result['document'] == ''
+                assert '等待当前输入结束' in result['progress']
                 engines[-1].call('cancel'); converge(expected)
                 cases.append('active_composition_not_committed_or_overwritten')
 
@@ -283,8 +284,12 @@ def run(binary, output):
                 engines[2].call('native_delete',rows=[native[1]])
                 expected.remove(native[1]);converge(expected)
                 cases.append('native_code_weight_update_and_deletion_converge')
-                engines[0].call('hook', after='status', effect='fail')
-                assert engines[0].call('tick')['error'] is not None
+                # ensureStarted intentionally tolerates a failed status probe;
+                # inject at the actual dictionary-coordination boundary instead.
+                engines[0].call('hook', after='pending_apply', effect='fail')
+                failed = engines[0].call('tick')
+                assert failed['error'] is not None
+                assert '同步失败，等待自动重试' in failed['progress']
                 engines[0].call('hook', after='status', effect='begin', before=True)
                 assert not engines[0].call('tick', force=False)['composition'], 'automatic retry ignored backoff'
                 assert engines[0].call('tick', force=True)['composition'], 'manual sync did not bypass backoff'

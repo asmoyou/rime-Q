@@ -9,6 +9,10 @@ import AppKit
     private let activity = SyncUI.text("正在读取设备状态…", size: 12, secondary: true)
     private let summaryTitle = SyncUI.text("", size: 16, weight: .semibold)
     private let summaryDetail = SyncUI.text("", size: 12, secondary: true)
+    private let syncTime = SyncUI.text("", size: 12, secondary: true)
+    private let syncProgress = SyncUI.text("", size: 12)
+    private let confirmation = NSProgressIndicator()
+    private var progressObserver: NSObjectProtocol?
     private let memberList = SettingsLayout.vertical([], spacing: 0)
     private let requests = SettingsLayout.vertical([], spacing: 8)
     private let search = NSSearchField()
@@ -37,6 +41,9 @@ import AppKit
         window.minSize = .init(width: 680, height: 580); window.isReleasedWhenClosed = false; window.center()
         super.init(window: window)
         window.delegate = self; window.contentView = root
+        confirmation.style = .bar; confirmation.isIndeterminate = false
+        confirmation.setAccessibilityLabel("当前已知变更的设备确认进度")
+        syncTime.toolTip = "本机观察到双方已应用同一已知版本的时间；无新变更的检查不会更新时间。离线设备仍可能有未传出的变更。"
         search.placeholderString = "搜索设备"; search.delegate = self; search.controlSize = .large
         search.setAccessibilityLabel("搜索已加入的设备")
         progress.style = .spinning; progress.controlSize = .small; progress.isDisplayedWhenStopped = false
@@ -59,17 +66,31 @@ import AppKit
     override func showWindow(_ sender: Any?) {
         super.showWindow(sender)
         if timer == nil {
-            timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+            timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
                 Task { @MainActor [weak self] in
                     guard let self, self.window?.isVisible == true else { return }
+                    self.updateProgress()
                     await self.refresh()
                 }
             }
         }
+        if progressObserver == nil {
+            progressObserver = NotificationCenter.default.addObserver(forName: DeviceSync.changed, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.updateProgress() }
+            }
+        }
         Task { await refresh() }
     }
-    func windowWillClose(_ notification: Notification) { timer?.invalidate(); timer = nil }
-    deinit { timer?.invalidate() }
+    func windowWillClose(_ notification: Notification) { timer?.invalidate(); timer = nil; if let progressObserver { NotificationCenter.default.removeObserver(progressObserver) }; progressObserver = nil }
+    deinit { timer?.invalidate(); if let progressObserver { NotificationCenter.default.removeObserver(progressObserver) } }
+
+    private func updateProgress() {
+        syncTime.stringValue = "最近成功同步：" + DeviceSync.successTime((state["last_sync_at"] as? NSNumber)?.doubleValue ?? 0)
+        syncProgress.stringValue = sync.progressText(state)
+        let p = state["progress"] as? [String: Any] ?? [:]
+        confirmation.maxValue = max(1, (p["total"] as? NSNumber)?.doubleValue ?? 0)
+        confirmation.doubleValue = (p["confirmed"] as? NSNumber)?.doubleValue ?? 0
+    }
 
     private func button(_ title: String, symbol: String? = nil, primary: Bool = false,
                         action: @escaping () -> Void) -> SyncActionButton {
@@ -110,11 +131,13 @@ import AppKit
             retryButton.isHidden = false
             if !loaded { buildLanding(); loaded = true }
             showError(error.localizedDescription)
+            syncProgress.stringValue = "服务暂不可用，请点重试连接"
             if !working { activity.stringValue = "服务暂不可用，请点重试连接" }
         }
     }
     private func render(_ value: [String: Any]) {
         state = value
+        updateProgress()
         let group = value["group"] as? [String: Any], id = group?["id"] as? String
         if !loaded || shownGroup != id {
             shownGroup = id; loaded = true; controls.removeAll(); memberRows.removeAll(); memberIDs = []; pendingIDs = []
@@ -189,7 +212,8 @@ import AppKit
         let card = SettingsCard([requests], padding: 16); card.isHidden = true; pendingCard = card
         let more = button("更多", symbol: "ellipsis") { [weak self] in self?.showMore() }; more.isBordered = false; moreButton = more
         let foot = SyncUI.row([SyncUI.text("离线设备会在重新连接后补齐变更。", size: 11, secondary: true), SyncUI.spacer(), more])
-        SyncUI.replace(body, with: [summary, card, tools, search, SettingsCard([memberList]), foot])
+        let progressCard = SettingsCard([syncTime, syncProgress, confirmation], padding: 16, spacing: 10)
+        SyncUI.replace(body, with: [summary, progressCard, card, tools, search, SettingsCard([memberList]), foot])
     }
     private func updateMembers(_ devices: [[String: Any]]) {
         let ids = devices.compactMap { $0["id"] as? String }
@@ -301,12 +325,16 @@ import AppKit
 
     func validateUnusedForSmoke() async throws {
         await refresh(); await refresh()
+        let stalled: [String: Any] = ["enabled": true, "progress": ["stage": "等待其他设备应用并确认", "confirmed": 1, "total": 2, "elapsed_seconds": 31]]
+        try EngineSmoke.check(sync.progressText(stalled).contains("等待较久") && sync.progressText(stalled).contains("1 / 2"), "stalled confirmation not visible")
+        try EngineSmoke.check(DeviceSync.successTime(0) == "尚无成功记录", "missing time reported as success")
         try EngineSmoke.check(loaded && state["group"] is NSNull, "unused sync page did not show setup")
         try EngineSmoke.check(!FileManager.default.fileExists(atPath: sync.root.path), "viewing unused sync started a helper or created an identity")
     }
 
     func validateForSmoke(destination: URL) async throws {
         await refresh()
+        try EngineSmoke.check(syncTime.stringValue.hasPrefix("最近成功同步：") && syncProgress.stringValue.contains("台设备已确认"), "sync time and confirmation progress missing")
         try EngineSmoke.check(memberRows.count == 6, "sync window lost group members")
         let first = memberRows.values.first
         await refresh()

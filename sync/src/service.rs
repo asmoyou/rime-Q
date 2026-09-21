@@ -70,6 +70,33 @@ struct Peer {
     next_attempt: Instant,
     failures: u32,
 }
+#[derive(Clone, Serialize, Deserialize)]
+struct Completion {
+    revision: String,
+    version: Vector,
+    at: u64,
+}
+struct Transfer {
+    label: &'static str,
+    started: Instant,
+}
+// RAII also clears progress when a connection is cancelled or times out.
+struct TransferGuard { shared: Shared, id: String }
+impl TransferGuard {
+    fn new(shared: Shared, label: &'static str) -> Self {
+        let id = identity::random();
+        shared.lock().unwrap().transfers.insert(id.clone(), Transfer { label, started: Instant::now() });
+        Self { shared, id }
+    }
+    fn stage(&self, label: &'static str) {
+        if let Some(t) = self.shared.lock().unwrap().transfers.get_mut(&self.id) {
+            t.label = label; t.started = Instant::now();
+        }
+    }
+}
+impl Drop for TransferGuard {
+    fn drop(&mut self) { if let Ok(mut s) = self.shared.lock() { s.transfers.remove(&self.id); } }
+}
 struct State {
     store: Store,
     root: PathBuf,
@@ -92,6 +119,8 @@ struct State {
     // The claimed id is only an error hint, never authentication or membership.
     // A later authenticated v2 connection clears hints for obsolete addresses.
     incompatible_peers: BTreeMap<String, String>,
+    transfers: BTreeMap<String, Transfer>,
+    progress_watch: std::cell::RefCell<(String, Instant)>,
 }
 #[derive(Debug)]
 struct ProtocolMismatch { claimed_id: String }
@@ -277,7 +306,29 @@ fn receipt(s: &State) -> Result<()> {
     let mut receipts: BTreeMap<String, Receipt> = s.store.get("receipts")?.unwrap_or_default();
     receipts.insert(r.id.clone(), r);
     s.store.set("receipt_seq", &seq)?;
-    s.store.set("receipts", &receipts)
+    s.store.set("receipts", &receipts)?;
+    record_completions(s)
+}
+
+// Locally observed confirmation times, never remote wall clocks. No-op receipt
+// sequence increments and polling must not turn an old success into "just now".
+fn record_completions(s: &State) -> Result<()> {
+    let receipts: BTreeMap<String, Receipt> = s.store.get("receipts")?.unwrap_or_default();
+    let version = s.store.vector()?;
+    let revision = s.store.revision()?;
+    let applied = |id: &str| receipts.get(id).is_some_and(|r| r.revision == revision && covers(&r.version, &version));
+    if !applied(&s.store.id()) || !s.store.enabled() { return Ok(()); }
+    let mut completed: BTreeMap<String, Completion> = s.store.get("sync_completed")?.unwrap_or_default();
+    let mut changed = false;
+    for member in s.store.members()? {
+        if member.id == s.store.id() || !s.store.authorized(&member.id)? || !applied(&member.id) { continue; }
+        if completed.get(&member.id).is_none_or(|old| old.revision != revision || old.version != version) {
+            completed.insert(member.id, Completion { revision: revision.clone(), version: version.clone(), at: now() });
+            changed = true;
+        }
+    }
+    if changed { s.store.set("sync_completed", &completed)?; }
+    Ok(())
 }
 
 async fn serve_peer(
@@ -448,6 +499,7 @@ async fn exchange<S: AsyncRead + AsyncWrite + Unpin>(
     client: bool,
     peer_id: &str,
 ) -> Result<()> {
+    let progress = TransferGuard::new(shared.clone(), "正在交换版本与回执");
     let own = {
         let s = shared.lock().unwrap();
         ensure!(s.store.enabled(), "sync paused");
@@ -471,6 +523,7 @@ async fn exchange<S: AsyncRead + AsyncWrite + Unpin>(
         );
         s.store.missing(&remote.version, MAX_BATCH)?
     };
+    progress.stage("正在传输词库变更");
     let incoming: Vec<Operation> = if client {
         network::write(stream, &outgoing).await?;
         network::read(stream).await?
@@ -484,11 +537,14 @@ async fn exchange<S: AsyncRead + AsyncWrite + Unpin>(
         ensure!(s.store.enabled(), "sync paused");
         ensure!(s.store.authorized(peer_id)?, "peer was removed");
         s.store.receive(&incoming)?;
+        record_completions(&s)?;
     }
     Ok(())
 }
 async fn sync_peer(shared: Shared, address: SocketAddr) -> Result<String> {
+    let progress = TransferGuard::new(shared.clone(), "正在连接设备");
     let mut stream = network::connect(address).await?;
+    progress.stage("正在验证设备身份");
     let binding =
         stream
             .get_ref()
@@ -529,6 +585,7 @@ async fn sync_peer(shared: Shared, address: SocketAddr) -> Result<String> {
         }
         bail!("this device was removed");
     }
+    drop(progress);
     exchange(shared, &mut stream, true, &hello.id).await?;
     Ok(hello.id)
 }
@@ -660,13 +717,14 @@ fn status(s: &State) -> Result<Value> {
         .get::<Group>("group")?
         .is_some_and(|g| g.founder == s.store.id());
     let receipts: BTreeMap<String, Receipt> = s.store.get("receipts")?.unwrap_or_default();
+    let completed: BTreeMap<String, Completion> = s.store.get("sync_completed")?.unwrap_or_default();
     let seen = &s.seen;
     let members:Vec<_>=s.store.members()?.iter().map(|m| {
         let p=s.peers.get(&m.id);let r=receipts.get(&m.id);let removed=!s.store.authorized(&m.id).unwrap_or(false);
         let last_seen=p.map(|p|p.last_seen).unwrap_or(0).max(seen.get(&m.id).copied().unwrap_or(0));
         let online=m.id==s.store.id() || now().saturating_sub(last_seen)<20;
         let applied=r.is_some_and(|r|r.revision==revision && covers(&r.version,&version));
-        json!({"id":m.id,"name":m.name,"self":m.id==s.store.id(),"removed":removed,"online":online,"applied":applied,"last_seen":last_seen,"needs_upgrade":s.incompatible_peers.contains_key(&m.id)})
+        json!({"id":m.id,"name":m.name,"self":m.id==s.store.id(),"removed":removed,"online":online,"applied":applied,"last_seen":last_seen,"last_sync_at":completed.get(&m.id).map(|c|c.at).unwrap_or(0),"needs_upgrade":s.incompatible_peers.contains_key(&m.id)})
     }).collect();
     let pending: Vec<_> = s
         .pending
@@ -675,8 +733,26 @@ fn status(s: &State) -> Result<Value> {
         .collect();
     let network_error=s.network_error.clone().or_else(|| (!s.incompatible_peers.is_empty()).then(||
         "设备的同步协议版本不一致，请将两端 Rime Q 都升级到支持完整学习记录同步的版本；无需重新配对，本机词库保留。".into()));
+    let valid: Vec<_> = members.iter().filter(|m| m["removed"] != true).collect();
+    let total = valid.len();
+    let confirmed = valid.iter().filter(|m| m["applied"] == true).count();
+    let stage = if !s.store.enabled() { "已暂停同步" }
+        else if !s.incompatible_peers.is_empty() { "等待设备升级" }
+        else if total < 2 { "等待添加其他设备" }
+        else if valid.iter().any(|m| m["self"] == true && m["applied"] != true) { "等待本机应用" }
+        else if confirmed == total { "当前已知变更已确认" }
+        else if valid.iter().any(|m| m["applied"] != true && m["online"] != true) { "等待离线设备连接" }
+        else { "等待其他设备应用并确认" };
+    let key = format!("{revision}:{stage}:{confirmed}/{total}");
+    let mut watch = s.progress_watch.borrow_mut();
+    if watch.0 != key { *watch = (key.clone(), Instant::now()); }
+    let elapsed = watch.1.elapsed().as_secs();
+    let transfer = s.transfers.values().max_by_key(|t| t.started);
+    let last_sync_at = valid.iter().filter_map(|m| m["last_sync_at"].as_u64()).max().unwrap_or(0);
+    let progress = json!({"stage":stage,"key":key,"elapsed_seconds":elapsed,"confirmed":confirmed,"total":total,
+        "transfer":transfer.map(|t|t.label),"transfer_seconds":transfer.map(|t|t.started.elapsed().as_secs()).unwrap_or(0)});
     Ok(
-        json!({"protocol":PROTOCOL,"id":s.store.id(),"group":s.store.get::<Group>("group")?,"enabled":s.store.enabled(),"can_remove":can_remove,"members":members,"pending":pending,"discovered":s.discovered.values().collect::<Vec<_>>(),"port":s.port,"bind":s.bind.to_string(),"rows":s.store.rows()?.len(),"version":version,"revision":revision,"waiting_input":s.store.get::<ApplyJob>("apply_job")?.is_some(),"network_error":network_error}),
+        json!({"protocol":PROTOCOL,"id":s.store.id(),"group":s.store.get::<Group>("group")?,"enabled":s.store.enabled(),"can_remove":can_remove,"members":members,"pending":pending,"discovered":s.discovered.values().collect::<Vec<_>>(),"port":s.port,"bind":s.bind.to_string(),"rows":s.store.rows()?.len(),"version":version,"revision":revision,"waiting_input":s.store.get::<ApplyJob>("apply_job")?.is_some(),"network_error":network_error,"last_sync_at":last_sync_at,"progress":progress}),
     )
 }
 
@@ -1034,6 +1110,8 @@ pub async fn run(
         stop: false,
         network_error: None,
         incompatible_peers: BTreeMap::new(),
+        transfers: BTreeMap::new(),
+        progress_watch: std::cell::RefCell::new((String::new(), Instant::now())),
     }));
     let controls = shared.clone();
     let control_task = tokio::spawn(async move {

@@ -56,9 +56,11 @@ namespace RimeQ {
         internal readonly Window Window;
         readonly StackPanel content=new StackPanel(),members=new StackPanel(),requests=new StackPanel();
         readonly TextBlock status=Label("正在读取设备状态…"),empty=Label("");
+        readonly TextBlock syncTime=Label(""),syncProgress=Label("");
+        readonly ProgressBar confirmation=new ProgressBar {Height=4,Margin=new Thickness(0,0,0,16),Visibility=Visibility.Collapsed};
         readonly Button retryButton;
         readonly TextBox search=new TextBox {MinHeight=30,Margin=new Thickness(0,0,0,12)};
-        readonly DispatcherTimer timer=new DispatcherTimer {Interval=TimeSpan.FromSeconds(2)};
+        readonly DispatcherTimer timer=new DispatcherTimer {Interval=TimeSpan.FromSeconds(1)};
         readonly Dictionary<string,DeviceRow> rows=new Dictionary<string,DeviceRow>();
         SyncStatus current;
         bool refreshing,working,joined;
@@ -84,11 +86,14 @@ namespace RimeQ {
             var title=Label("附近设备同步");title.FontSize=23;title.FontWeight=FontWeights.SemiBold;panel.Children.Add(title);
             panel.Children.Add(Label("只在你信任的局域网开启。同步个人词条和学习权重；本地网络或防火墙授权被拒绝时，输入与本机学习不受影响。"));
             panel.Children.Add(status);
+            panel.Children.Add(syncTime);panel.Children.Add(syncProgress);panel.Children.Add(confirmation);
+            syncTime.ToolTip="本机观察到双方已应用同一已知版本的时间；无新变更的检查不会更新时间。离线设备仍可能有未传出的变更。";
             retryButton=Command("重试连接",()=>DeviceSync.EnsureStarted(true));
             retryButton.Visibility=Visibility.Collapsed;panel.Children.Add(retryButton);panel.Children.Add(content);
-            timer.Tick+=async(s,e)=>{if(!working)await Refresh();};
+            timer.Tick+=async(s,e)=>{UpdateProgress();await Refresh();};
+            DeviceSync.Changed+=UpdateProgress;
             Window.Loaded+=async(s,e)=>{await Refresh();timer.Start();};
-            Window.Closed+=(s,e)=>timer.Stop();
+            Window.Closed+=(s,e)=>{timer.Stop();DeviceSync.Changed-=UpdateProgress;};
             search.TextChanged+=(s,e)=>ShowMembers();
             AutomationProperties.SetName(search,"搜索设备");
         }
@@ -98,11 +103,11 @@ namespace RimeQ {
                 current=await DeviceSync.DisplayStatus();
                 retryButton.Visibility=Visibility.Collapsed;
                 bool isJoined=current.group!=null;
+                UpdateProgress();
                 if(content.Children.Count==0||joined!=isJoined){joined=isJoined;Build();}
                 if(!isJoined){status.Text="尚未加入同步组。你可以创建，或加入已有设备的同步组。";return;}
                 var valid=(current.members??new List<SyncMember>()).Where(m=>!m.removed).ToList();
                 status.Text=current.group.name+" · "+valid.Count+" 台设备 · "+valid.Count(m=>m.online)+" 台在线"+(current.enabled?"":" · 已暂停");
-                if(current.enabled&&!string.IsNullOrEmpty(DeviceSync.LastState))status.Text+="\n"+DeviceSync.LastState;
                 if(!string.IsNullOrEmpty(DeviceSync.LastError))status.Text+="\n"+DeviceSync.LastError;
                 if(!string.IsNullOrEmpty(current.network_error))status.Text+="\n"+current.network_error;
                 pauseButton.Content=current.enabled?"暂停同步":"恢复同步";
@@ -117,9 +122,20 @@ namespace RimeQ {
                 }
             }catch(Exception error){
                 status.Text=error.Message;
+                syncProgress.Text="服务暂不可用，请点重试连接";
                 retryButton.Visibility=Visibility.Visible;
                 if(content.Children.Count==0){joined=false;Build();}
             }finally{refreshing=false;}
+        }
+        void UpdateProgress(){
+            bool visible=current!=null&&current.group!=null;
+            syncTime.Visibility=syncProgress.Visibility=confirmation.Visibility=visible?Visibility.Visible:Visibility.Collapsed;
+            if(!visible)return;
+            syncTime.Text="最近成功同步："+DeviceSync.SuccessTime(current.last_sync_at);
+            syncProgress.Text=DeviceSync.ProgressText(current);
+            confirmation.Maximum=Math.Max(1,current.progress==null?0:current.progress.total);
+            confirmation.Value=current.progress==null?0:current.progress.confirmed;
+            AutomationProperties.SetName(confirmation,"当前已知变更的设备确认进度");
         }
         void ShowMembers(){
             if(current==null||current.group==null)return;
@@ -215,7 +231,7 @@ namespace RimeQ {
                 text.TextTrimming=TextTrimming.CharacterEllipsis;Panel.Children.Add(text);
             }
             internal void Update(SyncMember member,bool paused,bool canRemove,Func<Task> action){
-                text.Text=member.name+(member.self?"（本机）":"");
+                text.Text=member.name+(member.self?"（本机）":"\n最近成功："+DeviceSync.SuccessTime(member.last_sync_at));
                 text.ToolTip=member.name;remove=async()=>{try{await action();}catch(Exception error){MessageBox.Show(error.Message,"同步操作未完成",MessageBoxButton.OK,MessageBoxImage.Warning);}};
                 state.Text=paused&&member.self?"已暂停":member.needs_upgrade?"需要升级":member.online?(member.applied?"已同步":"等待应用"):"等待连接";
                 state.ToolTip=member.needs_upgrade?"请将两端 Rime Q 升级到支持完整学习记录同步的版本；无需重新配对。":member.online&&member.applied?"已应用当前已知变更；离线设备可能还有未传出的词条。":"连接后自动同步；有组合输入时等待输入结束。";

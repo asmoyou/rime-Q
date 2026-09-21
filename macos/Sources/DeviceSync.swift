@@ -38,6 +38,31 @@ struct SyncApplication: Decodable { let id: String; let before: [SyncRecord]; le
     private var startupFailure: String?
     private var startupErrors: Pipe?
     private var retryAfter: TimeInterval = 0
+    private var stage: String?
+    private var stageSince = ProcessInfo.processInfo.systemUptime
+    private func setStage(_ value: String?) {
+        guard stage != value else { return }
+        stage = value; stageSince = ProcessInfo.processInfo.systemUptime
+        NotificationCenter.default.post(name: Self.changed, object: nil)
+    }
+    static func successTime(_ seconds: Double) -> String {
+        guard seconds > 0 else { return "尚无成功记录" }
+        let formatter = DateFormatter(); formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter.string(from: Date(timeIntervalSince1970: seconds))
+    }
+    func progressText(_ status: [String: Any]) -> String {
+        guard status["enabled"] as? Bool == true else { return "已暂停同步 · 本机输入和学习照常保留" }
+        let p = status["progress"] as? [String: Any] ?? [:]
+        let confirmed = p["confirmed"] as? Int ?? 0, total = p["total"] as? Int ?? 0
+        var text = stage ?? p["stage"] as? String ?? "正在读取同步进度"
+        let seconds = stage != nil ? Int(ProcessInfo.processInfo.systemUptime - stageSince) : p["elapsed_seconds"] as? Int ?? 0
+        let waiting = stage != nil || (confirmed < total && total > 1)
+        if waiting { text += " · 已持续 \(seconds) 秒" }
+        if waiting && seconds >= 30 { text += " · 等待较久，请查看设备状态或重试" }
+        text += "\n当前已知变更：\(confirmed) / \(total) 台设备已确认"
+        if let transfer = p["transfer"] as? String { text += "\n\(transfer) · \(p["transfer_seconds"] as? Int ?? 0) 秒" }
+        return text
+    }
 
     // Viewing an unused feature must not create an identity or access Keychain.
     func displayStatus() async throws -> [String: Any] {
@@ -201,49 +226,65 @@ struct SyncApplication: Decodable { let id: String; let before: [SyncRecord]; le
         busy = true; defer { busy = false; NotificationCenter.default.post(name: Self.changed, object: nil) }
         do {
             try await ensureStarted(); let status = try await request(["action": "status"])
-            guard status["enabled"] as? Bool == true, Engine.ready, !InputSession.hasComposition else { return }
+            guard status["enabled"] as? Bool == true, status["group"] is [String: Any] else { return }
+            guard Engine.ready else { setStage("等待输入引擎就绪"); return }
+            guard !InputSession.hasComposition else { setStage("等待当前输入结束"); return }
             let remote = try JSONSerialization.data(withJSONObject: ["revision": status["revision"] ?? ""], options: .sortedKeys)
-            guard force || lastError != nil || revision != QRimeLearningRevision() || remote != version || status["waiting_input"] as? Bool == true else { return }
-            guard !InputSession.hasComposition else { return }
+            guard force || lastError != nil || revision != QRimeLearningRevision() || remote != version || status["waiting_input"] as? Bool == true else { setStage(nil); return }
+            setStage("正在读取本机学习记录")
+            await Task.yield()
+            guard !InputSession.hasComposition else { setStage("等待当前输入结束"); return }
             var actual = try snapshot()
             var capturedRevision = QRimeLearningRevision()
+            setStage("正在合并同步记录")
             var pending = try job(await request(["action": "pending_apply", "rows": actual.map(\.object)]))
             if let value = pending, same(actual, value.after) {
                 _ = try await request(["action": "acknowledge", "id": value.id, "rows": actual.map(\.object)]); pending = nil
-                guard !InputSession.hasComposition else { return }
+                guard !InputSession.hasComposition else { setStage("等待当前输入结束"); return }
                 actual = try snapshot(); capturedRevision = QRimeLearningRevision()
             }
             if pending == nil { pending = try job(await request(["action": "capture", "rows": actual.map(\.object)])) }
             if let value = pending {
                 guard same(actual, value.before) else { throw LexiconError.message("同步恢复期间词库已有新修改。已保留本机记录和恢复快照，请在同步页面处理。") }
-                if InputSession.hasComposition { return }
+                if InputSession.hasComposition { setStage("等待当前输入结束"); return }
+                setStage("正在写入本机词库")
+                await Task.yield()
+                guard !InputSession.hasComposition else { setStage("等待当前输入结束"); return }
                 guard let observed = try apply(value) else {
-                    _ = try await request(["action": "abort_unapplied", "id": value.id]); revision = nil; return
+                    _ = try await request(["action": "abort_unapplied", "id": value.id]); revision = nil; setStage("本机有新修改，等待重新合并"); return
                 }
                 capturedRevision = QRimeLearningRevision()
+                setStage("正在校验写入并确认")
                 _ = try await request(["action": "acknowledge", "id": value.id, "rows": observed.map(\.object)])
             }
-            revision = capturedRevision; version = remote; lastError = nil; retryAfter = 0
+            revision = capturedRevision; version = remote; lastError = nil; retryAfter = 0; setStage(nil)
         } catch {
             lastError = error.localizedDescription + "\n30 秒后自动重试，也可点“立即同步”。"
             retryAfter = ProcessInfo.processInfo.systemUptime + 30
+            setStage("同步失败，等待自动重试")
         }
     }
     func recoverLocal() async throws {
         guard !busy else { throw LexiconError.message("正在同步，请稍后重试。") }
         busy = true; defer { busy = false }
+        do {
         guard let pending = try job(await request(["action": "pending_apply"])) else { return }
+        setStage("正在读取本机学习记录")
         let actual = try snapshot(), tag = UUID().uuidString
         try LexiconFiles.write(LexiconEntry.portable(actual.map(\.entry)), to: root.appendingPathComponent("backups/recovery-local-\(tag).tsv"))
         try LexiconFiles.write(LexiconEntry.portable(pending.after.map(\.entry)), to: root.appendingPathComponent("backups/recovery-target-\(tag).tsv"))
+        setStage("正在恢复并确认本机词库")
         _ = try await request(["action": "recover_local", "id": pending.id, "rows": actual.map(\.object)])
-        revision = nil; version = nil; lastError = nil; retryAfter = 0
+        revision = nil; version = nil; lastError = nil; retryAfter = 0; setStage(nil)
+        } catch {
+            lastError = error.localizedDescription; setStage("恢复未完成，请查看错误并重试"); throw error
+        }
     }
     func leave() async throws {
         defaults.set(false, forKey: "SyncStarted")
         timer?.invalidate(); timer = nil
         while busy { try await Task.sleep(nanoseconds: 100_000_000) }
-        do { _ = try await request(["action": "leave"]); revision = nil; version = nil; lastError = nil; retryAfter = 0 }
+        do { _ = try await request(["action": "leave"]); revision = nil; version = nil; lastError = nil; retryAfter = 0; setStage(nil) }
         catch { markStarted(); throw error }
     }
     func stop() {

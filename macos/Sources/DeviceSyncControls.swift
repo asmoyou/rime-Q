@@ -106,7 +106,7 @@ import AppKit
     func update(_ device: [String: Any], paused: Bool) {
         let own = device["self"] as? Bool == true
         name.stringValue = device["name"] as? String ?? "未命名设备"; name.toolTip = name.stringValue
-        detail.stringValue = own ? "这台电脑" : "已授权的设备"
+        detail.stringValue = own ? "这台电脑" : "最近成功：" + DeviceSync.successTime((device["last_sync_at"] as? NSNumber)?.doubleValue ?? 0)
         let online = device["online"] as? Bool == true, applied = device["applied"] as? Bool == true
         let needsUpgrade = device["needs_upgrade"] as? Bool == true
         status.stringValue = paused && own ? "已暂停" : needsUpgrade ? "需要升级" : online ? (applied ? "已同步" : "等待应用") : "等待连接"
