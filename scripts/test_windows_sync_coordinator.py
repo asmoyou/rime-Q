@@ -21,6 +21,12 @@ def main():
     with tempfile.TemporaryDirectory(prefix='rimeq-coordinator-') as temporary:
         node = Node(stage/'RimeQ.Sync.exe', Path(temporary)/'sync', 'Synthetic')
         try:
+            # .NET pipe writers may emit a UTF-8 preamble under a UTF-8 console.
+            # Exercise that exact boundary, independently of the developer locale.
+            framing=subprocess.run([str(native),str(stage),temporary],input=b'\xef\xbb\xbfexport\r\nprobe\r\nquit\r\n',
+                                   capture_output=True,timeout=30,env=env)
+            if framing.returncode or framing.stdout.count(b'RIMEQ-SYNC-TEST ok')!=2:
+                raise RuntimeError('Native fixture must accept the UTF-8 BOM and CRLF used by pipe writers')
             node.call('create', group='Synthetic', name='Synthetic')
             subprocess.run([str(output),str(stage),temporary,str(native)],check=True,timeout=90,env=env)
         finally:

@@ -12,7 +12,11 @@ int wmain(int argc,wchar_t** argv) {
         rq::Engine engine;engine.start(app,root,false);
         std::cout<<"RIMEQ-SYNC-TEST ready\n"<<std::flush;
         std::string line;
+        bool firstLine=true;
         while(std::getline(std::cin,line)) {
+            if(firstLine && line.rfind("\xEF\xBB\xBF",0)==0)line.erase(0,3);
+            firstLine=false;
+            if(!line.empty()&&line.back()=='\r')line.pop_back();
             rq::State state;
             if(line=="quit")break;
             if(line=="export")state=engine.process(1,{rq::Command::syncExport});
