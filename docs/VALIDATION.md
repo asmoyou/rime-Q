@@ -807,3 +807,7 @@ x64 和 x86 候选测试均通过短候选、长注释、鼠标索引、装饰�
 生产 TIP 的 TSF 测试增加 200 ms 首键响应延迟，以防重新使用 100 ms 导致字母直出。现用 Broker 占用正式管道，因此本机未执行该 TSF 夹具，也未为测试停止用户输入服务；交给 CI 的独立运行器验证。
 
 `python scripts/build_windows.py --reuse-resources --build 9137` 完成两架构编译、CTest 和安装包载荷校验。开发包 `dist/RimeQ-0.4.3-windows-x64.exe` 为 70,247,424 字节，SHA-256 `08c3561332ba1615d0aa4c0a67bbb0b31679ca3333043c6cc82d759222c92d70`。旧 9136 包保留为 `dist/RimeQ-0.4.3-windows-x64-9136.exe`。本段记录时现用程序仍为 9136；9137 尚待本机安装、真实同步回执及 ChatGPT 快打验收，不能宣称已经解决全部真实宿主输入问题。
+
+随后用户在正常安装流程中完成 9137 升级。只读确认 HKLM 活动版本为 `0.4.3.9137`，设置、Broker、Sync 三进程来自同一新安装目录。现用服务返回 Windows applied=true、Mac applied=true、两端在线、无 pending_apply、无 network_error，这是本次真实跨平台组的应用回执，不是合成测试。继续输入后远端可能短暂 applied=false，不能把任一时刻的回执说成永久完成。将首次应用前自动备份与当前导出的非全拼子集逐条比较，35 条编码及原权重全部一致。
+
+只读枚举 ChatGPT 进程的已加载 RimeQ.Tip.dll，路径和文件构建号仍为 9136；后台 Broker 已换新不能证明宿主已加载 9137 TIP。已告知用户正常完全退出并重新打开 ChatGPT 后再验收快打，无需重启 Windows，未代用户关闭会话或向聊天输入测试文字。修复提交 `3ab5e54` 已推送 main，[CI 运行](https://github.com/asmoyou/rime-Q/actions/runs/35558936389) 当时进行中，尚未记为通过。
