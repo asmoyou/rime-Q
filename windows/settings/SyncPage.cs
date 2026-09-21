@@ -131,7 +131,7 @@ namespace RimeQ {
             bool visible=current!=null&&current.group!=null;
             syncTime.Visibility=syncProgress.Visibility=confirmation.Visibility=visible?Visibility.Visible:Visibility.Collapsed;
             if(!visible)return;
-            syncTime.Text="最近成功同步："+DeviceSync.SuccessTime(current.last_sync_at);
+            syncTime.Text="最近成功同步："+DeviceSync.SuccessSummary(current);
             syncProgress.Text=DeviceSync.ProgressText(current);
             confirmation.Maximum=Math.Max(1,current.progress==null?0:current.progress.total);
             confirmation.Value=current.progress==null?0:current.progress.confirmed;
@@ -231,7 +231,7 @@ namespace RimeQ {
                 text.TextTrimming=TextTrimming.CharacterEllipsis;Panel.Children.Add(text);
             }
             internal void Update(SyncMember member,bool paused,bool canRemove,Func<Task> action){
-                text.Text=member.name+(member.self?"（本机）":"\n最近成功："+DeviceSync.SuccessTime(member.last_sync_at));
+                text.Text=member.name+(member.self?"（本机）":"\n最近成功："+DeviceSync.MemberSuccessSummary(member));
                 text.ToolTip=member.name;remove=async()=>{try{await action();}catch(Exception error){MessageBox.Show(error.Message,"同步操作未完成",MessageBoxButton.OK,MessageBoxImage.Warning);}};
                 state.Text=paused&&member.self?"已暂停":member.needs_upgrade?"需要升级":member.online?(member.applied?"已同步":"等待应用"):"等待连接";
                 state.ToolTip=member.needs_upgrade?"请将两端 Rime Q 升级到支持完整学习记录同步的版本；无需重新配对。":member.online&&member.applied?"已应用当前已知变更；离线设备可能还有未传出的词条。":"连接后自动同步；有组合输入时等待输入结束。";

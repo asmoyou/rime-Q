@@ -40,6 +40,12 @@ namespace RimeQ {
         static SyncRow Row(string text,string code,int weight=1){return new SyncRow {key=new SyncKey {@namespace="rime_q/full-pinyin/v1",text=text,code=code},weight=weight};}
         static async Task Change(SyncRow row,int? weight){await DeviceSync.Call<object>(new {action="fixture_change",changes=new[]{new {key=row.key,weight=weight}}});}
         static async Task Run(){
+            var oldPeer=new SyncMember {self=false,online=false,needs_upgrade=true};
+            var statusReason=new SyncStatus {enabled=true,members=new List<SyncMember>{new SyncMember {self=true,online=true},oldPeer}};
+            Require(DeviceSync.SuccessSummary(statusReason).Contains("升级")&&DeviceSync.MemberSuccessSummary(oldPeer).Contains("需要升级"),"Missing success time did not explain protocol upgrade");
+            oldPeer.needs_upgrade=false;Require(DeviceSync.SuccessSummary(statusReason).Contains("等待其他设备连接"),"Missing success time did not explain offline peer");
+            oldPeer.online=true;Require(DeviceSync.SuccessSummary(statusReason).Contains("双方应用确认"),"Missing success time did not explain confirmation");
+            statusReason.last_sync_at=1;Require(!DeviceSync.SuccessSummary(statusReason).Contains("尚无"),"Recorded success time was hidden by peer state");
             var stalled=new SyncStatus {enabled=true,progress=new SyncProgress {stage="等待其他设备应用并确认",confirmed=1,total=2,elapsed_seconds=31}};
             Require(DeviceSync.ProgressText(stalled).Contains("等待较久")&&DeviceSync.ProgressText(stalled).Contains("1 / 2"),"Stalled confirmation is not visible");
             stalled.enabled=false;Require(DeviceSync.ProgressText(stalled).StartsWith("已暂停同步"),"Pause was hidden by stale progress");

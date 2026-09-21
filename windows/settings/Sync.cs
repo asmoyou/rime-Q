@@ -36,6 +36,20 @@ namespace RimeQ {
         static string stage;
         static void Stage(string value){if(stage!=value){stage=value;stageClock.Restart();if(Changed!=null)Changed();}}
         internal static string SuccessTime(long seconds){return seconds<=0?"尚无成功记录":DateTimeOffset.FromUnixTimeSeconds(seconds).ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");}
+        internal static string SuccessSummary(SyncStatus status){
+            if(status.last_sync_at>0)return SuccessTime(status.last_sync_at);
+            var members=status.members??new List<SyncMember>();
+            if(members.Any(m=>!m.removed&&!m.self&&m.needs_upgrade))return "尚无记录 · 请先升级组内其他设备";
+            if(!members.Any(m=>!m.removed&&!m.self))return "尚无记录 · 添加其他设备后开始记录";
+            if(members.Where(m=>!m.removed&&!m.self).All(m=>!m.online))return "尚无记录 · 等待其他设备连接";
+            return "尚无记录 · 完成双方应用确认后显示";
+        }
+        internal static string MemberSuccessSummary(SyncMember member){
+            if(member.last_sync_at>0)return SuccessTime(member.last_sync_at);
+            if(member.needs_upgrade)return "尚无记录 · 需要升级";
+            if(!member.online)return "尚无记录 · 等待连接";
+            return "尚无记录 · 等待确认";
+        }
         internal static string ProgressText(SyncStatus status){
             var p=status.progress;
             if(!status.enabled)return "已暂停同步 · 本机输入和学习照常保留";

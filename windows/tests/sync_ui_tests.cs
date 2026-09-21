@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -20,6 +21,15 @@ namespace RimeQ {
             var frame=new DispatcherFrame();var timer=new DispatcherTimer {Interval=TimeSpan.FromMilliseconds(ms)};
             timer.Tick+=(s,e)=>{timer.Stop();frame.Continue=false;};timer.Start();Dispatcher.PushFrame(frame);
         }
+        static void SetPrivate(object target,string name,object value){
+            target.GetType().GetField(name,BindingFlags.Instance|BindingFlags.NonPublic).SetValue(target,value);
+        }
+        static object GetPrivate(object target,string name){
+            return target.GetType().GetField(name,BindingFlags.Instance|BindingFlags.NonPublic).GetValue(target);
+        }
+        static void InvokePrivate(object target,string name){
+            target.GetType().GetMethod(name,BindingFlags.Instance|BindingFlags.NonPublic).Invoke(target,null);
+        }
         static void Require(bool condition,string message){if(!condition)throw new Exception(message);}
         [STAThread] static int Main(string[] args) {
             if(args.Length!=4)return 2;
@@ -35,7 +45,7 @@ namespace RimeQ {
                 Require(!SyncConnectionInfo.TryParse("192.168.1.8:12345\nsynthetic-invite",out parsedAddress,out parsedInvite)&&
                         !SyncConnectionInfo.TryParse("连接地址： \n邀请标识：synthetic-invite",out parsedAddress,out parsedInvite)&&
                         !SyncConnectionInfo.TryParse(new string('a',4097),out parsedAddress,out parsedInvite),"Malformed or oversized clipboard information accepted");
-                bool errorCase=args[3]=="error";
+                bool errorCase=args[3]=="error",upgradeCase=args[3]=="upgrade";
                 if(errorCase){Require(!File.Exists(Path.Combine(Paths.App,"RimeQ.Sync.exe")),"Error fixture unexpectedly contains a helper");Paths.Set("SyncStarted","1");}
                 RenderOptions.ProcessRenderMode=System.Windows.Interop.RenderMode.SoftwareOnly;
                 var app=new Application {ShutdownMode=ShutdownMode.OnExplicitShutdown};
@@ -44,6 +54,24 @@ namespace RimeQ {
                 Window rendered=view.Window;
                 SyncWizard wizard=null;
                 bool invite=args[3]=="invite",joined=args[3]=="group"||invite,off=args[3]=="off"||args[3]=="off-dark",darkCase=args[3]=="off-dark";
+                if(upgradeCase){
+                    ((DispatcherTimer)GetPrivate(view,"timer")).Stop();
+                    var fixture=new SyncStatus {
+                        id="windows",group=new SyncGroup {id="fixture",name="我的电脑"},enabled=true,last_sync_at=0,
+                        network_error="设备的同步协议版本不一致，请将两端 Rime Q 都升级到支持完整学习记录同步的版本；无需重新配对，本机词库保留。",
+                        members=new List<SyncMember>{
+                            new SyncMember {id="windows",name="Windows 电脑",self=true,online=true,applied=true},
+                            new SyncMember {id="mac",name="MacBook",online=false,applied=false,needs_upgrade=true}
+                        },
+                        progress=new SyncProgress {stage="等待设备升级",confirmed=1,total=2,elapsed_seconds=45}
+                    };
+                    SetPrivate(view,"current",fixture);SetPrivate(view,"joined",true);
+                    InvokePrivate(view,"Build");InvokePrivate(view,"UpdateProgress");InvokePrivate(view,"ShowMembers");Pump(200);
+                    ((TextBlock)GetPrivate(view,"status")).Text=fixture.group.name+" · 2 台设备 · 1 台在线\n"+fixture.network_error;
+                    Require(Find<TextBlock>(view.Window).Any(t=>t.Text.Contains("请先升级组内其他设备")),"Upgrade reason missing beside last sync time");
+                    Require(Find<TextBlock>(view.Window).Any(t=>t.Text.Contains("最近成功：尚无记录 · 需要升级")),"Upgrade reason missing from peer row");
+                    Require(Find<TextBlock>(view.Window).Any(t=>t.Text=="需要升级"),"Peer upgrade state missing");
+                }
                 if(errorCase){
                     var retry=Find<Button>(view.Window).Single(b=>Convert.ToString(b.Content)=="重试连接");
                     Require(retry.Visibility==Visibility.Visible&&Find<TextBlock>(view.Window).Any(t=>t.Text.Contains("同步组件缺失")),"Failed service did not show retry and error");
@@ -73,7 +101,7 @@ namespace RimeQ {
                         Find<TextBlock>(wizard.Window).Single(t=>t.FontSize==34).Text="••••••";
                         rendered=wizard.Window;
                     }
-                } else if(!errorCase) {
+                } else if(!errorCase&&!upgradeCase) {
                     Require(Find<Button>(view.Window).Any(b=>Convert.ToString(b.Content)=="创建同步组")&&Find<Button>(view.Window).Any(b=>Convert.ToString(b.Content)=="加入已有同步组"),"Distinct create/join entry points missing");
                     if(off)Require(!File.Exists(Path.Combine(Paths.Root,"sync","identity.key"))&&!File.Exists(Path.Combine(Paths.Root,"sync","control.json")),"Viewing disabled sync created an identity or helper");
                     else {
@@ -114,7 +142,7 @@ namespace RimeQ {
                 using(var stream=File.Create(args[2]))encoder.Save(stream);
                 if(invite){Find<Button>(wizard.Window).Single(b=>Convert.ToString(b.Content)=="关闭邀请").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump(500);}
                 wizard?.Window.Close();view.Window.Close();app.Shutdown();
-                Console.WriteLine("PASS native sync window: "+(invite?"invitation countdown and copy state":joined?"six real services, device rows, pause, resume and search":errorCase?"persistent failure retry":off?"disabled view without helper or identity":"create/join wizard")+", macOS/Windows connection format, app light/dark resources, WPF render");return 0;
+                Console.WriteLine("PASS native sync window: "+(upgradeCase?"missing success time explains peer upgrade":invite?"invitation countdown and copy state":joined?"six real services, device rows, pause, resume and search":errorCase?"persistent failure retry":off?"disabled view without helper or identity":"create/join wizard")+", macOS/Windows connection format, app light/dark resources, WPF render");return 0;
             }catch(Exception error){Console.Error.WriteLine(error.Message);return 1;}
         }
     }

@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using System.Web.Script.Serialization;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -43,6 +44,99 @@ namespace RimeQ {
         void SetRelativePath([MarshalAs(UnmanagedType.LPWStr)] string relativePath, uint reserved);
         void Resolve(IntPtr window, uint flags);
         void SetPath([MarshalAs(UnmanagedType.LPWStr)] string path);
+    }
+
+    internal sealed class InstallerView {
+        internal readonly Window Window;
+        internal readonly Button Primary, Close;
+        internal readonly TextBlock Title, Subtitle, StatusTitle, Status;
+        internal readonly ProgressBar Progress;
+        internal bool SameVersion { get; private set; }
+        readonly Border statusPanel;
+        readonly TextBlock[] stepLabels = new TextBlock[3], stepNumbers = new TextBlock[3];
+        readonly bool uninstall;
+
+        static TextBlock Text(string value, double size = 13, bool secondary = false) {
+            var text = new TextBlock { Text=value, FontSize=size, TextWrapping=TextWrapping.Wrap };
+            text.SetResourceReference(TextBlock.ForegroundProperty, secondary ? "SecondaryColor" : "TextColor");
+            return text;
+        }
+        static Border Rule() { var line=new Border {Height=1,Margin=new Thickness(0,13,0,13)};line.SetResourceReference(Border.BackgroundProperty,"BorderColor");return line; }
+        static FrameworkElement Info(string glyph,string title,string detail) {
+            var row=new Grid();row.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(28)});row.ColumnDefinitions.Add(new ColumnDefinition());
+            var icon=Text(glyph,15);icon.FontFamily=new FontFamily("Segoe MDL2 Assets");icon.VerticalAlignment=VerticalAlignment.Top;icon.Margin=new Thickness(0,1,0,0);icon.SetResourceReference(TextBlock.ForegroundProperty,"Accent");
+            var labels=new StackPanel();var heading=Text(title,13);heading.FontWeight=FontWeights.SemiBold;var body=Text(detail,12,true);body.Margin=new Thickness(0,4,0,0);body.LineHeight=19;labels.Children.Add(heading);labels.Children.Add(body);
+            Grid.SetColumn(labels,1);row.Children.Add(icon);row.Children.Add(labels);return row;
+        }
+        void Step(StackPanel list,int index,string title) {
+            var row=new Grid {Margin=new Thickness(0,0,0,18)};row.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(30)});row.ColumnDefinitions.Add(new ColumnDefinition());
+            var circle=new Border {Width=22,Height=22,CornerRadius=new CornerRadius(11),BorderThickness=new Thickness(1),VerticalAlignment=VerticalAlignment.Center};circle.SetResourceReference(Border.BorderBrushProperty,"BorderColor");
+            var number=Text((index+1).ToString(CultureInfo.InvariantCulture),11,true);number.HorizontalAlignment=HorizontalAlignment.Center;number.VerticalAlignment=VerticalAlignment.Center;circle.Child=number;stepNumbers[index]=number;
+            var label=Text(title,12,true);label.VerticalAlignment=VerticalAlignment.Center;Grid.SetColumn(label,1);stepLabels[index]=label;row.Children.Add(circle);row.Children.Add(label);list.Children.Add(row);
+        }
+        internal InstallerView(bool uninstall, Version version) {
+            this.uninstall=uninstall;
+            Window=new Window {Title=uninstall?"卸载 Rime Q":"安装 Rime Q",Width=720,Height=560,ResizeMode=ResizeMode.NoResize,WindowStartupLocation=WindowStartupLocation.CenterScreen,FontFamily=new FontFamily("Segoe UI, Microsoft YaHei UI"),FontSize=13,UseLayoutRounding=true,SnapsToDevicePixels=true};
+            var root=new Grid();root.SetResourceReference(Grid.BackgroundProperty,"WindowBackground");root.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(184)});root.ColumnDefinitions.Add(new ColumnDefinition());Window.Content=root;
+            var sidebar=new Border {Padding=new Thickness(24,30,20,22),BorderThickness=new Thickness(0,0,1,0)};sidebar.SetResourceReference(Border.BackgroundProperty,"SidebarBackground");sidebar.SetResourceReference(Border.BorderBrushProperty,"BorderColor");root.Children.Add(sidebar);
+            var side=new DockPanel();sidebar.Child=side;
+            var versionLabel=Text("版本 "+version.ToString(3)+"  ·  构建 "+version.Revision,11,true);versionLabel.VerticalAlignment=VerticalAlignment.Bottom;DockPanel.SetDock(versionLabel,Dock.Bottom);side.Children.Add(versionLabel);
+            var sideContent=new StackPanel();side.Children.Add(sideContent);
+            var brand=new StackPanel {Orientation=Orientation.Horizontal,Margin=new Thickness(0,0,0,38)};
+            try {
+                using(var icon=System.Drawing.Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location)) {
+                    var source=System.Windows.Interop.Imaging.CreateBitmapSourceFromHIcon(icon.Handle,Int32Rect.Empty,BitmapSizeOptions.FromWidthAndHeight(42,42));source.Freeze();brand.Children.Add(new Image {Source=source,Width=42,Height=42,Margin=new Thickness(0,0,11,0)});
+                }
+            } catch { var mark=Text("Q",30);mark.FontWeight=FontWeights.Bold;mark.SetResourceReference(TextBlock.ForegroundProperty,"Accent");mark.Margin=new Thickness(0,0,11,0);brand.Children.Add(mark); }
+            var names=new StackPanel {VerticalAlignment=VerticalAlignment.Center};var product=Text("Rime Q",18);product.FontWeight=FontWeights.SemiBold;names.Children.Add(product);names.Children.Add(Text(uninstall?"卸载程序":"安装程序",11,true));brand.Children.Add(names);sideContent.Children.Add(brand);
+            var steps=new StackPanel();Step(steps,0,"准备");Step(steps,1,uninstall?"移除":"安装");Step(steps,2,"完成");sideContent.Children.Add(steps);
+
+            var main=new Grid {Margin=new Thickness(34,28,34,26)};main.RowDefinitions.Add(new RowDefinition {Height=GridLength.Auto});main.RowDefinitions.Add(new RowDefinition {Height=GridLength.Auto});main.RowDefinitions.Add(new RowDefinition {Height=GridLength.Auto});main.RowDefinitions.Add(new RowDefinition());main.RowDefinitions.Add(new RowDefinition {Height=GridLength.Auto});Grid.SetColumn(main,1);root.Children.Add(main);
+            var heading=new StackPanel {Margin=new Thickness(0,0,0,20)};Title=Text("",27);Title.FontWeight=FontWeights.SemiBold;Title.TextWrapping=TextWrapping.NoWrap;Subtitle=Text("",13,true);Subtitle.Margin=new Thickness(0,7,0,0);Subtitle.LineHeight=20;heading.Children.Add(Title);heading.Children.Add(Subtitle);main.Children.Add(heading);
+            var details=new Border {CornerRadius=new CornerRadius(6),BorderThickness=new Thickness(1),Padding=new Thickness(18,16,18,16),Margin=new Thickness(0,0,0,16)};details.SetResourceReference(Border.BackgroundProperty,"CardBackground");details.SetResourceReference(Border.BorderBrushProperty,"BorderColor");Grid.SetRow(details,1);main.Children.Add(details);
+            var information=new StackPanel();
+            if(uninstall) {
+                information.Children.Add(Info("\uE74D","移除程序和输入服务","卸载 Rime Q 应用文件并取消输入法注册。"));information.Children.Add(Rule());
+                information.Children.Add(Info("\uE73E","保留个人数据","个人词库、学习记录、设置和已下载模型不会删除。"));
+            } else {
+                information.Children.Add(Info("\uE896","完整离线组件","输入引擎和基础词库随包安装，无需另装其他输入法。"));information.Children.Add(Rule());
+                information.Children.Add(Info("\uE73E","升级保留个人数据","个人词库、学习记录、设置和已下载模型保持不变。"));information.Children.Add(Rule());
+                information.Children.Add(Info("\uE72E","明确的管理员认证","仅在写入 Rime Q 程序目录和注册输入服务时请求。"));
+            }
+            details.Child=information;
+            statusPanel=new Border {CornerRadius=new CornerRadius(6),Padding=new Thickness(16,13,16,13),Margin=new Thickness(0,0,0,16)};statusPanel.SetResourceReference(Border.BackgroundProperty,"StatusBackground");Grid.SetRow(statusPanel,2);main.Children.Add(statusPanel);
+            var statusStack=new StackPanel();StatusTitle=Text("",13);StatusTitle.FontWeight=FontWeights.SemiBold;Status=Text("",12,true);Status.Margin=new Thickness(0,4,0,0);Status.LineHeight=19;Progress=new ProgressBar {Height=4,Margin=new Thickness(0,12,0,0),IsIndeterminate=true,Visibility=Visibility.Collapsed};AutomationProperties.SetName(Progress,uninstall?"卸载进度":"安装进度");statusStack.Children.Add(StatusTitle);statusStack.Children.Add(Status);statusStack.Children.Add(Progress);statusPanel.Child=statusStack;
+            var buttons=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};Primary=new Button {Padding=new Thickness(22,9,22,9),MinWidth=96,IsDefault=!uninstall};Primary.SetResourceReference(Button.BackgroundProperty,"Accent");Primary.Foreground=Brushes.White;Primary.BorderThickness=new Thickness(0);AutomationProperties.SetName(Primary,uninstall?"确认卸载":"开始安装");
+            Close=new Button {Content="取消",Padding=new Thickness(20,9,20,9),Margin=new Thickness(10,0,0,0),MinWidth=82,IsCancel=true,IsDefault=uninstall};Close.SetResourceReference(Button.BackgroundProperty,"ControlBackground");Close.SetResourceReference(Button.ForegroundProperty,"TextColor");Close.SetResourceReference(Button.BorderBrushProperty,"BorderColor");buttons.Children.Add(Primary);buttons.Children.Add(Close);Grid.SetRow(buttons,4);main.Children.Add(buttons);
+            Close.Click+=(s,e)=>Window.Close();Apply(SystemDark());SetStep(0);
+        }
+        internal static bool SystemDark() { using(var key=Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"))return key!=null&&Convert.ToInt32(key.GetValue("AppsUseLightTheme",1))==0; }
+        internal void Apply(bool dark) {
+            var names=new[]{"WindowBackground","CardBackground","SidebarBackground","BorderColor","TextColor","SecondaryColor","Accent","ControlBackground","StatusBackground","PrimaryTextColor"};
+            var light=new[]{"#F6F7F9","#FFFFFF","#ECEFF3","#DDE1E7","#202124","#6F737A","#0078D4","#FFFFFF","#EAF3FB","#FFFFFF"};
+            var night=new[]{"#202226","#2A2D32","#27292E","#3C3F46","#F2F2F7","#A5A8B0","#4B9BFF","#34373E","#28394A","#FFFFFF"};
+            for(int i=0;i<names.Length;i++)Window.Resources[names[i]]=new SolidColorBrush((Color)ColorConverter.ConvertFromString((dark?night:light)[i]));
+            if(SystemParameters.HighContrast){Window.Resources["WindowBackground"]=Window.Resources["CardBackground"]=Window.Resources["ControlBackground"]=SystemColors.WindowBrush;Window.Resources["TextColor"]=Window.Resources["SecondaryColor"]=SystemColors.WindowTextBrush;Window.Resources["SidebarBackground"]=Window.Resources["StatusBackground"]=SystemColors.ControlBrush;Window.Resources["BorderColor"]=SystemColors.WindowTextBrush;Window.Resources["Accent"]=SystemColors.HighlightBrush;Window.Resources["PrimaryTextColor"]=SystemColors.HighlightTextBrush;}
+            Primary.SetResourceReference(Button.ForegroundProperty,"PrimaryTextColor");
+            Window.SetResourceReference(Window.BackgroundProperty,"WindowBackground");Window.SetResourceReference(Window.ForegroundProperty,"TextColor");
+        }
+        internal void Configure(Version current,Version installed) {
+            SameVersion=!uninstall&&installed!=null&&installed==current;
+            if(uninstall){Title.Text="卸载 Rime Q";Subtitle.Text="移除程序和输入服务，同时保留你的个人数据。";Primary.Content="确认卸载";AutomationProperties.SetName(Primary,"确认卸载 Rime Q");StatusTitle.Text="卸载前";Status.Text="请先结束当前输入。卸载时会安全切换到其他输入法。";return;}
+            if(installed==null){Title.Text="安装 Rime Q "+current.ToString(3);Subtitle.Text="简洁、流畅、离线的中文输入法。";Primary.Content="安装";AutomationProperties.SetName(Primary,"安装 Rime Q");StatusTitle.Text="准备安装";Status.Text="安装完成后，可从 Windows 输入法列表选择 Rime Q。";return;}
+            if(SameVersion){Title.Text="已安装当前版本";Subtitle.Text="Rime Q "+current+" 已在此电脑上。";Primary.Visibility=Visibility.Collapsed;Close.Content="关闭";StatusTitle.Text="无需重复安装";Status.Text="此安装包与已安装版本完全一致。个人数据和当前输入服务没有变化。";return;}
+            Title.Text="升级 Rime Q";Subtitle.Text=installed+"  →  "+current;Primary.Content="升级";AutomationProperties.SetName(Primary,"升级 Rime Q");StatusTitle.Text="准备升级";Status.Text="升级会替换程序组件，个人词库、学习记录、设置和模型全部保留。";
+        }
+        internal void Begin(string action) {SetStep(1);Title.Text="正在"+action+" Rime Q";Subtitle.Text="请保持此窗口打开。";StatusTitle.Text="正在准备";Status.Text="等待管理员认证，然后校验并写入 Rime Q 组件。";Progress.Visibility=Visibility.Visible;Primary.IsEnabled=Close.IsEnabled=false;}
+        internal void Complete(string message) {SetStep(2);Title.Text=uninstall?"卸载完成":"安装完成";Subtitle.Text=uninstall?"Rime Q 程序和输入服务已移除。":"Rime Q 已准备好，可从输入法列表选择使用。";StatusTitle.Text=uninstall?"个人数据已保留":"输入服务已启用";Status.Text=message;Progress.Visibility=Visibility.Collapsed;Primary.Visibility=Visibility.Collapsed;Close.Content="完成";Close.IsEnabled=true;}
+        internal void Fail(string message) {SetStep(1);Title.Text=uninstall?"卸载未完成":"安装未完成";Subtitle.Text="请查看下方原因后重试。";StatusTitle.Text="操作未完成";Status.Text=message;Progress.Visibility=Visibility.Collapsed;Primary.IsEnabled=Close.IsEnabled=true;}
+        internal void SetStep(int active) {
+            for(int i=0;i<stepLabels.Length;i++){bool current=i==active,done=i<active;stepLabels[i].FontWeight=current?FontWeights.SemiBold:FontWeights.Normal;stepLabels[i].SetResourceReference(TextBlock.ForegroundProperty,current||done?"TextColor":"SecondaryColor");stepNumbers[i].Text=done?"\uE73E":(i+1).ToString(CultureInfo.InvariantCulture);stepNumbers[i].FontFamily=done?new FontFamily("Segoe MDL2 Assets"):Window.FontFamily;stepNumbers[i].SetResourceReference(TextBlock.ForegroundProperty,current||done?"Accent":"SecondaryColor");}
+        }
+        internal void ValidateLayout() {
+            var root=(FrameworkElement)Window.Content;root.Measure(new Size(Window.Width,Window.Height));root.Arrange(new Rect(0,0,Window.Width,Window.Height));root.UpdateLayout();
+            if(Title.ActualWidth<=0||Status.ActualHeight<=0||Close.ActualWidth<80||statusPanel.ActualWidth<300)throw new IOException("安装器布局校验失败。");
+        }
     }
 
     internal static class Setup {
@@ -288,6 +382,9 @@ namespace RimeQ {
         }
         [STAThread]
         static int Main(string[] args) {
+            if(args.Length>0&&args[0]=="--render")AppDomain.CurrentDomain.UnhandledException+=(sender,eventArgs)=>{
+                var error=eventArgs.ExceptionObject as Exception;if(error!=null)Console.Error.WriteLine(error.GetType().FullName+": "+error.Message+"\n"+error.StackTrace);
+            };
             if (args.Length == 2 && args[0] == "--verify-payload") {
                 try { Extract(Path.GetFullPath(args[1])); return 0; }
                 catch (Exception error) {
@@ -306,34 +403,33 @@ namespace RimeQ {
                     return 0;
                 } catch (Exception error) { try { Log("failed-" + error.GetType().Name); } catch { } if (!args.Contains("--silent")) MessageBox.Show(error.Message, "Rime Q 安装", MessageBoxButton.OK, MessageBoxImage.Error); return 1; }
             }
-            var uninstall = (args.Length > 0 && args[0] == "--uninstall") || !Assembly.GetExecutingAssembly().GetManifestResourceNames().Contains("payload.zip");
+            var renderMode=args.Length>=2&&args[0]=="--render"?(args.Length>=3?args[2]:"install-light"):null;
+            var uninstall = renderMode!=null?renderMode.StartsWith("uninstall",StringComparison.OrdinalIgnoreCase):(args.Length > 0 && args[0] == "--uninstall") || !Assembly.GetExecutingAssembly().GetManifestResourceNames().Contains("payload.zip");
             var application = new Application();
-            var window = new Window { Title = uninstall ? "卸载 Rime Q" : "安装 Rime Q", Width = 580, Height = 600, ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                FontFamily = new FontFamily("Microsoft YaHei UI"), FontSize = 14, Background = new SolidColorBrush(Color.FromRgb(247,248,245)) };
-            var panel = new StackPanel { Margin = new Thickness(36,28,36,24) };
-            var scroll = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Background = window.Background }; window.Content = scroll;
-            panel.Children.Add(new TextBlock { Text = "Q", FontSize = 40, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(23,99,77)) });
-            var title = new TextBlock { Text = uninstall ? "卸载 Rime Q" : "安装 Rime Q " + Current.ToString(3), FontSize = 26, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0,14,0,18) }; panel.Children.Add(title);
-            var description = new TextBlock { Text = uninstall ? "移除 Rime Q 输入服务及程序文件。个人词库、学习记录、设置和已下载模型均会保留。" :
-                "引擎和基础词库已包含在安装包中，无需安装其他输入法。\n\nWindows 管理员认证用于写入 Rime Q 程序目录和注册输入服务；取消认证不会完成安装。", TextWrapping = TextWrapping.Wrap, LineHeight = 24, Foreground = Brushes.DarkSlateGray }; panel.Children.Add(description);
-            var status = new TextBlock { Margin = new Thickness(0,18,0,18), TextWrapping = TextWrapping.Wrap, LineHeight = 22 }; panel.Children.Add(status);
+            var view=new InstallerView(uninstall,Current);var window=view.Window;
+            bool installerClosed=false;
+            UserPreferenceChangedEventHandler appearanceChanged=(sender,eventArgs)=>{
+                if(window.Dispatcher.HasShutdownStarted)return;
+                window.Dispatcher.BeginInvoke(new Action(()=>{if(!installerClosed)view.Apply(InstallerView.SystemDark());}));
+            };
+            SystemEvents.UserPreferenceChanged+=appearanceChanged;
+            window.Closed+=(sender,eventArgs)=>{installerClosed=true;SystemEvents.UserPreferenceChanged-=appearanceChanged;};
             string installed = null;
-            var primary = new Button { Content = uninstall ? "确认卸载" : "安装", Padding = new Thickness(24,10,24,10), HorizontalAlignment = HorizontalAlignment.Left, IsDefault = !uninstall };
             try {
                 CheckSystem();
-                installed = Installed();
-                if (!uninstall && installed != null) {
-                    RequireUpgrade(InstalledVersion(installed), Current);
-                    primary.Content = InstalledVersion(installed) == Current ? "修复安装" : "升级";
-                    status.Text = "已安装 " + InstalledVersion(installed) + "。此次操作保留个人数据。";
-                } else status.Text = uninstall ? "请先结束当前输入，程序会切换到其他输入法。" : "安装后从 Windows 输入法列表选择 Rime Q。";
-            } catch (Exception error) { status.Text = error.Message; primary.IsEnabled = false; }
-            var buttons = new WrapPanel(); buttons.Children.Add(primary);
-            var close = new Button { Content = "取消", Padding = new Thickness(20,10,20,10), Margin = new Thickness(12,0,0,0), IsCancel = true, IsDefault = uninstall }; close.Click += (s,e) => window.Close(); buttons.Children.Add(close); panel.Children.Add(buttons);
+                if(renderMode==null)installed=Installed();
+                var installedVersion=installed==null?null:InstalledVersion(installed);
+                if(renderMode!=null&&renderMode.StartsWith("upgrade",StringComparison.OrdinalIgnoreCase))installedVersion=new Version(Current.Major,Current.Minor,Math.Max(0,Current.Build-1),Math.Max(0,Current.Revision-1));
+                else if(renderMode!=null&&renderMode.StartsWith("current",StringComparison.OrdinalIgnoreCase))installedVersion=Current;
+                view.Configure(Current,installedVersion);
+            } catch (Exception error) { view.Fail(error.Message); view.Primary.IsEnabled = false; }
+            if(renderMode!=null&&renderMode.StartsWith("complete",StringComparison.OrdinalIgnoreCase))view.Complete("安装完成。个人数据已保留。");
+            if(renderMode!=null&&renderMode.StartsWith("error",StringComparison.OrdinalIgnoreCase))view.Fail("管理员认证已取消，尚未更改此电脑上的 Rime Q。");
+            if(renderMode!=null)view.Apply(renderMode.EndsWith("dark",StringComparison.OrdinalIgnoreCase));
             bool busy = false; window.Closing += (s,e) => { if (busy) e.Cancel = true; };
-            primary.Click += async (s,e) => {
+            view.Primary.Click += async (s,e) => {
                 if (uninstall && MessageBox.Show(window, "确认卸载 Rime Q？个人词库、学习记录、设置和模型会保留。", "卸载 Rime Q", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
-                busy = true; primary.IsEnabled = close.IsEnabled = false; status.Text = "正在准备，请稍候…";
+                busy = true;view.Begin(uninstall?"卸载":"安装");
                 try {
                     await Task.Run(() => StopUserService(installed, uninstall));
                     var info = new ProcessStartInfo(Self, uninstall ? "--uninstall-elevated" : "--install-elevated") { UseShellExecute = true, Verb = "runas" };
@@ -345,22 +441,21 @@ namespace RimeQ {
                         // Start the new broker before enabling the profile. A host that still has an older
                         // versioned TIP loaded must never win the shared engine lock during this gap.
                         int enabled = await EnableAfterReady(() => StartUserApplication(current), () => Run(Path.Combine(current, "RimeQ.Control.exe"), "--enable"));
-                        status.Text = enabled != 0 ? "程序已安装，输入源尚待启用。请在 Windows 语言设置中添加 Rime Q。" : "安装完成。可从 Windows 输入法列表选择 Rime Q。";
+                        view.Complete(enabled != 0 ? "程序已安装，输入源尚待启用。请在 Windows 语言设置中添加 Rime Q。" : "输入引擎和基础词库已就绪，个人数据已保留。");
                     } else {
                         // UAC can run under a different administrator account. The
                         // original unelevated GUI must also clean its own user profile.
                         RemoveCurrentUserRegistration();
-                        status.Text = "Rime Q 已停用并卸载。个人数据保留；宿主仍加载的旧文件会保留至关闭对应应用后清理。";
+                        view.Complete("个人数据已保留；宿主仍加载的旧文件会在关闭对应应用后清理。");
                     }
-                    primary.Visibility = Visibility.Collapsed; close.Content = "完成";
                 } catch (Exception error) {
-                    status.Text = error is System.ComponentModel.Win32Exception ? "已取消管理员认证，操作未完成。" : error.Message;
+                    view.Fail(error is System.ComponentModel.Win32Exception ? "已取消管理员认证，操作未完成。" : error.Message);
                     if (installed != null) { try { await StartUserApplication(installed); Run(Path.Combine(installed, "RimeQ.Control.exe"), "--enable"); } catch { } }
-                } finally { busy = false; primary.IsEnabled = close.IsEnabled = true; }
+                } finally { busy = false; }
             };
-            if (args.Length == 2 && args[0] == "--render") {
-                scroll.Measure(new Size(580,560)); scroll.Arrange(new Rect(0,0,580,560)); scroll.UpdateLayout();
-                var bitmap = new RenderTargetBitmap(580,560,96,96,PixelFormats.Pbgra32); bitmap.Render(scroll);
+            if (renderMode != null) {
+                view.ValidateLayout();var root=(FrameworkElement)window.Content;
+                var bitmap = new RenderTargetBitmap((int)window.Width,(int)window.Height,96,96,PixelFormats.Pbgra32); bitmap.Render(root);
                 var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
                 using (var file = File.Create(Path.GetFullPath(args[1]))) encoder.Save(file); return 0;
             }

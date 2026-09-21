@@ -19,7 +19,7 @@
 - **按自己的习惯调整。** 原生候选栏按内容收紧宽度，支持四档字号、六款简洁配色与系统深浅外观；可选万象语法模型辅助整句组词。
 - **让词库更贴合自己。** 搜索、编辑和导入导出个人学习记录；管理内置词表，导入带全拼编码的第三方词库，查看资源来源与许可。
 - **常用工具，随手就有。** 在输入框里获取日期、时间、农历，计算表达式，转换金额大写，或输入 Unicode 字符。
-- **升级时保留积累。** 安装器识别升级与同版修复，保留个人词库和设置，阻止旧包覆盖新版。默认每天检查一次更新，可随时关闭。
+- **升级时保留积累。** 安装器识别升级与同版本，保留个人词库和设置，避免重复覆盖并阻止旧包覆盖新版。默认每天检查一次更新，可随时关闭。
 
 ## 下载与安装
 
@@ -29,15 +29,15 @@
 | Windows 10 22H2 / Windows 11 x64 | 独立 EXE 安装包，含 x64/x86 TSF；安装与宿主验收状态见 [Windows 说明](docs/WINDOWS.md) |
 | Linux | 客户端规划中 |
 
-Windows：前往 [最新版本](https://github.com/asmoyou/rime-Q/releases/latest)，下载 `RimeQ-0.4.4-windows-x64.exe`。双击安装并完成管理员认证，然后在输入法列表选择 **Rime Q**。安装、升级和备份步骤见 [Windows 使用说明](docs/WINDOWS.md)。Windows 安装包尚未进行 Authenticode 签名。
+Windows：前往 [最新版本](https://github.com/asmoyou/rime-Q/releases/latest)，下载 `RimeQ-0.4.5-windows-x64.exe`。双击安装并完成管理员认证，然后在输入法列表选择 **Rime Q**。安装、升级和备份步骤见 [Windows 使用说明](docs/WINDOWS.md)。Windows 安装包尚未进行 Authenticode 签名。
 
 macOS：
 
-1. 前往 [最新版本](https://github.com/asmoyou/rime-Q/releases/latest)，下载 `RimeQ-0.4.4-macos-universal.pkg`。
+1. 前往 [最新版本](https://github.com/asmoyou/rime-Q/releases/latest)，下载 `RimeQ-0.4.5-macos-universal.pkg`。
 2. 双击安装包，按 macOS 安装器的提示完成安装。应用会安装到系统输入法目录，并在后台完成启用。
 3. 从菜单栏的输入法菜单选择 **Rime Q**，开始输入。
 
-**0.4.4 源码**修复 Windows/macOS 完整学习记录同步：英文、简码及混合大小写编码不再被全拼音节校验拒绝。同步组中的设备需全部升级到支持新协议的版本，原配对与个人记录保留。Windows 同时改善同步后的首键超时及候选 emoji 显示。安装包以[最新发布页面](https://github.com/asmoyou/rime-Q/releases/latest)为准。附近设备同步默认关闭。万象模型仍按需下载，不随安装包提供。macOS 安装包已做本地 ad-hoc 签名，尚未完成 Apple Developer ID 签名与公证。若 macOS 阻止打开，请确认文件来自本项目，再按“系统设置 → 隐私与安全性”的提示处理（[Apple 说明](https://support.apple.com/zh-cn/102445)）。macOS 实际宿主测试主要在 Intel Mac 上完成，Apple Silicon 包已构建，更多设备与应用的兼容性仍在持续验证。
+**0.4.5 源码**让 Windows 同步页在尚无成功记录时直接说明原因，包括等待其他设备连接、等待双方应用确认或需要升级组内旧版设备；新版原生安装器补齐安装、升级、同版本、进度、完成、失败和卸载状态，并遵循应用深浅模式及系统高对比度。0.4.4 引入的完整英文、简码、混合大小写、权重和删除同步继续保留，原同步组与个人记录无需重建。安装包以[最新发布页面](https://github.com/asmoyou/rime-Q/releases/latest)为准。附近设备同步默认关闭。万象模型仍按需下载，不随安装包提供。macOS 安装包已做本地 ad-hoc 签名，尚未完成 Apple Developer ID 签名与公证。若 macOS 阻止打开，请确认文件来自本项目，再按“系统设置 → 隐私与安全性”的提示处理（[Apple 说明](https://support.apple.com/zh-cn/102445)）。macOS 实际宿主测试主要在 Intel Mac 上完成，Apple Silicon 包已构建，更多设备与应用的兼容性仍在持续验证。
 
 安装时，管理员认证用于写入系统输入法目录；安装器可能请求读取下载文件夹。升级较早版本时，也可能请求退出仍在运行的旧版 Rime Q。详见 [安装与授权说明](docs/PERMISSIONS.md)。
 
@@ -108,7 +108,7 @@ Mac 保留原来的单个 Rime Q 输入源和 Q 图标，输入时另用“中 /
 
 ## 从源码构建
 
-Windows 客户端构建：`python scripts/build_windows.py --smoke`，产物为 `dist/RimeQ-0.4.4-windows-x64.exe`。原生 TSF、独立引擎服务、WPF 设置、个人词库、词库资源、可选模型及安装步骤见 [Windows 说明](docs/WINDOWS.md)。macOS 与 Windows 使用相同的设置页能力、词库与模型规则及操作流程，系统输入接入和原生控件分别适配；一致性契约见 [客户端功能一致性](docs/CLIENT_PARITY.md)。
+Windows 客户端构建：`python scripts/build_windows.py --smoke`，产物为 `dist/RimeQ-0.4.5-windows-x64.exe`。原生 TSF、独立引擎服务、WPF 设置、个人词库、词库资源、可选模型及安装步骤见 [Windows 说明](docs/WINDOWS.md)。macOS 与 Windows 使用相同的设置页能力、词库与模型规则及操作流程，系统输入接入和原生控件分别适配；一致性契约见 [客户端功能一致性](docs/CLIENT_PARITY.md)。
 
 macOS 客户端构建需要 macOS 13+、Xcode 工具链和 Python 3.10+。首次构建会下载并核验固定版本依赖。
 
@@ -118,7 +118,7 @@ cd rime-Q
 python3 scripts/build_macos.py --universal --smoke
 ```
 
-产物为 `dist/RimeQ-0.4.4-macos-universal.pkg`。已有资源缓存时可加 `--reuse-resources`；默认只保留 PKG，临时应用在打包后清理。
+产物为 `dist/RimeQ-0.4.5-macos-universal.pkg`。已有资源缓存时可加 `--reuse-resources`；默认只保留 PKG，临时应用在打包后清理。
 
 构建检查包括真实引擎与学习、快捷输入、词库管理、原生设置操作、候选皮肤、安装状态、更新版本比较和每日调度。CI 还会在独立运行环境安装实际 PKG，核验启用或明确的待启用处理，并验证卸载保留数据。
 

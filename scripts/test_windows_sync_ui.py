@@ -25,6 +25,7 @@ def main():
             (unused/'sync'/'isolated-test-only').touch()
             subprocess.run([str(test),str(ROOT/'build-windows/stage'),str(unused),str(ROOT/'artifacts/sync-ui-off.png'),'off'],check=True,timeout=30)
             subprocess.run([str(test),str(ROOT/'build-windows/stage'),str(unused),str(ROOT/'artifacts/sync-ui-off-dark.png'),'off-dark'],check=True,timeout=30)
+            subprocess.run([str(test),str(ROOT/'build-windows/stage'),str(unused),str(ROOT/'artifacts/sync-ui-upgrade.png'),'upgrade'],check=True,timeout=30)
             subprocess.run([str(test),str(unused),str(unused),str(ROOT/'artifacts/sync-ui-error.png'),'error'],check=True,timeout=30)
             subprocess.run([str(test),str(ROOT/'build-windows/stage'),str(nodes[0].root.parent),str(ROOT/'artifacts/sync-ui-join.png'),'join'],check=True,timeout=30)
             nodes[0].call('create',group='我的电脑 · 沙盒测试',name=nodes[0].name)

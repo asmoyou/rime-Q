@@ -121,7 +121,7 @@ namespace RimeQ {
         internal UpdateResult Result { get; private set; }
         internal Updates(HttpClient client = null) {
             http = client ?? new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
-            http.DefaultRequestHeaders.UserAgent.ParseAdd("RimeQ-Windows/0.4.4");
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("RimeQ-Windows/0.4.5");
             http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
             Result = new UpdateResult { State = Paths.Get("UpdateState", "unchecked"), Message = Paths.Get("UpdateMessage", "尚未检查更新。"), Tag = Paths.Get("UpdateTag") };
         }
@@ -264,7 +264,7 @@ namespace RimeQ {
                 if (uri.Scheme != "https" || uri.Host != "github.com" || !uri.AbsolutePath.StartsWith("/amzxyz/RIME-LMDG/releases/download/LTS/", StringComparison.Ordinal))
                     throw new IOException("无效的模型下载地址。");
                 using (var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan }) {
-                    http.DefaultRequestHeaders.UserAgent.ParseAdd("RimeQ-Windows/0.4.4");
+                    http.DefaultRequestHeaders.UserAgent.ParseAdd("RimeQ-Windows/0.4.5");
                     using (var response = await http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, token)) {
                         response.EnsureSuccessStatusCode();
                         if (response.Content.Headers.ContentLength.HasValue && response.Content.Headers.ContentLength != ExpectedBytes) throw new IOException("下载大小与依赖锁不一致。");
