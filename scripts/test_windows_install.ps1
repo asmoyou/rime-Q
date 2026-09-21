@@ -23,7 +23,7 @@ if (Test-Path 'HKLM:\Software\RimeQ') { throw 'Existing Rime Q installation foun
 . "$PSScriptRoot/windows_lifecycle_process.ps1"
 $lifecycleTemp = if ($WindowsSandbox -or $DisposableWindowsVM) { $env:TEMP } else { $env:RUNNER_TEMP }
 
-$setup = (Resolve-Path 'dist/RimeQ-0.4.3-windows-x64.exe').Path
+$setup = (Resolve-Path 'dist/RimeQ-0.4.4-windows-x64.exe').Path
 Invoke-RimeQ $setup '--install-elevated --silent'
 $installed = (Get-ItemProperty 'HKLM:\Software\RimeQ').ActiveDirectory
 $programRoot = Join-Path $env:ProgramFiles 'RimeQ'

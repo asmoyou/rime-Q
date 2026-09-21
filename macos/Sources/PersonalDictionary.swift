@@ -56,7 +56,7 @@ struct LexiconEntry: Codable, Equatable, Identifiable {
     }()
     func validateFullPinyin() throws {
         try validate()
-        guard code.split(separator: " ").allSatisfy({ Self.syllables.contains(String($0)) || $0.utf8.allSatisfy { (65...90).contains($0) } }) else {
+        guard code.split(separator: " ").allSatisfy({ $0.count <= 16 && (Self.syllables.contains(String($0)) || $0.utf8.allSatisfy { (65...90).contains($0) }) }) else {
             throw LexiconError.message("拼音中有无法识别的音节。请使用不带声调的全拼，并用空格分隔，例如 shu ru fa。")
         }
     }
@@ -74,7 +74,7 @@ struct LexiconEntry: Codable, Equatable, Identifiable {
               !text.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
               !code.isEmpty, code.utf8.count <= 1024, weight >= 0, weight < Int(Int32.max),
               code.split(separator: " ").allSatisfy({ part in
-                  !part.isEmpty && part.count <= 16 && part.utf8.allSatisfy { (97...122).contains($0) || (65...90).contains($0) }
+                  !part.isEmpty && part.utf8.allSatisfy { (97...122).contains($0) || (65...90).contains($0) }
               }), code.utf8.allSatisfy({ $0 == 32 || (97...122).contains($0) || (65...90).contains($0) }) else {
             throw LexiconError.message("词条不能为空；拼音请按音节用空格分隔，不带声调，例如 xing he ci ku。权重须为非负整数。")
         }

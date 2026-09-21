@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     output = ROOT / 'build-windows/Sync.Coordinator.Tests.exe'
     build_windows.csharp(output, sorted((ROOT/'windows/settings').glob('*.cs')) +
-                         [ROOT/'windows/tests/sync_coordinator_tests.cs'], 9137,
+                         [ROOT/'windows/tests/sync_coordinator_tests.cs'], 9138,
                          main='RimeQ.SyncCoordinatorTests', console=True)
     stage = ROOT/'build-windows/stage'
     native = ROOT/'build-windows/x64/Release/rimeq_sync_engine_node.exe'

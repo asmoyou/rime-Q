@@ -81,12 +81,15 @@ impl Revocation {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ApplyJob {
+    #[serde(default = "legacy_protocol")]
+    pub protocol: u32,
     pub id: String,
     pub before: Vec<Row>,
     pub after: Vec<Row>,
     pub version: Vector,
     pub revision: String,
 }
+fn legacy_protocol() -> u32 { 1 }
 
 pub struct Store {
     pub identity: Identity,
@@ -139,7 +142,7 @@ impl Store {
         db.busy_timeout(std::time::Duration::from_secs(5))?;
         let version: i64 = db.query_row("PRAGMA user_version", [], |r| r.get(0))?;
         ensure!(
-            version == 0 || version == 1,
+            (0..=2).contains(&version),
             "unsupported sync storage version"
         );
         db.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;
@@ -152,7 +155,7 @@ impl Store {
             CREATE TABLE IF NOT EXISTS heads(key TEXT NOT NULL, origin TEXT NOT NULL, seq INTEGER NOT NULL, context TEXT NOT NULL, weight INTEGER, PRIMARY KEY(key,origin,seq));
             CREATE TABLE IF NOT EXISTS barriers(key TEXT NOT NULL, origin TEXT NOT NULL, seq INTEGER NOT NULL, PRIMARY KEY(key,origin));
             CREATE TABLE IF NOT EXISTS baseline(key TEXT PRIMARY KEY, body TEXT NOT NULL);
-            PRAGMA user_version=1;")?;
+            PRAGMA user_version=2;")?;
         Ok(Self { identity, db })
     }
     pub fn id(&self) -> String {
@@ -781,6 +784,7 @@ impl Store {
             return Ok(None);
         }
         let job = ApplyJob {
+            protocol: PROTOCOL,
             id: identity::random(),
             before,
             after,
@@ -789,6 +793,26 @@ impl Store {
         };
         self.set("apply_job", &job)?;
         Ok(Some(job))
+    }
+    // v1 Windows could keep non-syllable rows outside its pending snapshot.
+    // Reconcile only an exact before/after match; never guess after partial writes.
+    pub fn upgrade_pending(&self, rows: &[Row]) -> Result<bool> {
+        let Some(job) = self.get::<ApplyJob>("apply_job")? else { return Ok(false) };
+        if job.protocol != 1 { return Ok(false); }
+        ensure!(rows.len() <= MAX_ROWS, "dictionary capacity exceeded");
+        let mut unique = BTreeSet::new();
+        for row in rows { row.validate()?; ensure!(unique.insert(&row.key), "duplicate dictionary key"); }
+        let legacy: Vec<Row> = rows.iter().filter(|r|r.key.validate_legacy().is_ok()).cloned().collect();
+        let map = |values: &[Row]| values.iter().map(|r|(r.key.clone(),r.weight)).collect::<BTreeMap<_,_>>();
+        let actual=map(&legacy);
+        ensure!(actual==map(&job.before)||actual==map(&job.after), "recover pending engine application first");
+        self.transaction(|| {
+            if actual==map(&job.after) { self.acknowledge(&job.id,&legacy)?; }
+            else { self.clear("apply_job")?; }
+            self.capture(rows)?;
+            self.prepare_apply()?;
+            Ok(true)
+        })
     }
     pub fn acknowledge(&self, id: &str, rows: &[Row]) -> Result<()> {
         let job: ApplyJob = self

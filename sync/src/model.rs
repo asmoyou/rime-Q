@@ -2,7 +2,9 @@ use anyhow::{bail, ensure, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-pub const PROTOCOL: u32 = 1;
+// v2 carries native learning codes, not only dictionary-editor full syllables.
+// The historical key namespace stays unchanged to preserve identity/deletions.
+pub const PROTOCOL: u32 = 2;
 pub const MAX_MEMBERS: usize = 128;
 pub const MAX_ROWS: usize = 200_000;
 pub const MAX_FRAME: usize = 4 * 1024 * 1024;
@@ -24,13 +26,7 @@ impl Key {
             code: code
                 .replace('\'', " ")
                 .split_whitespace()
-                .map(|s| {
-                    if s.bytes().all(|b| b.is_ascii_uppercase()) {
-                        s.to_owned()
-                    } else {
-                        s.to_lowercase()
-                    }
-                })
+                .map(str::to_owned)
                 .collect::<Vec<_>>()
                 .join(" "),
         };
@@ -64,6 +60,11 @@ impl Key {
                 .all(|c| c.is_ascii_alphabetic() || c == b' '),
             "unsupported pinyin"
         );
+        Ok(())
+    }
+    // Keep the validation of already-signed v1 history unchanged.
+    pub(crate) fn validate_legacy(&self) -> Result<()> {
+        self.validate()?;
         static SYLLABLES: std::sync::OnceLock<std::collections::BTreeSet<&'static str>> =
             std::sync::OnceLock::new();
         let known =
@@ -126,7 +127,7 @@ impl Operation {
     }
     pub fn validate(&self) -> Result<()> {
         ensure!(
-            self.protocol == PROTOCOL && self.seq > 0 && self.seq < i64::MAX as u64,
+            (self.protocol == 1 || self.protocol == PROTOCOL) && self.seq > 0 && self.seq < i64::MAX as u64,
             "invalid protocol or sequence"
         );
         ensure!(
@@ -144,7 +145,7 @@ impl Operation {
         );
         let mut unique = std::collections::BTreeSet::new();
         for c in &self.changes {
-            c.key.validate()?;
+            if self.protocol == 1 { c.key.validate_legacy()?; } else { c.key.validate()?; }
             ensure!(
                 c.weight.is_none_or(|w| w < i32::MAX as u32),
                 "invalid weight"

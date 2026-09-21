@@ -25,7 +25,7 @@ inline SyncRows syncRows(const fs::path& file) {
         for (unsigned char c:text) if (c<32 || c==127) throw std::runtime_error("Invalid dictionary control character");
         std::string normalized,syllable;std::istringstream syllables(code);
         while (syllables>>syllable) {
-            if (syllable.size()>16 || !std::all_of(syllable.begin(),syllable.end(),[](char c){return c>='a' && c<='z' || c>='A' && c<='Z';})) throw std::runtime_error("Unsupported sync pinyin");
+            if (!std::all_of(syllable.begin(),syllable.end(),[](char c){return c>='a' && c<='z' || c>='A' && c<='Z';})) throw std::runtime_error("Unsupported sync encoding");
             if (!normalized.empty()) normalized+=' ';normalized+=syllable;
         }
         size_t end=0;auto value=std::stoll(weight,&end);

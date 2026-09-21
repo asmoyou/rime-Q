@@ -64,7 +64,7 @@ import QRimeBridge
                 switch action {
                 case "tick":
                     defaults.set(true, forKey: "SyncStarted")
-                    try wait { await sync.tick() }
+                    try wait { await sync.tick(force: command["force"] as? Bool ?? true) }
                     response = ["error": sync.lastError as Any? ?? NSNull(), "composition": InputSession.hasComposition, "document": client.document]
                 case "preference": response = ["started": defaults.bool(forKey: "SyncStarted")]
                 case "disabled":
@@ -93,6 +93,17 @@ import QRimeBridge
                 case "replace":
                     let rows = try JSONDecoder().decode([SyncRecord].self, from: JSONSerialization.data(withJSONObject: command["rows"]!))
                     try replace(rows)
+                case "native_import", "native_delete":
+                    let rows = try JSONDecoder().decode([SyncRecord].self, from: JSONSerialization.data(withJSONObject: command["rows"]!))
+                    try rows.forEach { try $0.entry.validate() }
+                    if action == "native_delete" { _ = try dictionary.delete(rows.map(\.entry)) }
+                    else {
+                        try Engine.maintain {
+                            let file = root.appendingPathComponent("synthetic-native.tsv")
+                            try LexiconFiles.write(LexiconEntry.portable(rows.map(\.entry)), to: file)
+                            try EngineSmoke.check(QRimeImportPersonalDictionary(file.path) >= 0, "native learning fixture import failed")
+                        }
+                    }
                 case "begin": try type("nihao")
                 case "cancel": try type("\u{1b}")
                 case "type": try type(command["text"] as! String); response = ["document": client.document]

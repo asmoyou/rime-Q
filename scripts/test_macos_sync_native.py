@@ -273,6 +273,23 @@ def run(binary, output):
                 nodes[-2].call('add_peer', address=nodes[-1].address())
                 converge(expected)
                 cases.append('six_engine_restarts_preserve_dictionary_and_group')
+                # Native learned encodings are not manual full-pinyin drafts.
+                native = [row('Native'+str(i), code, 17+i) for i,code in enumerate(
+                    ['amazon','u','uig','gocheng','iPhone','NASA','internationalization'])]
+                engines[0].call('native_import', rows=native)
+                expected.extend(native);converge(expected)
+                cases.append('native_english_abbreviation_case_and_long_codes_sync_without_filtering')
+                native[0]['weight']=41;engines[1].call('native_import',rows=[native[0]]);converge(expected)
+                engines[2].call('native_delete',rows=[native[1]])
+                expected.remove(native[1]);converge(expected)
+                cases.append('native_code_weight_update_and_deletion_converge')
+                engines[0].call('hook', after='status', effect='fail')
+                assert engines[0].call('tick')['error'] is not None
+                engines[0].call('hook', after='status', effect='begin', before=True)
+                assert not engines[0].call('tick', force=False)['composition'], 'automatic retry ignored backoff'
+                assert engines[0].call('tick', force=True)['composition'], 'manual sync did not bypass backoff'
+                engines[0].call('cancel');converge(expected)
+                cases.append('failed_scan_backoff_and_manual_retry')
                 before = engines[-1].rows()
                 engines[-1].call('leave')
                 assert engines[-1].rows() == before

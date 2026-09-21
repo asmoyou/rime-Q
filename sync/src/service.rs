@@ -89,7 +89,16 @@ struct State {
     discovery_tag: String,
     stop: bool,
     network_error: Option<String>,
+    // The claimed id is only an error hint, never authentication or membership.
+    // A later authenticated v2 connection clears hints for obsolete addresses.
+    incompatible_peers: BTreeMap<String, String>,
 }
+#[derive(Debug)]
+struct ProtocolMismatch { claimed_id: String }
+impl std::fmt::Display for ProtocolMismatch {
+    fn fmt(&self,f:&mut std::fmt::Formatter<'_>)->std::fmt::Result { write!(f,"incompatible peer") }
+}
+impl std::error::Error for ProtocolMismatch {}
 // A timed-out/aborted local control request must not leave joining locked.
 struct JoinAttempt {
     shared: Shared,
@@ -486,7 +495,7 @@ async fn sync_peer(shared: Shared, address: SocketAddr) -> Result<String> {
             .1
             .export_keying_material([0u8; 32], b"EXPORTER-RimeQ-sync-v1", None)?;
     let hello: Hello = network::read(&mut stream).await?;
-    ensure!(hello.protocol == PROTOCOL, "incompatible peer");
+    if hello.protocol != PROTOCOL { return Err(ProtocolMismatch { claimed_id:hello.id }.into()); }
     let (auth, bytes) = {
         let s = shared.lock().unwrap();
         ensure!(
@@ -657,15 +666,17 @@ fn status(s: &State) -> Result<Value> {
         let last_seen=p.map(|p|p.last_seen).unwrap_or(0).max(seen.get(&m.id).copied().unwrap_or(0));
         let online=m.id==s.store.id() || now().saturating_sub(last_seen)<20;
         let applied=r.is_some_and(|r|r.revision==revision && covers(&r.version,&version));
-        json!({"id":m.id,"name":m.name,"self":m.id==s.store.id(),"removed":removed,"online":online,"applied":applied,"last_seen":last_seen})
+        json!({"id":m.id,"name":m.name,"self":m.id==s.store.id(),"removed":removed,"online":online,"applied":applied,"last_seen":last_seen,"needs_upgrade":s.incompatible_peers.contains_key(&m.id)})
     }).collect();
     let pending: Vec<_> = s
         .pending
         .iter()
         .map(|(id, p)| json!({"id":id,"name":p.name}))
         .collect();
+    let network_error=s.network_error.clone().or_else(|| (!s.incompatible_peers.is_empty()).then(||
+        "设备的同步协议版本不一致，请将两端 Rime Q 都升级到支持完整学习记录同步的版本；无需重新配对，本机词库保留。".into()));
     Ok(
-        json!({"protocol":PROTOCOL,"id":s.store.id(),"group":s.store.get::<Group>("group")?,"enabled":s.store.enabled(),"can_remove":can_remove,"members":members,"pending":pending,"discovered":s.discovered.values().collect::<Vec<_>>(),"port":s.port,"bind":s.bind.to_string(),"rows":s.store.rows()?.len(),"version":version,"revision":revision,"waiting_input":s.store.get::<ApplyJob>("apply_job")?.is_some(),"network_error":s.network_error}),
+        json!({"protocol":PROTOCOL,"id":s.store.id(),"group":s.store.get::<Group>("group")?,"enabled":s.store.enabled(),"can_remove":can_remove,"members":members,"pending":pending,"discovered":s.discovered.values().collect::<Vec<_>>(),"port":s.port,"bind":s.bind.to_string(),"rows":s.store.rows()?.len(),"version":version,"revision":revision,"waiting_input":s.store.get::<ApplyJob>("apply_job")?.is_some(),"network_error":network_error}),
     )
 }
 
@@ -798,6 +809,7 @@ async fn control(shared: Shared, value: Value) -> Result<Value> {
         }
         "remove" => {
             s.store.revoke(string("id")?)?;
+            s.incompatible_peers.remove(string("id")?);
             status(&s)
         }
         "add_peer" => {
@@ -838,7 +850,13 @@ async fn control(shared: Shared, value: Value) -> Result<Value> {
             }
             Ok(json!({"job":job}))
         }
-        "pending_apply" => Ok(json!({"job":s.store.get::<ApplyJob>("apply_job")?})),
+        "pending_apply" => {
+            if let Some(value)=value.get("rows") {
+                let rows:Vec<Row>=serde_json::from_value(value.clone())?;
+                if s.store.upgrade_pending(&rows)? && s.store.get::<ApplyJob>("apply_job")?.is_none() { receipt(&s)?; }
+            }
+            Ok(json!({"job":s.store.get::<ApplyJob>("apply_job")?}))
+        }
         "abort_unapplied" => {
             let job: ApplyJob = s
                 .store
@@ -1015,6 +1033,7 @@ pub async fn run(
         discovery_tag: identity::random(),
         stop: false,
         network_error: None,
+        incompatible_peers: BTreeMap::new(),
     }));
     let controls = shared.clone();
     let control_task = tokio::spawn(async move {
@@ -1197,6 +1216,8 @@ pub async fn run(
                 let mut state = s.lock().unwrap();
                 match result {
                     Ok(Ok(id)) => {
+                        state.incompatible_peers.remove(&key);
+                        state.incompatible_peers.retain(|key,hint|key!=&id && hint!=&id);
                         state.peers.remove(&key);
                         state.peers.retain(|_, p| p.address != address);
                         state.peers.insert(
@@ -1210,7 +1231,12 @@ pub async fn run(
                         );
                         let _ = persist_peers(&state);
                     }
-                    _ => {
+                    failure => {
+                        if let Ok(Err(error))=&failure {
+                            if let Some(mismatch)=error.downcast_ref::<ProtocolMismatch>() {
+                                state.incompatible_peers.insert(key.clone(),mismatch.claimed_id.clone());
+                            }
+                        }
                         if let Some(p) = state.peers.get_mut(&key) {
                             p.failures = (p.failures + 1).min(6);
                             p.next_attempt =

@@ -121,7 +121,7 @@ namespace RimeQ {
         internal UpdateResult Result { get; private set; }
         internal Updates(HttpClient client = null) {
             http = client ?? new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
-            http.DefaultRequestHeaders.UserAgent.ParseAdd("RimeQ-Windows/0.4.3");
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("RimeQ-Windows/0.4.4");
             http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
             Result = new UpdateResult { State = Paths.Get("UpdateState", "unchecked"), Message = Paths.Get("UpdateMessage", "尚未检查更新。"), Tag = Paths.Get("UpdateTag") };
         }
@@ -264,7 +264,7 @@ namespace RimeQ {
                 if (uri.Scheme != "https" || uri.Host != "github.com" || !uri.AbsolutePath.StartsWith("/amzxyz/RIME-LMDG/releases/download/LTS/", StringComparison.Ordinal))
                     throw new IOException("无效的模型下载地址。");
                 using (var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan }) {
-                    http.DefaultRequestHeaders.UserAgent.ParseAdd("RimeQ-Windows/0.4.3");
+                    http.DefaultRequestHeaders.UserAgent.ParseAdd("RimeQ-Windows/0.4.4");
                     using (var response = await http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, token)) {
                         response.EnsureSuccessStatusCode();
                         if (response.Content.Headers.ContentLength.HasValue && response.Content.Headers.ContentLength != ExpectedBytes) throw new IOException("下载大小与依赖锁不一致。");
@@ -320,7 +320,7 @@ namespace RimeQ {
         static DictionaryRow Draft(string text, string code, int weight, bool allowDelete) {
             var row = new DictionaryRow { Text = (text ?? "").Trim(), Code = NormalizeCode(code), Weight = weight };
             if (row.Text.Length == 0 || row.Text.StartsWith("#", StringComparison.Ordinal) || Encoding.UTF8.GetByteCount(row.Text) > 1024 || row.Text.Any(char.IsControl) ||
-                row.Code.Length == 0 || Encoding.UTF8.GetByteCount(row.Code) > 1024 || row.Code.Split(' ').Any(part => part.Length == 0 || part.Length > 16 || part.Any(c => !(c >= 'a' && c <= 'z') && !(c >= 'A' && c <= 'Z'))) ||
+                row.Code.Length == 0 || Encoding.UTF8.GetByteCount(row.Code) > 1024 || row.Code.Split(' ').Any(part => part.Length == 0 || part.Any(c => !(c >= 'a' && c <= 'z') && !(c >= 'A' && c <= 'Z'))) ||
                 row.Weight < (allowDelete ? -1 : 0) || row.Weight == int.MaxValue)
                 throw new FormatException("词条不能为空；拼音请按音节用空格分隔，不带声调，例如 xing he ci ku。权重须为非负整数。");
             return row;
@@ -362,7 +362,7 @@ namespace RimeQ {
         }
         internal static void ValidateFullPinyin(DictionaryRow row) {
             var known = Syllables();
-            if (row.Code.Split(' ').Any(part => !known.Contains(part) && !part.All(c => c >= 'A' && c <= 'Z')))
+            if (row.Code.Split(' ').Any(part => part.Length>16 || !known.Contains(part) && !part.All(c => c >= 'A' && c <= 'Z')))
                 throw new FormatException("拼音中有无法识别的音节。请使用不带声调的全拼，并用空格分隔，例如 shu ru fa。");
         }
         internal static List<DictionaryRow> ParsePersonal(string text) {

@@ -183,7 +183,7 @@ import AppKit
         let add = button("添加设备", symbol: "plus", primary: true) { [weak self] in self?.showInvitation() }; addButton = add
         let now = button("立即同步", symbol: "arrow.clockwise") { [weak self] in
             guard let self else { return }
-            runAction("正在同步…") { [self] in _ = try await self.sync.request(["action": "sync_now"]); await self.sync.tick() }
+            runAction("正在同步…") { [self] in _ = try await self.sync.request(["action": "sync_now"]); await self.sync.tick(force: true) }
         }
         let tools = SyncUI.row([SyncUI.text("已加入的设备", size: 14, weight: .semibold), SyncUI.spacer(), now, add])
         let card = SettingsCard([requests], padding: 16); card.isHidden = true; pendingCard = card

@@ -108,9 +108,10 @@ import AppKit
         name.stringValue = device["name"] as? String ?? "未命名设备"; name.toolTip = name.stringValue
         detail.stringValue = own ? "这台电脑" : "已授权的设备"
         let online = device["online"] as? Bool == true, applied = device["applied"] as? Bool == true
-        status.stringValue = paused && own ? "已暂停" : online ? (applied ? "已同步" : "等待应用") : "等待连接"
-        status.textColor = paused && own ? .secondaryLabelColor : online && applied ? NSColor.adaptive(0x237947, 0x70D59C) : .secondaryLabelColor
-        status.toolTip = online && applied ? "已应用当前已知变更；离线设备可能仍有未传出的词条。" : "连接后自动同步；有组合输入时等待输入结束。"
+        let needsUpgrade = device["needs_upgrade"] as? Bool == true
+        status.stringValue = paused && own ? "已暂停" : needsUpgrade ? "需要升级" : online ? (applied ? "已同步" : "等待应用") : "等待连接"
+        status.textColor = paused && own ? .secondaryLabelColor : online && applied && !needsUpgrade ? NSColor.adaptive(0x237947, 0x70D59C) : .secondaryLabelColor
+        status.toolTip = needsUpgrade ? "请将两端 Rime Q 升级到支持完整学习记录同步的版本；无需重新配对。" : online && applied ? "已应用当前已知变更；离线设备可能仍有未传出的词条。" : "连接后自动同步；有组合输入时等待输入结束。"
         more.isHidden = remove == nil
         more.setAccessibilityLabel("管理“\(name.stringValue)”")
     }

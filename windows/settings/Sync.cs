@@ -15,7 +15,7 @@ namespace RimeQ {
     internal sealed class SyncJob {public string id {get;set;} public List<SyncRow> before {get;set;} public List<SyncRow> after {get;set;}}
     internal sealed class SyncJobResult {public SyncJob job {get;set;}}
     internal sealed class SyncGroup {public string id {get;set;} public string name {get;set;}}
-    internal sealed class SyncMember {public string id {get;set;} public string name {get;set;} public bool self {get;set;} public bool removed {get;set;} public bool online {get;set;} public bool applied {get;set;} public long last_seen {get;set;}}
+    internal sealed class SyncMember {public string id {get;set;} public string name {get;set;} public bool self {get;set;} public bool removed {get;set;} public bool online {get;set;} public bool applied {get;set;} public long last_seen {get;set;} public bool needs_upgrade {get;set;}}
     internal sealed class SyncPending {public string id {get;set;} public string name {get;set;}}
     internal sealed class SyncNearby {public string address {get;set;} public string name {get;set;} public string invite {get;set;}}
     internal sealed class SyncStatus {public string id {get;set;} public SyncGroup group {get;set;} public bool enabled {get;set;} public List<SyncMember> members {get;set;} public List<SyncPending> pending {get;set;} public List<SyncNearby> discovered {get;set;} public int port {get;set;} public bool waiting_input {get;set;} public Dictionary<string,long> version {get;set;} public string network_error {get;set;} public string revision {get;set;} public bool can_remove {get;set;}}
@@ -33,14 +33,6 @@ namespace RimeQ {
         static long retryAfter;
         // Assigned only by the isolated coordinator test, never by application settings.
         internal static Func<int,Task<BrokerState>> EngineRequest=Broker.Request;
-        static readonly Lazy<HashSet<string>> syncSyllables=new Lazy<HashSet<string>>(()=>{
-            using(var stream=typeof(DeviceSync).Assembly.GetManifestResourceStream("SyncPinyin.txt"))
-            using(var reader=new StreamReader(stream,Encoding.UTF8))
-                return new HashSet<string>(reader.ReadToEnd().Split(new[]{'\r','\n'},StringSplitOptions.RemoveEmptyEntries),StringComparer.Ordinal);
-        });
-        internal static bool Supported(SyncRow row){return row.key.code.Split(' ').All(s=>syncSyllables.Value.Contains(s)||s.All(c=>c>='A'&&c<='Z'));}
-        internal static List<SyncRow> Shared(IEnumerable<SyncRow> rows){return rows.Where(Supported).ToList();}
-        internal static List<SyncRow> PreserveLocal(IEnumerable<SyncRow> actual,IEnumerable<SyncRow> shared){return shared.Concat(actual.Where(r=>!Supported(r))).ToList();}
         static JavaScriptSerializer Json(){return new JavaScriptSerializer {MaxJsonLength=96*1024*1024,RecursionLimit=64};}
         internal static async Task<SyncStatus> DisplayStatus() {
             if(File.Exists(Path.Combine(Root,"control.json")))
@@ -85,6 +77,7 @@ namespace RimeQ {
         }
         static async Task ReadExact(Stream stream,byte[] bytes){int offset=0;while(offset<bytes.Length){int count=await stream.ReadAsync(bytes,offset,bytes.Length-offset);if(count==0)throw new EndOfStreamException();offset+=count;}}
         static string Friendly(string message){
+            if(message.Contains("incompatible peer"))return "设备的同步协议版本不一致，请将两端 Rime Q 都升级到支持完整学习记录同步的版本；无需重新配对，本机词库保留。";
             if(message.Contains("pairing cancelled"))return "已取消加入同步组。";
             if(message.Contains("invalid name"))return "设备或同步组名称无效，请缩短名称并去掉换行等特殊字符。";
             if(message.Contains("only local network addresses"))return "请选择局域网地址。两台电脑需要在能互相连接的本地网络中。";
@@ -110,20 +103,19 @@ namespace RimeQ {
                 if(!force&&LastError==null&&probe.Message==revision&&remote==version&&!status.waiting_input){LastState=lastAppliedState;return;}
                 var exported=await EngineRequest(11);if(!exported.Handled){LastState="等待当前输入结束";return;}
                 var path=Path.Combine(Root,"engine","current.tsv");var actual=ToSync(DictionaryData.Parse(File.ReadAllText(path,new UTF8Encoding(false,true))));
-                var shared=Shared(actual);int retained=actual.Count-shared.Count;
-                var job=(await Call<SyncJobResult>(new {action="pending_apply"})).job;
-                if(job!=null&&Same(shared,job.after)){await Call<object>(new {action="acknowledge",id=job.id,rows=shared});job=null;}
-                if(job==null)job=(await Call<SyncJobResult>(new {action="capture",rows=shared})).job;
+                var job=(await Call<SyncJobResult>(new {action="pending_apply",rows=actual})).job;
+                if(job!=null&&Same(actual,job.after)){await Call<object>(new {action="acknowledge",id=job.id,rows=actual});job=null;}
+                if(job==null)job=(await Call<SyncJobResult>(new {action="capture",rows=actual})).job;
                 if(job!=null){
-                    if(!Same(shared,job.before))throw new IOException("同步恢复期间词库已有新修改。已保留本机记录和恢复快照，请在同步页面处理。");
+                    if(!Same(actual,job.before))throw new IOException("同步恢复期间词库已有新修改。已保留本机记录和恢复快照，请在同步页面处理。");
                     Paths.AtomicText(Path.Combine(Root,"engine","before.tsv"),DictionaryData.Format(FromSync(actual)));
-                    Paths.AtomicText(Path.Combine(Root,"engine","after.tsv"),DictionaryData.Format(FromSync(PreserveLocal(actual,job.after))));
+                    Paths.AtomicText(Path.Combine(Root,"engine","after.tsv"),DictionaryData.Format(FromSync(job.after)));
                     var applied=await EngineRequest(12);
                     if(!applied.Handled){if(applied.Message=="sync-stale"){await Call<object>(new {action="abort_unapplied",id=job.id});revision=null;return;}if(applied.Message=="sync-busy"){LastState="等待当前输入结束";return;}throw new IOException("同步写入未能完整完成，已保留备份，将在下次检查时恢复。");}
                     actual=ToSync(DictionaryData.Parse(File.ReadAllText(path,new UTF8Encoding(false,true))));
-                    await Call<object>(new {action="acknowledge",id=job.id,rows=Shared(actual)});revision=applied.Message;
+                    await Call<object>(new {action="acknowledge",id=job.id,rows=actual});revision=applied.Message;
                 }else revision=exported.Message;
-                version=remote;LastError=null;retryAfter=0;LastState=lastAppliedState="本机词库已同步"+(retained==0?"":" · "+retained+" 条非全拼记录仅保留在本机");
+                version=remote;LastError=null;retryAfter=0;LastState=lastAppliedState="本机学习记录已完整应用";
             }catch(Exception error){LastError=error.Message;LastState="同步暂未完成，30 秒后自动重试";retryAfter=retryClock.ElapsedMilliseconds+30000;}finally{busy=false;if(Changed!=null)Changed();}
         }
         internal static async Task RecoverLocal(){
@@ -136,7 +128,7 @@ namespace RimeQ {
                 var backup=Path.Combine(Root,"backups");Directory.CreateDirectory(backup);var tag=Guid.NewGuid().ToString("N");
                 Paths.AtomicText(Path.Combine(backup,"recovery-local-"+tag+".tsv"),DictionaryData.Format(FromSync(actual)));
                 Paths.AtomicText(Path.Combine(backup,"recovery-target-"+tag+".tsv"),DictionaryData.Format(FromSync(job.after)));
-                await Call<object>(new {action="recover_local",id=job.id,rows=Shared(actual)});revision=null;version=null;LastError=null;retryAfter=0;
+                await Call<object>(new {action="recover_local",id=job.id,rows=actual});revision=null;version=null;LastError=null;retryAfter=0;
             }finally{busy=false;}
         }
         internal static async Task Leave(){

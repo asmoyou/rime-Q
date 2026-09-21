@@ -37,6 +37,7 @@ struct SyncApplication: Decodable { let id: String; let before: [SyncRecord]; le
     private(set) var lastError: String?
     private var startupFailure: String?
     private var startupErrors: Pipe?
+    private var retryAfter: TimeInterval = 0
 
     // Viewing an unused feature must not create an identity or access Keychain.
     func displayStatus() async throws -> [String: Any] {
@@ -123,6 +124,7 @@ struct SyncApplication: Decodable { let id: String; let before: [SyncRecord]; le
     // Never expose raw helper output: it may contain paths or library details.
     nonisolated private static func failureMessage(_ detail: String) -> String {
         for (needle, message) in [
+            ("incompatible peer", "设备的同步协议版本不一致，请将两端 Rime Q 都升级到支持完整学习记录同步的版本；无需重新配对，本机词库保留。"),
             ("enter a local IP address and port", "连接地址格式不正确，请复制原设备显示的 IP 地址和端口。"),
             ("invalid port", "连接端口不正确，请重新复制原设备的连接信息。"),
             ("only local network addresses", "请选择局域网地址。两台电脑需要在能够互相连接的本地网络中。"),
@@ -151,7 +153,7 @@ struct SyncApplication: Decodable { let id: String; let before: [SyncRecord]; le
             var keys = Set<String>()
             guard rows.count <= 200_000 else { throw LexiconError.message("同步词库超过 20 万条限制。") }
             for row in rows {
-                try row.entry.validateFullPinyin()
+                try row.entry.validate()
                 guard row.key.namespace == "rime_q/full-pinyin/v1", keys.insert(row.entry.id).inserted else {
                     throw LexiconError.message("同步快照包含不兼容或重复词条，已停止写入。")
                 }
@@ -174,7 +176,7 @@ struct SyncApplication: Decodable { let id: String; let before: [SyncRecord]; le
             let store = dictionary
             let actual = try store.readClosedDictionary().map(SyncRecord.init)
             guard same(actual, application.before) else { return nil }
-            try application.after.forEach { try $0.entry.validateFullPinyin() }
+            try application.after.forEach { try $0.entry.validate() }
             let backup = root.appendingPathComponent("backups/before-\(UUID().uuidString).tsv")
             try LexiconFiles.write(LexiconEntry.portable(actual.map(\.entry)), to: backup)
             let before = Dictionary(uniqueKeysWithValues: actual.map { ($0.entry.id, $0) })
@@ -193,19 +195,19 @@ struct SyncApplication: Decodable { let id: String; let before: [SyncRecord]; le
             return observed
         }
     }
-    func tick() async {
+    func tick(force: Bool = false) async {
         precondition(Thread.isMainThread)
-        guard !busy, defaults.bool(forKey: "SyncStarted") else { return }
+        guard !busy, defaults.bool(forKey: "SyncStarted"), force || ProcessInfo.processInfo.systemUptime >= retryAfter else { return }
         busy = true; defer { busy = false; NotificationCenter.default.post(name: Self.changed, object: nil) }
         do {
             try await ensureStarted(); let status = try await request(["action": "status"])
             guard status["enabled"] as? Bool == true, Engine.ready, !InputSession.hasComposition else { return }
             let remote = try JSONSerialization.data(withJSONObject: ["revision": status["revision"] ?? ""], options: .sortedKeys)
-            guard revision != QRimeLearningRevision() || remote != version || status["waiting_input"] as? Bool == true else { return }
-            var pending = try job(await request(["action": "pending_apply"]))
+            guard force || lastError != nil || revision != QRimeLearningRevision() || remote != version || status["waiting_input"] as? Bool == true else { return }
             guard !InputSession.hasComposition else { return }
             var actual = try snapshot()
             var capturedRevision = QRimeLearningRevision()
+            var pending = try job(await request(["action": "pending_apply", "rows": actual.map(\.object)]))
             if let value = pending, same(actual, value.after) {
                 _ = try await request(["action": "acknowledge", "id": value.id, "rows": actual.map(\.object)]); pending = nil
                 guard !InputSession.hasComposition else { return }
@@ -221,8 +223,11 @@ struct SyncApplication: Decodable { let id: String; let before: [SyncRecord]; le
                 capturedRevision = QRimeLearningRevision()
                 _ = try await request(["action": "acknowledge", "id": value.id, "rows": observed.map(\.object)])
             }
-            revision = capturedRevision; version = remote; lastError = nil
-        } catch { lastError = error.localizedDescription }
+            revision = capturedRevision; version = remote; lastError = nil; retryAfter = 0
+        } catch {
+            lastError = error.localizedDescription + "\n30 秒后自动重试，也可点“立即同步”。"
+            retryAfter = ProcessInfo.processInfo.systemUptime + 30
+        }
     }
     func recoverLocal() async throws {
         guard !busy else { throw LexiconError.message("正在同步，请稍后重试。") }
@@ -232,13 +237,13 @@ struct SyncApplication: Decodable { let id: String; let before: [SyncRecord]; le
         try LexiconFiles.write(LexiconEntry.portable(actual.map(\.entry)), to: root.appendingPathComponent("backups/recovery-local-\(tag).tsv"))
         try LexiconFiles.write(LexiconEntry.portable(pending.after.map(\.entry)), to: root.appendingPathComponent("backups/recovery-target-\(tag).tsv"))
         _ = try await request(["action": "recover_local", "id": pending.id, "rows": actual.map(\.object)])
-        revision = nil; version = nil; lastError = nil
+        revision = nil; version = nil; lastError = nil; retryAfter = 0
     }
     func leave() async throws {
         defaults.set(false, forKey: "SyncStarted")
         timer?.invalidate(); timer = nil
         while busy { try await Task.sleep(nanoseconds: 100_000_000) }
-        do { _ = try await request(["action": "leave"]); revision = nil; version = nil; lastError = nil }
+        do { _ = try await request(["action": "leave"]); revision = nil; version = nil; lastError = nil; retryAfter = 0 }
         catch { markStarted(); throw error }
     }
     func stop() {
