@@ -102,6 +102,7 @@ namespace RimeQ {
                 if(!isJoined){status.Text="尚未加入同步组。你可以创建，或加入已有设备的同步组。";return;}
                 var valid=(current.members??new List<SyncMember>()).Where(m=>!m.removed).ToList();
                 status.Text=current.group.name+" · "+valid.Count+" 台设备 · "+valid.Count(m=>m.online)+" 台在线"+(current.enabled?"":" · 已暂停");
+                if(current.enabled&&!string.IsNullOrEmpty(DeviceSync.LastState))status.Text+="\n"+DeviceSync.LastState;
                 if(!string.IsNullOrEmpty(DeviceSync.LastError))status.Text+="\n"+DeviceSync.LastError;
                 if(!string.IsNullOrEmpty(current.network_error))status.Text+="\n"+current.network_error;
                 pauseButton.Content=current.enabled?"暂停同步":"恢复同步";
@@ -176,7 +177,7 @@ namespace RimeQ {
             content.Children.Add(requests);
             var actions=new StackPanel {Orientation=Orientation.Horizontal,Margin=new Thickness(0,10,0,0)};
             actions.Children.Add(Action("添加设备",()=>OpenWizard(SyncWizard.Mode.Invite)));
-            actions.Children.Add(Command("立即同步",async()=>{await DeviceSync.Call<object>(new {action="sync_now"});await DeviceSync.Tick();}));
+            actions.Children.Add(Command("立即同步",async()=>{await DeviceSync.Call<object>(new {action="sync_now"});await DeviceSync.Tick(true);}));
             pauseButton=Command(current.enabled?"暂停同步":"恢复同步",()=>DeviceSync.Call<object>(new {action=current.enabled?"pause":"resume"}));
             actions.Children.Add(pauseButton);
             var more=Action("更多",()=>{});var menu=new ContextMenu();

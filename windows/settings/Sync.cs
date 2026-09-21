@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -26,8 +27,20 @@ namespace RimeQ {
         internal static string LastState {get;private set;}
         internal static event Action Changed;
         static bool busy,starting;
-        static string revision,version;
+        static string revision,version,lastAppliedState;
         static string startupFailure;
+        static readonly Stopwatch retryClock=Stopwatch.StartNew();
+        static long retryAfter;
+        // Assigned only by the isolated coordinator test, never by application settings.
+        internal static Func<int,Task<BrokerState>> EngineRequest=Broker.Request;
+        static readonly Lazy<HashSet<string>> syncSyllables=new Lazy<HashSet<string>>(()=>{
+            using(var stream=typeof(DeviceSync).Assembly.GetManifestResourceStream("SyncPinyin.txt"))
+            using(var reader=new StreamReader(stream,Encoding.UTF8))
+                return new HashSet<string>(reader.ReadToEnd().Split(new[]{'\r','\n'},StringSplitOptions.RemoveEmptyEntries),StringComparer.Ordinal);
+        });
+        internal static bool Supported(SyncRow row){return row.key.code.Split(' ').All(s=>syncSyllables.Value.Contains(s)||s.All(c=>c>='A'&&c<='Z'));}
+        internal static List<SyncRow> Shared(IEnumerable<SyncRow> rows){return rows.Where(Supported).ToList();}
+        internal static List<SyncRow> PreserveLocal(IEnumerable<SyncRow> actual,IEnumerable<SyncRow> shared){return shared.Concat(actual.Where(r=>!Supported(r))).ToList();}
         static JavaScriptSerializer Json(){return new JavaScriptSerializer {MaxJsonLength=96*1024*1024,RecursionLimit=64};}
         internal static async Task<SyncStatus> DisplayStatus() {
             if(File.Exists(Path.Combine(Root,"control.json")))
@@ -82,51 +95,53 @@ namespace RimeQ {
             if(message.Contains("only the group creator"))return "请在创建同步组的电脑上移除设备。";
             if(message.Contains("already in a group"))return "这台电脑已加入同步组。";
             if(message.Contains("capacity")||message.Contains("limit"))return "同步数据超过本版限制，请减少单次操作规模或更新版本。";
+            if(message.Contains("invalid syllable")||message.Contains("invalid pinyin")||message.Contains("unsupported pinyin"))return "词库编码与同步协议不兼容；本机记录已保留，请更新 Rime Q 后重试。";
             return "同步操作未完成，请检查设备状态后重试。";
         }
         internal static List<SyncRow> ToSync(IEnumerable<DictionaryRow> rows){return rows.Select(r=>new SyncRow {key=new SyncKey {@namespace="rime_q/full-pinyin/v1",text=r.Text,code=r.Code.Trim()},weight=r.Weight}).OrderBy(r=>r.key.text,StringComparer.Ordinal).ThenBy(r=>r.key.code,StringComparer.Ordinal).ToList();}
         internal static List<DictionaryRow> FromSync(IEnumerable<SyncRow> rows){return rows.Select(r=>new DictionaryRow {Text=r.key.text,Code=r.key.code,Weight=r.weight}).ToList();}
         internal static bool Same(IEnumerable<SyncRow> left,IEnumerable<SyncRow> right){return left.OrderBy(r=>r.key.text,StringComparer.Ordinal).ThenBy(r=>r.key.code,StringComparer.Ordinal).Select(r=>r.key.text+"\t"+r.key.code+"\t"+r.weight).SequenceEqual(right.OrderBy(r=>r.key.text,StringComparer.Ordinal).ThenBy(r=>r.key.code,StringComparer.Ordinal).Select(r=>r.key.text+"\t"+r.key.code+"\t"+r.weight));}
-        internal static async Task Tick(){
-            if(busy||Paths.Get("SyncStarted","0")!="1")return;busy=true;
+        internal static async Task Tick(bool force=false){
+            if(busy||Paths.Get("SyncStarted","0")!="1"||(!force&&retryClock.ElapsedMilliseconds<retryAfter))return;busy=true;
             try{
                 await EnsureStarted();var status=await Call<SyncStatus>(new {action="status"});if(!status.enabled||status.group==null)return;
-                var probe=await Broker.Request(10);if(!probe.Ready||!probe.Handled){LastState="等待当前输入结束";return;}
+                var probe=await EngineRequest(10);if(!probe.Ready||!probe.Handled){LastState="等待当前输入结束";return;}
                 var remote=status.revision;
-                if(probe.Message==revision&&remote==version&&!status.waiting_input)return;
-                var exported=await Broker.Request(11);if(!exported.Handled){LastState="等待当前输入结束";return;}
+                if(!force&&LastError==null&&probe.Message==revision&&remote==version&&!status.waiting_input){LastState=lastAppliedState;return;}
+                var exported=await EngineRequest(11);if(!exported.Handled){LastState="等待当前输入结束";return;}
                 var path=Path.Combine(Root,"engine","current.tsv");var actual=ToSync(DictionaryData.Parse(File.ReadAllText(path,new UTF8Encoding(false,true))));
+                var shared=Shared(actual);int retained=actual.Count-shared.Count;
                 var job=(await Call<SyncJobResult>(new {action="pending_apply"})).job;
-                if(job!=null&&Same(actual,job.after)){await Call<object>(new {action="acknowledge",id=job.id,rows=actual});job=null;}
-                if(job==null)job=(await Call<SyncJobResult>(new {action="capture",rows=actual})).job;
+                if(job!=null&&Same(shared,job.after)){await Call<object>(new {action="acknowledge",id=job.id,rows=shared});job=null;}
+                if(job==null)job=(await Call<SyncJobResult>(new {action="capture",rows=shared})).job;
                 if(job!=null){
-                    if(!Same(actual,job.before))throw new IOException("同步恢复期间词库已有新修改。已保留本机记录和恢复快照，请在同步页面处理。");
+                    if(!Same(shared,job.before))throw new IOException("同步恢复期间词库已有新修改。已保留本机记录和恢复快照，请在同步页面处理。");
                     Paths.AtomicText(Path.Combine(Root,"engine","before.tsv"),DictionaryData.Format(FromSync(actual)));
-                    Paths.AtomicText(Path.Combine(Root,"engine","after.tsv"),DictionaryData.Format(FromSync(job.after)));
-                    var applied=await Broker.Request(12);
+                    Paths.AtomicText(Path.Combine(Root,"engine","after.tsv"),DictionaryData.Format(FromSync(PreserveLocal(actual,job.after))));
+                    var applied=await EngineRequest(12);
                     if(!applied.Handled){if(applied.Message=="sync-stale"){await Call<object>(new {action="abort_unapplied",id=job.id});revision=null;return;}if(applied.Message=="sync-busy"){LastState="等待当前输入结束";return;}throw new IOException("同步写入未能完整完成，已保留备份，将在下次检查时恢复。");}
                     actual=ToSync(DictionaryData.Parse(File.ReadAllText(path,new UTF8Encoding(false,true))));
-                    await Call<object>(new {action="acknowledge",id=job.id,rows=actual});revision=applied.Message;
+                    await Call<object>(new {action="acknowledge",id=job.id,rows=Shared(actual)});revision=applied.Message;
                 }else revision=exported.Message;
-                version=remote;LastError=null;LastState="本机词库已同步";
-            }catch(Exception error){LastError=error.Message;LastState="同步等待处理";}finally{busy=false;if(Changed!=null)Changed();}
+                version=remote;LastError=null;retryAfter=0;LastState=lastAppliedState="本机词库已同步"+(retained==0?"":" · "+retained+" 条非全拼记录仅保留在本机");
+            }catch(Exception error){LastError=error.Message;LastState="同步暂未完成，30 秒后自动重试";retryAfter=retryClock.ElapsedMilliseconds+30000;}finally{busy=false;if(Changed!=null)Changed();}
         }
         internal static async Task RecoverLocal(){
             if(busy)throw new IOException("正在同步，请稍后重试。");busy=true;
             try{
                 var job=(await Call<SyncJobResult>(new {action="pending_apply"})).job;
                 if(job==null)return;
-                var exported=await Broker.Request(11);if(!exported.Handled)throw new IOException("请结束当前输入后重试。");
+                var exported=await EngineRequest(11);if(!exported.Handled)throw new IOException("请结束当前输入后重试。");
                 var actual=ToSync(DictionaryData.Parse(File.ReadAllText(Path.Combine(Root,"engine","current.tsv"),new UTF8Encoding(false,true))));
                 var backup=Path.Combine(Root,"backups");Directory.CreateDirectory(backup);var tag=Guid.NewGuid().ToString("N");
                 Paths.AtomicText(Path.Combine(backup,"recovery-local-"+tag+".tsv"),DictionaryData.Format(FromSync(actual)));
                 Paths.AtomicText(Path.Combine(backup,"recovery-target-"+tag+".tsv"),DictionaryData.Format(FromSync(job.after)));
-                await Call<object>(new {action="recover_local",id=job.id,rows=actual});revision=null;version=null;LastError=null;
+                await Call<object>(new {action="recover_local",id=job.id,rows=Shared(actual)});revision=null;version=null;LastError=null;retryAfter=0;
             }finally{busy=false;}
         }
         internal static async Task Leave(){
             Paths.Set("SyncStarted","0");while(busy)await Task.Delay(100);
-            try{await Call<object>(new {action="leave"});revision=null;version=null;LastError=null;}
+            try{await Call<object>(new {action="leave"});revision=null;version=null;LastError=null;LastState=null;lastAppliedState=null;retryAfter=0;}
             catch{Paths.Set("SyncStarted","1");throw;}
         }
         internal static void Stop(){try{Task.Run(()=>Call<object>(new {action="shutdown"})).Wait(1500);}catch(Exception){}}

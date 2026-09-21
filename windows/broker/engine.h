@@ -17,6 +17,7 @@ class Engine {
     uint64_t learningRevision_ = 1;
     std::vector<RimeSessionId> available_;
     RimeSessionId session(uint64_t client);
+    void warmSession();
     State read(RimeSessionId id, bool handled);
     State synchronize(Command command);
 public:

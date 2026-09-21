@@ -62,6 +62,7 @@ def csharp(output, sources, build, resources=(), main=None, console=False):
     for name in references: options.append('/reference:' + str(framework / (name + '.dll')))
     for name in ['PresentationCore', 'PresentationFramework', 'WindowsBase', 'UIAutomationTypes']: options.append('/reference:' + str(framework / 'WPF' / (name + '.dll')))
     for path, name in resources: options.append('/resource:' + str(path) + ',' + name)
+    options.append('/resource:' + str(ROOT / 'sync/resources/pinyin.txt') + ',SyncPinyin.txt')
     if main: options.append('/main:' + main)
     metadata = ROOT / 'build-windows/AssemblyVersion.cs'
     metadata.write_text('using System.Reflection;\n[assembly: AssemblyTitle("Rime Q")]\n[assembly: AssemblyProduct("Rime Q")]\n'
@@ -115,6 +116,7 @@ def build(args):
     shutil.copytree(ROOT / 'third_party/windows/licenses', stage / 'licenses/windows', dirs_exist_ok=True)
     if args.smoke:
         import tempfile
+        run('python', ROOT / 'scripts/test_windows_sync_coordinator.py')
         with tempfile.TemporaryDirectory(prefix='rimeq-sync-engine-') as user:
             run(output / 'x64/Release/rimeq_sync_engine_tests.exe', stage, Path(user) / 'fixture')
         run('python', ROOT / 'scripts/test_lan_sync_native.py', '--binary', stage / 'RimeQ.Sync.exe',
@@ -157,7 +159,7 @@ def build(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--build', type=int, default=9136)
+    parser.add_argument('--build', type=int, default=9137)
     parser.add_argument('--reuse-resources', action='store_true')
     parser.add_argument('--smoke', action='store_true')
     parser.add_argument('--no-package', action='store_true')

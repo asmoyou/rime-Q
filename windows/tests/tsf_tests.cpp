@@ -11,6 +11,7 @@
 #include <wrl/client.h>
 #include <atomic>
 #include <thread>
+#include <chrono>
 #include <iostream>
 #include <fstream>
 #include "thread_manager.h"
@@ -135,9 +136,12 @@ int wmain(int argc, wchar_t** argv) {
                 }
             }
             require(connected,"Fixture client did not connect");
+            bool delayFirstKey=true;
             for (;;) {
                 std::vector<uint8_t> bytes; if (!rq::receiveFrame(pipe.value,bytes,GetTickCount64()+10000)) break;
-                auto state = engine.process(1,rq::request(bytes)); if (!rq::sendFrame(pipe.value,rq::encode(state),GetTickCount64()+2000)) break;
+                auto request=rq::request(bytes);
+                if(delayFirstKey&&request.command==rq::Command::key){delayFirstKey=false;std::this_thread::sleep_for(std::chrono::milliseconds(200));}
+                auto state = engine.process(1,request); if (!rq::sendFrame(pipe.value,rq::encode(state),GetTickCount64()+2000)) break;
             }
             engine.disconnect(1); return 0;
         } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }
@@ -162,10 +166,13 @@ int wmain(int argc, wchar_t** argv) {
             else if (!connected && GetLastError() == ERROR_PIPE_CONNECTED) connected = true;
             if (!connected) { CancelIoEx(pipe.value, &ov); return; }
             try {
+                bool delayFirstKey=true;
                 while (!stop) {
                     std::vector<uint8_t> data;
                     if (!rq::receiveFrame(pipe.value, data, GetTickCount64() + 5000)) break;
-                    auto request = rq::request(data); auto state = engine.process(1, request);
+                    auto request = rq::request(data);
+                    if(delayFirstKey&&request.command==rq::Command::key){delayFirstKey=false;std::this_thread::sleep_for(std::chrono::milliseconds(200));}
+                    auto state = engine.process(1, request);
                     if (!rq::sendFrame(pipe.value, rq::encode(state), GetTickCount64() + 1000)) break;
                 }
             } catch (const std::exception& e) { std::cerr << "server error " << e.what() << "\n"; }

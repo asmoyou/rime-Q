@@ -455,7 +455,10 @@ class Service final : public ITfTextInputProcessorEx, public ITfKeyEventSink, pu
         auto edit = new (std::nothrow) Edit([&, context](TfEditCookie cookie) {
             if (!current(context) || password(context, cookie)) return S_FALSE;
             bool previousAscii=state_.ascii;rq::State response;
-            if (!client_.exchange(request, response) || !response.ready) {
+            // Dictionary maintenance briefly owns the broker lock while reopening
+            // the schema. A 100ms deadline could forward a Chinese-mode first key
+            // as English even when the healthy broker was about to respond.
+            if (!client_.exchange(request, response, 500) || !response.ready) {
                 ready_ = false; client_.close(); finish(cookie, true); hide(); state_ = {}; return S_FALSE;
             }
             auto hr = updateText(context, cookie, response);

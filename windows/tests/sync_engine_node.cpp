@@ -1,5 +1,6 @@
 #include "../broker/engine.h"
 #include <iostream>
+#include <chrono>
 
 // Synthetic stdio fixture. It has no named pipe, registration or UI and cannot
 // use a production root. Each process owns exactly one real librime database.
@@ -15,6 +16,13 @@ int wmain(int argc,wchar_t** argv) {
             rq::State state;
             if(line=="quit")break;
             if(line=="export")state=engine.process(1,{rq::Command::syncExport});
+            else if(line=="probe")state=engine.process(1,{rq::Command::syncProbe});
+            else if(line=="first-key") {
+                auto start=std::chrono::steady_clock::now();
+                state=engine.process(1,{rq::Command::key,'n'});
+                state.message=std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now()-start).count());
+                engine.process(1,{rq::Command::clear});
+            }
             else if(line=="apply")state=engine.process(1,{rq::Command::syncApply});
             else if(line=="begin") {
                 for(auto key:std::string("nihao"))state=engine.process(1,{rq::Command::key,static_cast<uint32_t>(key)});

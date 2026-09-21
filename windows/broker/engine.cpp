@@ -81,6 +81,15 @@ RimeSessionId Engine::session(uint64_t client) {
     }
     api_->set_option(id, "ascii_mode", preservedAscii_[client]); return id;
 }
+void Engine::warmSession() {
+    if (!available_.empty()) return;
+    auto id=api_->create_session();
+    if (!id || !configureSession(id,grammar_,adjacentKeys_,correctionHints_,false)) {
+        if(id)api_->destroy_session(id);
+        throw std::runtime_error("Cannot warm input session after dictionary maintenance");
+    }
+    available_.push_back(id);
+}
 State Engine::read(RimeSessionId id, bool handled) {
     State s; s.ready = true; s.handled = handled; s.ascii = api_->get_option(id, "ascii_mode") != 0;
     RIME_STRUCT(RimeCommit, commit);
@@ -191,14 +200,17 @@ State Engine::synchronize(Command command) {
     exportCurrent();
     if(command==Command::syncApply){
         const auto actual=syncRows(current),expected=syncRows(directory/L"before.tsv"),desired=syncRows(directory/L"after.tsv");
-        if(actual!=expected){result.message="sync-stale";return result;}
+        if(actual!=expected){warmSession();result.message="sync-stale";return result;}
         auto backups=root_/L"sync/backups";fs::create_directories(backups);
         auto backup=backups/(L"before-"+std::to_wstring(std::time(nullptr))+L"-"+std::to_wstring(GetTickCount64())+L".tsv");
         fs::copy_file(current,backup,fs::copy_options::none);
         auto delta=directory/L"apply.tsv";syncDelta(delta,actual,desired);
         int count=manager->import_user_dict("rime_q",utf8(delta.wstring()).c_str());++learningRevision_;exportCurrent();
-        if(count<0 || syncRows(current)!=desired){result.message="sync-readback-failed";return result;}
+        if(count<0 || syncRows(current)!=desired){warmSession();result.message="sync-readback-failed";return result;}
     }
+    // Levers requires closing sessions, which discards the preloaded schema.
+    // Rewarm before releasing the broker lock, not on the user's next key.
+    warmSession();
     result.handled=true;result.message=std::to_string(learningRevision_);return result;
 }
 bool Engine::idle() {
