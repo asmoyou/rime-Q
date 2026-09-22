@@ -1,0 +1,45 @@
+{
+  "fixture": "isolated real librime; synthetic 7908 rows; warm cache; no host UI",
+  "fixture_sha256": "11eb2a743a2eceb2142451b09f0d75568dd1128dec28b9fbfc7f6551330b3410",
+  "cancel_changed_revision": true,
+  "cancel_export_bytes_unchanged": true,
+  "exports": [
+    {
+      "wall_ms": 158.02590000384953,
+      "cpu_ms": 140.625,
+      "read_bytes": 115702,
+      "write_bytes": 213640,
+      "revision": "8"
+    },
+    {
+      "wall_ms": 147.17219999874942,
+      "cpu_ms": 125.0,
+      "read_bytes": 115702,
+      "write_bytes": 213640,
+      "revision": "8"
+    },
+    {
+      "wall_ms": 182.82460000773426,
+      "cpu_ms": 125.0,
+      "read_bytes": 115702,
+      "write_bytes": 213640,
+      "revision": "8"
+    },
+    {
+      "wall_ms": 163.82879999582656,
+      "cpu_ms": 109.375,
+      "read_bytes": 115702,
+      "write_bytes": 213640,
+      "revision": "8"
+    },
+    {
+      "wall_ms": 147.97240000916645,
+      "cpu_ms": 93.75,
+      "read_bytes": 115702,
+      "write_bytes": 213640,
+      "revision": "8"
+    }
+  ],
+  "median_export_wall_ms": 158.02590000384953,
+  "median_export_cpu_ms": 125.0
+}

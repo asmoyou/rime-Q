@@ -53,7 +53,7 @@ namespace RimeQ {
                 var view=new DeviceSyncWindow(null);view.Window.ShowActivated=false;view.Window.Show();Pump(3200);
                 Window rendered=view.Window;
                 SyncWizard wizard=null;
-                bool invite=args[3]=="invite",joined=args[3]=="group"||invite,off=args[3]=="off"||args[3]=="off-dark",darkCase=args[3]=="off-dark";
+                bool invite=args[3]=="invite",joined=args[3].StartsWith("group")||invite,off=args[3]=="off"||args[3]=="off-dark",darkCase=args[3]=="off-dark"||args[3]=="group-dark";
                 if(upgradeCase){
                     ((DispatcherTimer)GetPrivate(view,"timer")).Stop();
                     var fixture=new SyncStatus {
@@ -84,6 +84,17 @@ namespace RimeQ {
                     Require(Find<TextBlock>(view.Window).Any(t=>t.Text.Contains("台设备已确认"))&&Find<ProgressBar>(view.Window).Any(),"Confirmation count/progress bar missing");
                     Require(Find<TextBlock>(view.Window).Any(t=>t.Text.Contains("6 台设备")),"Six-device summary missing");
                     Require(Find<TextBlock>(view.Window).Count(t=>t.Text.StartsWith("Test device "))==6,"Device rows missing");
+                    var shown=(SyncStatus)GetPrivate(view,"current");
+                    var progress=(TextBlock)GetPrivate(view,"syncProgress");
+                    var searchPosition=((TextBox)GetPrivate(view,"search")).TransformToAncestor(view.Window).Transform(new Point(0,0));
+                    var stable=progress.Text;
+                    for(int cycle=0;cycle<6;cycle++){
+                        shown.progress.transfer=cycle%2==0?"正在连接其他设备":null;shown.progress.transfer_seconds=cycle;
+                        InvokePrivate(view,"UpdateProgress");view.Window.UpdateLayout();
+                        Require(progress.Text==stable,"Idle transport leaked into user-visible progress");
+                        var position=((TextBox)GetPrivate(view,"search")).TransformToAncestor(view.Window).Transform(new Point(0,0));
+                        Require(Math.Abs(position.Y-searchPosition.Y)<0.1,"Connection status moved the device list");
+                    }
                     var toggle=Find<Button>(view.Window).Single(b=>Convert.ToString(b.Content)=="暂停同步");
                     toggle.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump(2400);
                     Require(Find<TextBlock>(view.Window).Any(t=>t.Text.Contains("已暂停")),"Pause state did not update");
@@ -131,10 +142,10 @@ namespace RimeQ {
                     SyncStyle.Update(window,Appearance.SystemDark);
                 }
                 if(darkCase)SyncStyle.Update(rendered,true);
-                var width=rendered==view.Window?640:560;var height=rendered==view.Window?700:invite?480:650;
-                var root=(FrameworkElement)rendered.Content;root.Width=width;root.Height=height;
+                var width=rendered==view.Window?640:560;var height=rendered==view.Window?(args[3]=="group-compact"?560:780):invite?480:650;
+                var root=(FrameworkElement)rendered.Content;root.Width=width;root.Height=height;rendered.MinWidth=0;rendered.MinHeight=0;rendered.SizeToContent=SizeToContent.WidthAndHeight;rendered.UpdateLayout();Pump(100);
                 root.Measure(new Size(width,height));root.Arrange(new Rect(0,0,width,height));root.UpdateLayout();
-                var bitmap=new RenderTargetBitmap(width,height,96,96,PixelFormats.Pbgra32);var background=new DrawingVisual();using(var drawing=background.RenderOpen())drawing.DrawRectangle(rendered.Background??Brushes.White,null,new Rect(0,0,width,height));bitmap.Render(background);bitmap.Render(root);
+                var bitmap=new RenderTargetBitmap(width,height,96,96,PixelFormats.Pbgra32);var background=new DrawingVisual();using(var drawing=background.RenderOpen()){drawing.DrawRectangle(rendered.Background??Brushes.White,null,new Rect(0,0,width,height));drawing.DrawRectangle(new VisualBrush(root) {ViewboxUnits=BrushMappingMode.Absolute,Viewbox=new Rect(0,0,width,height),Stretch=Stretch.Fill},null,new Rect(0,0,width,height));}bitmap.Render(background);
                 var pixels=new byte[width*height*4];bitmap.CopyPixels(pixels,width*4,0);
                 Require(Enumerable.Range(0,width*height).Any(i=>pixels[i*4+3]!=0),"WPF render unavailable");
                 var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));
@@ -143,7 +154,7 @@ namespace RimeQ {
                 if(invite){Find<Button>(wizard.Window).Single(b=>Convert.ToString(b.Content)=="关闭邀请").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump(500);}
                 wizard?.Window.Close();view.Window.Close();app.Shutdown();
                 Console.WriteLine("PASS native sync window: "+(upgradeCase?"missing success time explains peer upgrade":invite?"invitation countdown and copy state":joined?"six real services, device rows, pause, resume and search":errorCase?"persistent failure retry":off?"disabled view without helper or identity":"create/join wizard")+", macOS/Windows connection format, app light/dark resources, WPF render");return 0;
-            }catch(Exception error){Console.Error.WriteLine(error.Message);return 1;}
+            }catch(Exception error){Console.Error.WriteLine(error.ToString());return 1;}
         }
     }
 }

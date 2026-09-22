@@ -188,8 +188,8 @@ jobs:
       - name: Verify the package built by this workflow
         shell: pwsh
         run: |
-          $expected = (Get-Content 'dist/RimeQ-0.4.5-windows-SHA256SUMS.txt').Split(' ')[0]
-          $actual = (Get-FileHash 'dist/RimeQ-0.4.5-windows-x64.exe' -Algorithm SHA256).Hash
+          $expected = (Get-Content 'dist/RimeQ-0.4.6-windows-SHA256SUMS.txt').Split(' ')[0]
+          $actual = (Get-FileHash 'dist/RimeQ-0.4.6-windows-x64.exe' -Algorithm SHA256).Hash
           if ($actual -ne $expected) { throw 'Windows artifact checksum mismatch.' }
       - name: Verify lifecycle command diagnostics in isolation
         run: ./scripts/test_windows_lifecycle_process.ps1

@@ -67,6 +67,15 @@ import QRimeBridge
                     try wait { await sync.tick(force: command["force"] as? Bool ?? true) }
                     response = ["error": sync.lastError as Any? ?? NSNull(), "composition": InputSession.hasComposition, "document": client.document,
                                 "progress": sync.progressText(["enabled": true])]
+                case "throttle":
+                    defaults.set(true, forKey: "SyncStarted")
+                    try wait { await sync.tick(force: true) }
+                    var requests = 0
+                    sync.beforeRequest = { _ in requests += 1 }
+                    defer { sync.beforeRequest = nil }
+                    try wait { await sync.tick(); await sync.tick() }
+                    try EngineSmoke.check(requests == 0, "background sync ignored minimum check interval")
+                    response = ["requests": requests]
                 case "preference": response = ["started": defaults.bool(forKey: "SyncStarted")]
                 case "disabled":
                     defaults.set(false, forKey: "SyncStarted")

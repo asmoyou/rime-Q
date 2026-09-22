@@ -94,6 +94,8 @@ fn legacy_protocol() -> u32 { 1 }
 pub struct Store {
     pub identity: Identity,
     db: Connection,
+    row_count_cache: std::cell::Cell<Option<(u64, usize)>>,
+    revision_cache: std::cell::RefCell<Option<(u64, String)>>,
 }
 pub fn name(value: &str) -> Result<()> {
     ensure!(
@@ -156,7 +158,7 @@ impl Store {
             CREATE TABLE IF NOT EXISTS barriers(key TEXT NOT NULL, origin TEXT NOT NULL, seq INTEGER NOT NULL, PRIMARY KEY(key,origin));
             CREATE TABLE IF NOT EXISTS baseline(key TEXT PRIMARY KEY, body TEXT NOT NULL);
             PRAGMA user_version=2;")?;
-        Ok(Self { identity, db })
+        Ok(Self { identity, db, row_count_cache: std::cell::Cell::new(None), revision_cache: std::cell::RefCell::new(None) })
     }
     pub fn id(&self) -> String {
         self.identity.id()
@@ -454,12 +456,29 @@ impl Store {
         Ok(result)
     }
     pub fn revision(&self) -> Result<String> {
-        Ok(identity::digest(&serde_json::to_vec(&(
-            self.get::<Group>("group")?,
-            self.members()?,
-            self.revocations()?,
-            self.vector()?,
-        ))?))
+        let generation = self.db.total_changes();
+        if let Some((prior, value)) = self.revision_cache.borrow().as_ref() {
+            if *prior == generation { return Ok(value.clone()); }
+        }
+        let value = identity::digest(&serde_json::to_vec(&(
+            self.get::<Group>("group")?, self.members()?, self.revocations()?, self.vector()?,
+        ))?);
+        *self.revision_cache.borrow_mut() = Some((generation, value.clone()));
+        Ok(value)
+    }
+    pub fn row_count(&self) -> Result<usize> {
+        let generation = self.db.total_changes();
+        if let Some((prior, count)) = self.row_count_cache.get() {
+            if prior == generation { return Ok(count); }
+        }
+        let count = self.db.query_row(
+            "SELECT COUNT(*) FROM (SELECT key FROM heads GROUP BY key HAVING SUM(weight IS NULL)=0)",
+            [], |r| r.get(0))?;
+        self.row_count_cache.set(Some((generation, count)));
+        Ok(count)
+    }
+    pub fn has_pending_application(&self) -> Result<bool> {
+        Ok(self.db.query_row("SELECT EXISTS(SELECT 1 FROM meta WHERE key='apply_job')", [], |r| r.get(0))?)
     }
     fn cutoffs(&self) -> Result<Vector> {
         let mut result = Vector::new();
@@ -519,6 +538,7 @@ impl Store {
         Ok(result)
     }
     pub fn receive(&self, ops: &[Operation]) -> Result<()> {
+        if ops.is_empty() { return Ok(()); }
         self.transaction(|| self.receive_inner(ops))
     }
     fn receive_inner(&self, ops: &[Operation]) -> Result<()> {
@@ -669,6 +689,7 @@ impl Store {
         );
         // SQLite filters acknowledged history before deserialization. Walk in
         // causal insertion order and bound the entire serialized network frame.
+        if covers(known, &self.vector()?) { return Ok(Vec::new()); }
         let mut query = self.db.prepare("SELECT body FROM ops WHERE processed=1 AND seq > COALESCE((SELECT value FROM json_each(?1) WHERE key=origin),0) ORDER BY rowid LIMIT ?2")?;
         let mut cursor = query.query(params![serde_json::to_string(known)?, limit])?;
         let mut result = Vec::new();
@@ -762,9 +783,17 @@ impl Store {
                 // The engine has only observed acknowledged applications.
                 // Receiving a deletion in the helper does not make older local
                 // learning a deliberate re-add after that deletion.
-                self.change_observed(changes, self.get("applied_vector")?.unwrap_or_default())?;
+                self.change_observed(changes.clone(), self.get("applied_vector")?.unwrap_or_default())?;
+                for change in &changes {
+                    if let Some(weight) = change.weight {
+                        let row = Row { key: change.key.clone(), weight };
+                        self.db.execute("INSERT INTO baseline VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET body=excluded.body",
+                            params![row.key.id(), serde_json::to_string(&row)?])?;
+                    } else {
+                        self.db.execute("DELETE FROM baseline WHERE key=?", [change.key.id()])?;
+                    }
+                }
             }
-            self.set_baseline(rows)?;
             self.set("captured", &true)
         })
     }
@@ -877,8 +906,46 @@ impl Store {
             }
             Err(e) => {
                 let _ = self.db.execute_batch("ROLLBACK");
+                self.row_count_cache.set(None);
+                *self.revision_cache.borrow_mut() = None;
                 Err(e)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod performance_tests {
+    use super::*;
+
+    #[test]
+    fn unchanged_capture_does_not_write_and_counts_follow_deletion_and_rollback() {
+        let store = Store::memory(Identity::generate()).unwrap();
+        store.create_group("test", "local").unwrap();
+        let row = Row { key: Key::pinyin("sample", "ce shi").unwrap(), weight: 3 };
+        store.capture(std::slice::from_ref(&row)).unwrap();
+        assert!(store.prepare_apply().unwrap().is_none());
+        assert_eq!(store.row_count().unwrap(), 1);
+        let revision = store.revision().unwrap();
+        let changes = store.db.total_changes();
+        for _ in 0..5 {
+            store.capture(std::slice::from_ref(&row)).unwrap();
+            assert!(store.prepare_apply().unwrap().is_none());
+            assert_eq!(store.row_count().unwrap(), 1);
+            assert_eq!(store.revision().unwrap(), revision);
+        }
+        assert_eq!(store.db.total_changes(), changes, "unchanged capture wrote to SQLite");
+        let failed: Result<()> = store.transaction(|| {
+            store.capture(&[])?;
+            assert_eq!(store.row_count()?, 0);
+            assert_ne!(store.revision()?, revision);
+            anyhow::bail!("simulate transaction failure")
+        });
+        assert!(failed.is_err());
+        assert_eq!(store.row_count().unwrap(), 1);
+        assert_eq!(store.revision().unwrap(), revision);
+        store.capture(&[]).unwrap();
+        assert_eq!(store.row_count().unwrap(), 0);
+        assert!(store.baseline().unwrap().is_empty());
     }
 }

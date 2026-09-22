@@ -69,6 +69,7 @@ struct Peer {
     last_seen: u64,
     next_attempt: Instant,
     failures: u32,
+    in_flight: bool,
 }
 #[derive(Clone, Serialize, Deserialize)]
 struct Completion {
@@ -293,17 +294,22 @@ fn accept_manifest(s: &mut State, value: &Manifest) -> Result<()> {
     s.store.set("receipts", &receipts)
 }
 fn receipt(s: &State) -> Result<()> {
+    let version = s.store.get("applied_vector")?.unwrap_or_default();
+    let revision: String = s.store.get("applied_revision")?.unwrap_or_default();
+    let mut receipts: BTreeMap<String, Receipt> = s.store.get("receipts")?.unwrap_or_default();
+    if receipts.get(&s.store.id()).is_some_and(|r| r.version == version && r.revision == revision) {
+        return record_completions(s);
+    }
     let seq = s.store.get::<u64>("receipt_seq")?.unwrap_or(0) + 1;
     let mut r = Receipt {
         group: s.store.group()?.id,
         id: s.store.id(),
         seq,
-        version: s.store.get("applied_vector")?.unwrap_or_default(),
-        revision: s.store.get("applied_revision")?.unwrap_or_default(),
+        version,
+        revision,
         signature: String::new(),
     };
     r.signature = s.store.identity.sign(&r.bytes()?);
-    let mut receipts: BTreeMap<String, Receipt> = s.store.get("receipts")?.unwrap_or_default();
     receipts.insert(r.id.clone(), r);
     s.store.set("receipt_seq", &seq)?;
     s.store.set("receipts", &receipts)?;
@@ -395,7 +401,7 @@ async fn serve_peer(
             if removed {
                 return Ok(());
             }
-            exchange(shared, &mut stream, false, &id).await
+            exchange(shared, &mut stream, false, &id).await.map(|_| ())
         }
         Authenticate::Pair {
             id,
@@ -498,7 +504,7 @@ async fn exchange<S: AsyncRead + AsyncWrite + Unpin>(
     stream: &mut S,
     client: bool,
     peer_id: &str,
-) -> Result<()> {
+) -> Result<bool> {
     let progress = TransferGuard::new(shared.clone(), "正在交换版本与回执");
     let own = {
         let s = shared.lock().unwrap();
@@ -515,12 +521,14 @@ async fn exchange<S: AsyncRead + AsyncWrite + Unpin>(
     };
     let outgoing = {
         let mut s = shared.lock().unwrap();
+        let before = exchange_key(&s)?;
         accept_manifest(&mut s, &remote)?;
         ensure!(s.store.authorized(peer_id)?, "peer was removed");
         ensure!(
             !s.store.is_revoked(&s.store.id())?,
             "this device was removed"
         );
+        if exchange_key(&s)? != before { wake_peers(&mut s); }
         s.store.missing(&remote.version, MAX_BATCH)?
     };
     progress.stage("正在传输词库变更");
@@ -533,15 +541,18 @@ async fn exchange<S: AsyncRead + AsyncWrite + Unpin>(
         r
     };
     {
-        let s = shared.lock().unwrap();
+        let mut s = shared.lock().unwrap();
         ensure!(s.store.enabled(), "sync paused");
         ensure!(s.store.authorized(peer_id)?, "peer was removed");
+        let before = exchange_key(&s)?;
         s.store.receive(&incoming)?;
         record_completions(&s)?;
+        if !outgoing.is_empty() || !incoming.is_empty() || exchange_key(&s)? != before { wake_peers(&mut s); }
     }
-    Ok(())
+    Ok(!outgoing.is_empty() || !incoming.is_empty())
 }
-async fn sync_peer(shared: Shared, address: SocketAddr) -> Result<String> {
+async fn sync_peer(shared: Shared, address: SocketAddr) -> Result<(String, bool)> {
+    let before = exchange_key(&shared.lock().unwrap())?;
     let progress = TransferGuard::new(shared.clone(), "正在连接设备");
     let mut stream = network::connect(address).await?;
     progress.stage("正在验证设备身份");
@@ -586,8 +597,9 @@ async fn sync_peer(shared: Shared, address: SocketAddr) -> Result<String> {
         bail!("this device was removed");
     }
     drop(progress);
-    exchange(shared, &mut stream, true, &hello.id).await?;
-    Ok(hello.id)
+    let transferred = exchange(shared.clone(), &mut stream, true, &hello.id).await?;
+    let changed = transferred || exchange_key(&shared.lock().unwrap())? != before;
+    Ok((hello.id, changed))
 }
 async fn join(
     shared: Shared,
@@ -693,13 +705,22 @@ async fn join(
                 address,
                 last_seen: now(),
                 next_attempt: Instant::now(),
-                failures: 0,
+                failures: 0, in_flight: false,
             },
         );
         persist_peers(&s)?;
     }
     Ok(json!({"joined":true,"id":id}))
 }
+fn wake_peers(s: &mut State) {
+    for p in s.peers.values_mut() {
+        if p.failures == 0 { p.next_attempt = Instant::now(); }
+    }
+}
+fn exchange_key(s: &State) -> Result<String> {
+    Ok(identity::digest(&serde_json::to_vec(&manifest(s)?)?))
+}
+
 fn persist_peers(s: &State) -> Result<()> {
     let addresses: BTreeMap<_, _> = s
         .peers
@@ -722,7 +743,7 @@ fn status(s: &State) -> Result<Value> {
     let members:Vec<_>=s.store.members()?.iter().map(|m| {
         let p=s.peers.get(&m.id);let r=receipts.get(&m.id);let removed=!s.store.authorized(&m.id).unwrap_or(false);
         let last_seen=p.map(|p|p.last_seen).unwrap_or(0).max(seen.get(&m.id).copied().unwrap_or(0));
-        let online=m.id==s.store.id() || now().saturating_sub(last_seen)<20;
+        let online=m.id==s.store.id() || now().saturating_sub(last_seen)<95;
         let applied=r.is_some_and(|r|r.revision==revision && covers(&r.version,&version));
         json!({"id":m.id,"name":m.name,"self":m.id==s.store.id(),"removed":removed,"online":online,"applied":applied,"last_seen":last_seen,"last_sync_at":completed.get(&m.id).map(|c|c.at).unwrap_or(0),"needs_upgrade":s.incompatible_peers.contains_key(&m.id)})
     }).collect();
@@ -752,7 +773,7 @@ fn status(s: &State) -> Result<Value> {
     let progress = json!({"stage":stage,"key":key,"elapsed_seconds":elapsed,"confirmed":confirmed,"total":total,
         "transfer":transfer.map(|t|t.label),"transfer_seconds":transfer.map(|t|t.started.elapsed().as_secs()).unwrap_or(0)});
     Ok(
-        json!({"protocol":PROTOCOL,"id":s.store.id(),"group":s.store.get::<Group>("group")?,"enabled":s.store.enabled(),"can_remove":can_remove,"members":members,"pending":pending,"discovered":s.discovered.values().collect::<Vec<_>>(),"port":s.port,"bind":s.bind.to_string(),"rows":s.store.rows()?.len(),"version":version,"revision":revision,"waiting_input":s.store.get::<ApplyJob>("apply_job")?.is_some(),"network_error":network_error,"last_sync_at":last_sync_at,"progress":progress}),
+        json!({"protocol":PROTOCOL,"id":s.store.id(),"group":s.store.get::<Group>("group")?,"enabled":s.store.enabled(),"can_remove":can_remove,"members":members,"pending":pending,"discovered":s.discovered.values().collect::<Vec<_>>(),"port":s.port,"bind":s.bind.to_string(),"rows":s.store.row_count()?,"version":version,"revision":revision,"waiting_input":s.store.has_pending_application()?,"network_error":network_error,"last_sync_at":last_sync_at,"progress":progress}),
     )
 }
 
@@ -814,7 +835,8 @@ async fn control(shared: Shared, value: Value) -> Result<Value> {
     }
     let mut s = shared.lock().unwrap();
     ensure!(!s.stop, "sync service is restarting");
-    match action {
+    let before = if matches!(action, "capture" | "acknowledge" | "prepare_apply" | "pending_apply" | "recover_local" | "remove" | "approve" | "resume" | "fixture_change") { Some(exchange_key(&s)?) } else { None };
+    let result = match action {
         "status" => status(&s),
         "cancel_join" => {
             let cancelled = s
@@ -897,7 +919,7 @@ async fn control(shared: Shared, value: Value) -> Result<Value> {
                     address,
                     last_seen: 0,
                     next_attempt: Instant::now(),
-                    failures: 0,
+                    failures: 0, in_flight: false,
                 },
             );
             persist_peers(&s)?;
@@ -989,7 +1011,11 @@ async fn control(shared: Shared, value: Value) -> Result<Value> {
             Ok(json!({"rows":s.store.rows()?}))
         }
         _ => bail!("unknown control action"),
+    };
+    if let Some(before) = before {
+        if exchange_key(&s)? != before || action == "resume" { wake_peers(&mut s); }
     }
+    result
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -1073,7 +1099,7 @@ pub async fn run(
                     address,
                     last_seen: 0,
                     next_attempt: Instant::now(),
-                    failures: 0,
+                    failures: 0, in_flight: false,
                 },
             );
         }
@@ -1276,11 +1302,12 @@ pub async fn run(
             let mut due: Vec<_> = s
                 .peers
                 .iter_mut()
-                .filter(|(_, p)| p.next_attempt <= Instant::now())
+                .filter(|(_, p)| !p.in_flight && p.next_attempt <= Instant::now())
                 .collect();
             due.sort_by_key(|(_, p)| p.next_attempt);
             for (id, p) in due.into_iter().take(2) {
                 targets.push((id.clone(), p.address));
+                p.in_flight = true;
                 p.next_attempt = Instant::now() + Duration::from_secs(30);
             }
             targets
@@ -1293,7 +1320,7 @@ pub async fn run(
                         .await;
                 let mut state = s.lock().unwrap();
                 match result {
-                    Ok(Ok(id)) => {
+                    Ok(Ok((id, changed))) => {
                         state.incompatible_peers.remove(&key);
                         state.incompatible_peers.retain(|key,hint|key!=&id && hint!=&id);
                         state.peers.remove(&key);
@@ -1303,8 +1330,8 @@ pub async fn run(
                             Peer {
                                 address,
                                 last_seen: now(),
-                                next_attempt: Instant::now() + Duration::from_secs(2),
-                                failures: 0,
+                                next_attempt: Instant::now() + Duration::from_secs(if changed { 2 } else { 30 }),
+                                failures: 0, in_flight: false,
                             },
                         );
                         let _ = persist_peers(&state);
@@ -1316,6 +1343,7 @@ pub async fn run(
                             }
                         }
                         if let Some(p) = state.peers.get_mut(&key) {
+                            p.in_flight = false;
                             p.failures = (p.failures + 1).min(6);
                             p.next_attempt =
                                 Instant::now() + Duration::from_secs((1 << p.failures).min(60));
@@ -1440,7 +1468,7 @@ fn discover(shared: Shared, port: u16) -> Result<Discovery> {
                             address,
                             last_seen: 0,
                             next_attempt: Instant::now(),
-                            failures: 0,
+                            failures: 0, in_flight: false,
                         });
                     }
                     s.discovered.insert(key,json!({"address":address.to_string(),"invite":info.get_property_val_str("invite").unwrap_or(""),"name":info.get_property_val_str("name").filter(|n|!n.is_empty()).unwrap_or_else(||info.get_fullname().split('.').next().unwrap_or("Rime Q")).chars().filter(|c|!c.is_control()).take(128).collect::<String>()}));

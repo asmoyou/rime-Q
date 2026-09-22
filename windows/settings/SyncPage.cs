@@ -21,6 +21,14 @@ namespace RimeQ {
             using(var stream=Assembly.GetExecutingAssembly().GetManifestResourceStream("Shell.xaml")) {
                 var shell=(Window)XamlReader.Load(stream);window.Resources=shell.Resources;
             }
+            window.Resources[typeof(System.Windows.Controls.Primitives.ScrollBar)]=XamlReader.Parse(@"<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='ScrollBar'>
+                <Setter Property='Width' Value='12'/><Setter Property='Background' Value='{DynamicResource WindowBackground}'/>
+                <Setter Property='Template'><Setter.Value><ControlTemplate TargetType='ScrollBar'><Grid Background='{TemplateBinding Background}'>
+                <Track x:Name='PART_Track' IsDirectionReversed='True' Orientation='Vertical'>
+                <Track.DecreaseRepeatButton><RepeatButton Command='ScrollBar.PageUpCommand' Opacity='0' Focusable='False'/></Track.DecreaseRepeatButton>
+                <Track.Thumb><Thumb><Thumb.Template><ControlTemplate TargetType='Thumb'><Border Background='{DynamicResource BorderColor}' CornerRadius='3' Margin='3,2'/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
+                <Track.IncreaseRepeatButton><RepeatButton Command='ScrollBar.PageDownCommand' Opacity='0' Focusable='False'/></Track.IncreaseRepeatButton>
+                </Track></Grid></ControlTemplate></Setter.Value></Setter></Style>");
             window.FontFamily=new FontFamily("Segoe UI, Microsoft YaHei UI");
             window.FontSize=13;window.UseLayoutRounding=true;
             window.SetResourceReference(Window.BackgroundProperty,"WindowBackground");
@@ -57,10 +65,14 @@ namespace RimeQ {
         readonly StackPanel content=new StackPanel(),members=new StackPanel(),requests=new StackPanel();
         readonly TextBlock status=Label("正在读取设备状态…"),empty=Label("");
         readonly TextBlock syncTime=Label(""),syncProgress=Label("");
+        readonly TextBlock groupTitle=Label(""),groupDetail=Label("");
+        readonly StackPanel summary=new StackPanel();
+        readonly Border summaryCard;
+        string pendingKey;
         readonly ProgressBar confirmation=new ProgressBar {Height=4,Margin=new Thickness(0,0,0,16),Visibility=Visibility.Collapsed};
         readonly Button retryButton;
         readonly TextBox search=new TextBox {MinHeight=30,Margin=new Thickness(0,0,0,12)};
-        readonly DispatcherTimer timer=new DispatcherTimer {Interval=TimeSpan.FromSeconds(1)};
+        readonly DispatcherTimer timer=new DispatcherTimer {Interval=TimeSpan.FromSeconds(2)};
         readonly Dictionary<string,DeviceRow> rows=new Dictionary<string,DeviceRow>();
         SyncStatus current;
         bool refreshing,working,joined;
@@ -78,24 +90,38 @@ namespace RimeQ {
                 finally{working=false;button.IsEnabled=true;}
             });return button;
         }
+        internal static Border Card(UIElement child,Thickness? padding=null){
+            var card=new Border {Child=child,CornerRadius=new CornerRadius(10),BorderThickness=new Thickness(1),Padding=padding??new Thickness(18),Margin=new Thickness(0,0,0,18)};
+            card.SetResourceReference(Border.BackgroundProperty,"CardBackground");card.SetResourceReference(Border.BorderBrushProperty,"BorderColor");return card;
+        }
+        internal static TextBlock Icon(string glyph,int size=22){var icon=new TextBlock {Text=glyph,FontFamily=new FontFamily("Segoe MDL2 Assets"),FontSize=size,VerticalAlignment=VerticalAlignment.Center};icon.SetResourceReference(TextBlock.ForegroundProperty,"Accent");return icon;}
         public DeviceSyncWindow(Window owner){
-            Window=new Window {Title="附近设备同步",Owner=owner,Width=700,Height=700,MinWidth=560,MinHeight=500,WindowStartupLocation=owner==null?WindowStartupLocation.CenterScreen:WindowStartupLocation.CenterOwner};
+            Window=new Window {Title="附近设备同步",Owner=owner,Width=760,Height=800,MinWidth=620,MinHeight=580,WindowStartupLocation=owner==null?WindowStartupLocation.CenterScreen:WindowStartupLocation.CenterOwner};
             SyncStyle.Apply(Window);
-            var panel=new StackPanel {Margin=new Thickness(24)};
-            Window.Content=new ScrollViewer {Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
-            var title=Label("附近设备同步");title.FontSize=23;title.FontWeight=FontWeights.SemiBold;panel.Children.Add(title);
-            panel.Children.Add(Label("只在你信任的局域网开启。同步个人词条和学习权重；本地网络或防火墙授权被拒绝时，输入与本机学习不受影响。"));
-            panel.Children.Add(status);
-            panel.Children.Add(syncTime);panel.Children.Add(syncProgress);panel.Children.Add(confirmation);
+            var panel=new StackPanel {Margin=new Thickness(28,24,28,24)};
+            Window.Content=new ScrollViewer {Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
+            var heading=new DockPanel {Margin=new Thickness(0,0,0,16)};
+            var mark=Icon("\uE895",28);mark.Margin=new Thickness(0,0,16,0);DockPanel.SetDock(mark,Dock.Left);heading.Children.Add(mark);
+            var labels=new StackPanel();var title=Label("附近设备同步");title.FontSize=24;title.FontWeight=FontWeights.SemiBold;labels.Children.Add(title);
+            var subtitle=Label("在你的电脑之间，延续个人词库与学习记录。");subtitle.SetResourceReference(TextBlock.ForegroundProperty,"SecondaryColor");labels.Children.Add(subtitle);heading.Children.Add(labels);panel.Children.Add(heading);
+            status.MinHeight=20;status.SetResourceReference(TextBlock.ForegroundProperty,"SecondaryColor");panel.Children.Add(status);
+            retryButton=Command("重试连接",()=>DeviceSync.EnsureStarted(true));retryButton.Visibility=Visibility.Collapsed;panel.Children.Add(retryButton);
+            groupTitle.FontSize=17;groupTitle.FontWeight=FontWeights.SemiBold;
+            groupDetail.SetResourceReference(TextBlock.ForegroundProperty,"SecondaryColor");groupDetail.Margin=new Thickness(0,0,0,14);
+            syncTime.FontSize=12;syncTime.SetResourceReference(TextBlock.ForegroundProperty,"SecondaryColor");
+            syncTime.TextWrapping=TextWrapping.NoWrap;syncTime.TextTrimming=TextTrimming.CharacterEllipsis;
+            syncProgress.Height=44;syncProgress.LineHeight=21;syncProgress.TextWrapping=TextWrapping.NoWrap;syncProgress.TextTrimming=TextTrimming.CharacterEllipsis;syncProgress.Margin=new Thickness(0,0,0,8);
+            confirmation.Margin=new Thickness(0,0,0,0);
+            confirmation.Template=(ControlTemplate)XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='ProgressBar'><Border x:Name='PART_Track' Background='{DynamicResource BorderColor}' CornerRadius='2'><Border x:Name='PART_Indicator' Background='{DynamicResource Accent}' HorizontalAlignment='Left' CornerRadius='2'/></Border></ControlTemplate>");
+            summary.Children.Add(groupTitle);summary.Children.Add(groupDetail);summary.Children.Add(syncTime);summary.Children.Add(syncProgress);summary.Children.Add(confirmation);
+            summaryCard=Card(summary);summaryCard.Visibility=Visibility.Collapsed;panel.Children.Add(summaryCard);panel.Children.Add(content);
             syncTime.ToolTip="本机观察到双方已应用同一已知版本的时间；无新变更的检查不会更新时间。离线设备仍可能有未传出的变更。";
-            retryButton=Command("重试连接",()=>DeviceSync.EnsureStarted(true));
-            retryButton.Visibility=Visibility.Collapsed;panel.Children.Add(retryButton);panel.Children.Add(content);
-            timer.Tick+=async(s,e)=>{UpdateProgress();await Refresh();};
+            var footer=Label("仅在信任的局域网开启。连接已授权设备，日常输入仍在本机完成。\n未允许本地网络或防火墙访问时，本机输入与学习不受影响。");footer.FontSize=11;footer.Margin=new Thickness(0,6,0,0);footer.SetResourceReference(TextBlock.ForegroundProperty,"SecondaryColor");panel.Children.Add(footer);
+            timer.Tick+=async(s,e)=>{if(Window.IsVisible&&Window.WindowState!=WindowState.Minimized){UpdateProgress();await Refresh();}};
             DeviceSync.Changed+=UpdateProgress;
             Window.Loaded+=async(s,e)=>{await Refresh();timer.Start();};
             Window.Closed+=(s,e)=>{timer.Stop();DeviceSync.Changed-=UpdateProgress;};
-            search.TextChanged+=(s,e)=>ShowMembers();
-            AutomationProperties.SetName(search,"搜索设备");
+            search.TextChanged+=(s,e)=>ShowMembers();AutomationProperties.SetName(search,"搜索设备");
         }
         async Task Refresh(){
             if(refreshing)return;refreshing=true;
@@ -107,12 +133,15 @@ namespace RimeQ {
                 if(content.Children.Count==0||joined!=isJoined){joined=isJoined;Build();}
                 if(!isJoined){status.Text="尚未加入同步组。你可以创建，或加入已有设备的同步组。";return;}
                 var valid=(current.members??new List<SyncMember>()).Where(m=>!m.removed).ToList();
-                status.Text=current.group.name+" · "+valid.Count+" 台设备 · "+valid.Count(m=>m.online)+" 台在线"+(current.enabled?"":" · 已暂停");
+                groupTitle.Text=current.group.name;
+                groupDetail.Text=valid.Count+" 台设备 · "+valid.Count(m=>m.online)+" 台在线";
+                status.Text=current.enabled?"同步已开启 · 有变更时自动合并，输入结束后应用":"同步已暂停 · 本机输入和学习照常保留";
                 if(!string.IsNullOrEmpty(DeviceSync.LastError))status.Text+="\n"+DeviceSync.LastError;
                 if(!string.IsNullOrEmpty(current.network_error))status.Text+="\n"+current.network_error;
                 pauseButton.Content=current.enabled?"暂停同步":"恢复同步";
                 ShowMembers();
-                requests.Children.Clear();
+                var nextPending=string.Join("|",(current.pending??new List<SyncPending>()).Select(p=>p.id+":"+p.name));
+                if(nextPending==pendingKey)return;pendingKey=nextPending;requests.Children.Clear();
                 foreach(var pending in current.pending??new List<SyncPending>()){
                     var target=pending;var row=new StackPanel {Orientation=Orientation.Horizontal,Margin=new Thickness(0,0,0,8)};
                     row.Children.Add(Label(target.name+" 请求加入"));
@@ -129,10 +158,11 @@ namespace RimeQ {
         }
         void UpdateProgress(){
             bool visible=current!=null&&current.group!=null;
+            summaryCard.Visibility=visible?Visibility.Visible:Visibility.Collapsed;
             syncTime.Visibility=syncProgress.Visibility=confirmation.Visibility=visible?Visibility.Visible:Visibility.Collapsed;
             if(!visible)return;
             syncTime.Text="最近成功同步："+DeviceSync.SuccessSummary(current);
-            syncProgress.Text=DeviceSync.ProgressText(current);
+            syncProgress.Text=DeviceSync.ProgressText(current);syncProgress.ToolTip=syncProgress.Text;
             confirmation.Maximum=Math.Max(1,current.progress==null?0:current.progress.total);
             confirmation.Value=current.progress==null?0:current.progress.confirmed;
             AutomationProperties.SetName(confirmation,"当前已知变更的设备确认进度");
@@ -158,6 +188,7 @@ namespace RimeQ {
                 members.Children.Clear();foreach(var row in visible)members.Children.Add(row);
             }
             empty.Text=visible.Count==0?(term.Length>0?"没有匹配的设备。":"尚无已授权设备。"):"";
+            empty.Visibility=visible.Count==0?Visibility.Visible:Visibility.Collapsed;
         }
         async Task Remove(SyncMember member){
             if(MessageBox.Show(Window,"将“"+member.name+"”移出同步组？\n\n其他设备收到移除记录后停止与其同步。已复制的词条无法远程收回。","移除设备",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)!=MessageBoxResult.Yes)return;
@@ -169,7 +200,7 @@ namespace RimeQ {
             wizard.Window.ShowDialog();
         }
         void Build(){
-            content.Children.Clear();rows.Clear();
+            content.Children.Clear();rows.Clear();members.Children.Clear();requests.Children.Clear();pendingKey=null;
             if(!joined){
                 var choices=new Grid {Margin=new Thickness(0,12,0,16)};
                 choices.ColumnDefinitions.Add(new ColumnDefinition());choices.ColumnDefinitions.Add(new ColumnDefinition());
@@ -188,10 +219,7 @@ namespace RimeQ {
                 content.Children.Add(Label("每台电脑只需加入一次；创建者不必持续在线。"));
                 return;
             }
-            content.Children.Add(Label("所有已授权设备都可邀请新电脑；只有创建同步组的电脑可移除设备。"));
-            content.Children.Add(Label("搜索设备"));content.Children.Add(search);content.Children.Add(empty);content.Children.Add(members);
-            content.Children.Add(requests);
-            var actions=new StackPanel {Orientation=Orientation.Horizontal,Margin=new Thickness(0,10,0,0)};
+            var actions=new WrapPanel {Margin=new Thickness(0,0,0,12)};
             actions.Children.Add(Action("添加设备",()=>OpenWizard(SyncWizard.Mode.Invite)));
             actions.Children.Add(Command("立即同步",async()=>{await DeviceSync.Call<object>(new {action="sync_now"});await DeviceSync.Tick(true);}));
             pauseButton=Command(current.enabled?"暂停同步":"恢复同步",()=>DeviceSync.Call<object>(new {action=current.enabled?"pause":"resume"}));
@@ -212,31 +240,37 @@ namespace RimeQ {
             });
             more.ContextMenu=menu;more.Click+=(s,e)=>{menu.PlacementTarget=more;menu.IsOpen=true;};
             actions.Children.Add(more);content.Children.Add(actions);
+            var section=Label("已加入的设备");section.FontSize=15;section.FontWeight=FontWeights.SemiBold;content.Children.Add(section);
+            search.ToolTip="按设备名称搜索";content.Children.Add(search);content.Children.Add(empty);
+            content.Children.Add(Card(members,new Thickness(0)));content.Children.Add(requests);
         }
         sealed class DeviceRow {
-            internal readonly DockPanel Panel=new DockPanel {Margin=new Thickness(0,0,0,8),MinHeight=50};
-            readonly TextBlock text=Label(""),state=Label("");
+            internal readonly Grid Panel=new Grid {Height=68,Margin=new Thickness(14,0,14,0)};
+            readonly TextBlock text=Label(""),detail=Label(""),state=Label("");
             readonly Button options=Action("⋯",()=>{});
             Action remove;
             internal DeviceRow(string id){
-                options.ToolTip="设备选项";options.Width=34;options.MinWidth=34;
+                Panel.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(38)});Panel.ColumnDefinitions.Add(new ColumnDefinition());
+                Panel.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(78)});Panel.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(32)});
+                var icon=Icon("\uE7F4");icon.SetResourceReference(TextBlock.ForegroundProperty,"SecondaryColor");Panel.Children.Add(icon);
+                var labels=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,10,0)};Grid.SetColumn(labels,1);Panel.Children.Add(labels);
+                text.FontWeight=FontWeights.SemiBold;text.Margin=new Thickness(0,0,0,4);text.TextWrapping=TextWrapping.NoWrap;text.TextTrimming=TextTrimming.CharacterEllipsis;labels.Children.Add(text);
+                detail.FontSize=11;detail.Margin=new Thickness(0);detail.TextWrapping=TextWrapping.NoWrap;detail.TextTrimming=TextTrimming.CharacterEllipsis;detail.SetResourceReference(TextBlock.ForegroundProperty,"SecondaryColor");labels.Children.Add(detail);
+                state.FontSize=12;state.Margin=new Thickness(0);state.VerticalAlignment=VerticalAlignment.Center;state.TextAlignment=TextAlignment.Right;Grid.SetColumn(state,2);Panel.Children.Add(state);
+                options.ToolTip="设备选项";options.Width=28;options.MinWidth=28;options.Padding=new Thickness(2);options.Margin=new Thickness(4,0,0,0);options.VerticalAlignment=VerticalAlignment.Center;
                 options.Content=new TextBlock {Text="\uE10C",FontFamily=new FontFamily("Segoe MDL2 Assets"),FontSize=15,TextAlignment=TextAlignment.Center};
-                options.Click+=(s,e)=>{
-                    var menu=new ContextMenu();var item=new MenuItem {Header="移除这台设备…"};
-                    item.Click+=(sender,args)=>remove?.Invoke();menu.Items.Add(item);menu.PlacementTarget=options;menu.IsOpen=true;
-                };
-                DockPanel.SetDock(options,Dock.Right);Panel.Children.Add(options);
-                DockPanel.SetDock(state,Dock.Right);state.Margin=new Thickness(10,4,12,0);Panel.Children.Add(state);
-                text.Margin=new Thickness(0,4,0,0);text.MaxWidth=350;text.HorizontalAlignment=HorizontalAlignment.Left;text.TextWrapping=TextWrapping.NoWrap;
-                text.TextTrimming=TextTrimming.CharacterEllipsis;Panel.Children.Add(text);
+                options.Click+=(s,e)=>{var menu=new ContextMenu();var item=new MenuItem {Header="移除这台设备…"};item.Click+=(sender,args)=>remove?.Invoke();menu.Items.Add(item);menu.PlacementTarget=options;menu.IsOpen=true;};
+                Grid.SetColumn(options,3);Panel.Children.Add(options);
             }
             internal void Update(SyncMember member,bool paused,bool canRemove,Func<Task> action){
-                text.Text=member.name+(member.self?"（本机）":"\n最近成功："+DeviceSync.MemberSuccessSummary(member));
-                text.ToolTip=member.name;remove=async()=>{try{await action();}catch(Exception error){MessageBox.Show(error.Message,"同步操作未完成",MessageBoxButton.OK,MessageBoxImage.Warning);}};
+                text.Text=member.name;text.ToolTip=member.name;
+                detail.Text=member.self?"这台电脑":"最近成功："+DeviceSync.MemberSuccessSummary(member);detail.ToolTip=detail.Text;
+                remove=async()=>{try{await action();}catch(Exception error){MessageBox.Show(error.Message,"同步操作未完成",MessageBoxButton.OK,MessageBoxImage.Warning);}};
                 state.Text=paused&&member.self?"已暂停":member.needs_upgrade?"需要升级":member.online?(member.applied?"已同步":"等待应用"):"等待连接";
+                state.SetResourceReference(TextBlock.ForegroundProperty,member.online&&member.applied&&!member.needs_upgrade&&!(paused&&member.self)?"Accent":"SecondaryColor");
                 state.ToolTip=member.needs_upgrade?"请将两端 Rime Q 升级到支持完整学习记录同步的版本；无需重新配对。":member.online&&member.applied?"已应用当前已知变更；离线设备可能还有未传出的词条。":"连接后自动同步；有组合输入时等待输入结束。";
-                options.Visibility=!member.self&&canRemove?Visibility.Visible:Visibility.Collapsed;
-                options.ToolTip="管理“"+member.name+"”";
+                options.Visibility=!member.self&&canRemove?Visibility.Visible:Visibility.Hidden;
+                AutomationProperties.SetName(options,"管理“"+member.name+"”");
             }
         }
     }

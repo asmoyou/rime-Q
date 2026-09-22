@@ -1,0 +1,28 @@
+{
+  "fixture": "installed 0.4.5 sync binary; isolated synthetic 7908 rows; unchanged captures; warm cache",
+  "samples": [
+    {
+      "wall_ms": 126.75910000689328,
+      "cpu_ms": 109.375,
+      "read_bytes": 3801088,
+      "write_bytes": 1734520,
+      "job_created": false
+    },
+    {
+      "wall_ms": 133.4657999977935,
+      "cpu_ms": 125.0,
+      "read_bytes": 3801088,
+      "write_bytes": 1734520,
+      "job_created": false
+    },
+    {
+      "wall_ms": 168.81230000581127,
+      "cpu_ms": 125.0,
+      "read_bytes": 5525504,
+      "write_bytes": 3458968,
+      "job_created": false
+    }
+  ],
+  "median_wall_ms": 133.4657999977935,
+  "median_cpu_ms": 125.0
+}

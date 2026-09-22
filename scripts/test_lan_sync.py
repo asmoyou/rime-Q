@@ -169,6 +169,13 @@ def check_observability(binary, root):
             n.call("capture", rows=[])
         until(lambda: all(n.call("status")["last_sync_at"] > 0 for n in nodes), "Confirmed empty dictionaries have no success time")
         times = [n.call("status")["last_sync_at"] for n in nodes]
+        # Allow final receipt propagation, then prove a quiescent pair does not
+        # reconnect every two seconds. A real edit must still wake it promptly.
+        time.sleep(5)
+        seen = [[m['last_seen'] for m in n.call('status')['members']] for n in nodes]
+        time.sleep(6)
+        assert seen == [[m['last_seen'] for m in n.call('status')['members']] for n in nodes], 'Idle pair keeps reconnecting'
+
         time.sleep(1.1)
         for i, n in enumerate(nodes):
             n.call("capture", rows=[])

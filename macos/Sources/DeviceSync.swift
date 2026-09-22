@@ -38,6 +38,8 @@ struct SyncApplication: Decodable { let id: String; let before: [SyncRecord]; le
     private var startupFailure: String?
     private var startupErrors: Pipe?
     private var retryAfter: TimeInterval = 0
+    private var nextCheck: TimeInterval = 0
+    private var nextExport: TimeInterval = 0
     private var stage: String?
     private var stageSince = ProcessInfo.processInfo.systemUptime
     private func setStage(_ value: String?) {
@@ -60,7 +62,6 @@ struct SyncApplication: Decodable { let id: String; let before: [SyncRecord]; le
         if waiting { text += " · 已持续 \(seconds) 秒" }
         if waiting && seconds >= 30 { text += " · 等待较久，请查看设备状态或重试" }
         text += "\n当前已知变更：\(confirmed) / \(total) 台设备已确认"
-        if let transfer = p["transfer"] as? String { text += "\n\(transfer) · \(p["transfer_seconds"] as? Int ?? 0) 秒" }
         return text
     }
 
@@ -72,23 +73,22 @@ struct SyncApplication: Decodable { let id: String; let before: [SyncRecord]; le
                let status = try? await request(["action": "status"]) { return status }
             return ["group": NSNull(), "enabled": false]
         }
-        try await ensureStarted()
-        return try await request(["action": "status"])
+        return try await ensureStarted()
     }
 
     func startIfEnabled() {
         guard defaults.bool(forKey: "SyncStarted"), timer == nil else { return }
-        timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in Task { [weak self] in await self?.tick() } }
+        timer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in Task { [weak self] in await self?.tick() } }
         Task { await tick() }
     }
     func markStarted() { defaults.set(true, forKey: "SyncStarted"); startIfEnabled() }
     nonisolated private static var environment: [String: String] {
         ProcessInfo.processInfo.environment.filter { ["HOME", "USER", "LOGNAME", "TMPDIR", "PATH", "LANG"].contains($0.key) }
     }
-    func ensureStarted(retry: Bool = false) async throws {
+    @discardableResult func ensureStarted(retry: Bool = false) async throws -> [String: Any] {
         if retry { startupFailure = nil }
         if FileManager.default.fileExists(atPath: root.appendingPathComponent("control.json").path),
-           (try? await request(["action": "status"])) != nil { startupFailure = nil; return }
+           let status = try? await request(["action": "status"]) { startupFailure = nil; return status }
         if let startupFailure { throw LexiconError.message(startupFailure) }
         do {
             guard FileManager.default.isExecutableFile(atPath: executable.path) else { throw LexiconError.message("同步组件缺失，请安装包含此功能的完整版本。") }
@@ -107,7 +107,7 @@ struct SyncApplication: Decodable { let id: String; let before: [SyncRecord]; le
                     throw LexiconError.message(Self.failureMessage(String(decoding: diagnostic.prefix(4096), as: UTF8.self)))
                 }
                 try await Task.sleep(nanoseconds: 100_000_000)
-                if (try? await request(["action": "status"])) != nil { return }
+                if let status = try? await request(["action": "status"]) { return status }
             }
             throw LexiconError.message("同步服务未能启动，请稍后重试。")
         } catch {
@@ -119,28 +119,11 @@ struct SyncApplication: Decodable { let id: String; let before: [SyncRecord]; le
     func request(_ object: [String: Any]) async throws -> [String: Any] {
         if isolated { try beforeRequest?(object["action"] as? String ?? "") }
         let data = try JSONSerialization.data(withJSONObject: object)
-        let executable = executable, root = root
+        let root = root
         let response: [String: Any] = try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .utility).async {
-                do {
-                    let task = Process(), input = Pipe(), output = Pipe(), errors = Pipe()
-                    task.executableURL = executable; task.arguments = ["control", "--root", root.path]
-                    task.environment = Self.environment; task.standardInput = input; task.standardOutput = output; task.standardError = errors
-                    try task.run()
-                    let timeout = DispatchWorkItem { if task.isRunning { task.terminate() } }
-                    DispatchQueue.global().asyncAfter(deadline: .now() + 145, execute: timeout)
-                    input.fileHandleForWriting.write(data); try input.fileHandleForWriting.close()
-                    let result = output.fileHandleForReading.readDataToEndOfFile(); task.waitUntilExit(); timeout.cancel()
-                    let diagnostic = errors.fileHandleForReading.readDataToEndOfFile()
-                    guard task.terminationStatus == 0 else {
-                        throw LexiconError.message(Self.failureMessage(String(decoding: diagnostic.prefix(4096), as: UTF8.self)))
-                    }
-                    guard result.count <= 96 * 1024 * 1024,
-                          let value = try JSONSerialization.jsonObject(with: result) as? [String: Any] else {
-                        throw LexiconError.message("同步操作未完成。请检查设备状态、配对码及原设备的确认，过期后重新生成邀请。")
-                    }
-                    continuation.resume(returning: value)
-                } catch { continuation.resume(throwing: error) }
+                do { continuation.resume(returning: try SyncTransport.request(root: root, data: data)) }
+                catch { continuation.resume(throwing: LexiconError.message(Self.failureMessage(error.localizedDescription))) }
             }
         }
         if isolated { try afterRequest?(object["action"] as? String ?? "") }
@@ -222,15 +205,18 @@ struct SyncApplication: Decodable { let id: String; let before: [SyncRecord]; le
     }
     func tick(force: Bool = false) async {
         precondition(Thread.isMainThread)
-        guard !busy, defaults.bool(forKey: "SyncStarted"), force || ProcessInfo.processInfo.systemUptime >= retryAfter else { return }
+        guard !busy, defaults.bool(forKey: "SyncStarted"), force || ProcessInfo.processInfo.systemUptime >= max(retryAfter, nextCheck) else { return }
         busy = true; defer { busy = false; NotificationCenter.default.post(name: Self.changed, object: nil) }
         do {
-            try await ensureStarted(); let status = try await request(["action": "status"])
+            nextCheck = ProcessInfo.processInfo.systemUptime + 10
+            let status = try await ensureStarted()
             guard status["enabled"] as? Bool == true, status["group"] is [String: Any] else { return }
             guard Engine.ready else { setStage("等待输入引擎就绪"); return }
             guard !InputSession.hasComposition else { setStage("等待当前输入结束"); return }
             let remote = try JSONSerialization.data(withJSONObject: ["revision": status["revision"] ?? ""], options: .sortedKeys)
             guard force || lastError != nil || revision != QRimeLearningRevision() || remote != version || status["waiting_input"] as? Bool == true else { setStage(nil); return }
+            guard force || lastError != nil || status["waiting_input"] as? Bool == true || ProcessInfo.processInfo.systemUptime >= nextExport else { return }
+            nextExport = ProcessInfo.processInfo.systemUptime + 30
             setStage("正在读取本机学习记录")
             await Task.yield()
             guard !InputSession.hasComposition else { setStage("等待当前输入结束"); return }

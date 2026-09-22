@@ -41,6 +41,8 @@ import AppKit
         window.minSize = .init(width: 680, height: 580); window.isReleasedWhenClosed = false; window.center()
         super.init(window: window)
         window.delegate = self; window.contentView = root
+        syncProgress.maximumNumberOfLines = 2; syncProgress.lineBreakMode = .byTruncatingTail
+        syncProgress.heightAnchor.constraint(equalToConstant: 36).isActive = true
         confirmation.style = .bar; confirmation.isIndeterminate = false
         confirmation.setAccessibilityLabel("当前已知变更的设备确认进度")
         syncTime.toolTip = "本机观察到双方已应用同一已知版本的时间；无新变更的检查不会更新时间。离线设备仍可能有未传出的变更。"
@@ -66,7 +68,7 @@ import AppKit
     override func showWindow(_ sender: Any?) {
         super.showWindow(sender)
         if timer == nil {
-            timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
                 Task { @MainActor [weak self] in
                     guard let self, self.window?.isVisible == true else { return }
                     self.updateProgress()
@@ -86,7 +88,7 @@ import AppKit
 
     private func updateProgress() {
         syncTime.stringValue = "最近成功同步：" + DeviceSync.successTime((state["last_sync_at"] as? NSNumber)?.doubleValue ?? 0)
-        syncProgress.stringValue = sync.progressText(state)
+        syncProgress.stringValue = sync.progressText(state); syncProgress.toolTip = syncProgress.stringValue
         let p = state["progress"] as? [String: Any] ?? [:]
         confirmation.maxValue = max(1, (p["total"] as? NSNumber)?.doubleValue ?? 0)
         confirmation.doubleValue = (p["confirmed"] as? NSNumber)?.doubleValue ?? 0
@@ -336,6 +338,11 @@ import AppKit
         await refresh()
         try EngineSmoke.check(syncTime.stringValue.hasPrefix("最近成功同步：") && syncProgress.stringValue.contains("台设备已确认"), "sync time and confirmation progress missing")
         try EngineSmoke.check(memberRows.count == 6, "sync window lost group members")
+        let stableProgress = syncProgress.stringValue
+        var transport = state["progress"] as? [String: Any] ?? [:]
+        transport["transfer"] = "正在连接其他设备"; transport["transfer_seconds"] = 1
+        state["progress"] = transport; updateProgress()
+        try EngineSmoke.check(syncProgress.stringValue == stableProgress, "idle transport changed visible progress")
         let first = memberRows.values.first
         await refresh()
         try EngineSmoke.check(memberRows.values.contains { $0 === first }, "polling replaced stable device rows")

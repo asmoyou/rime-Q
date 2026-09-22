@@ -1,0 +1,126 @@
+{
+  "fixture": "7908 identical synthetic records, warm cache, single isolated service, no network peers, no UI or real typing",
+  "logical_processors": 4,
+  "before": {
+    "binary_sha256": "6dc87257e5cfe2550e91dee5c3efa6cfb74dda041600ea0952dc37a6a40e1d4e",
+    "status_20": {
+      "cpu_seconds": 0.25,
+      "cpu_percent": 19.7258,
+      "rss_mib": 13.61,
+      "private_mib": 5.29,
+      "read_bytes": 40878080,
+      "write_bytes": 0,
+      "read_operations": 9980,
+      "write_operations": 0,
+      "median_ms": 14.707750007801224
+    },
+    "unchanged_captures": [
+      {
+        "wall_ms": 136.93120000243653,
+        "cpu_seconds": 0.109375,
+        "cpu_percent": 19.969,
+        "rss_mib": 13.15,
+        "private_mib": 6.74,
+        "read_bytes": 3719168,
+        "write_bytes": 1668600,
+        "read_operations": 908,
+        "write_operations": 810
+      },
+      {
+        "wall_ms": 139.39689999097027,
+        "cpu_seconds": 0.125,
+        "cpu_percent": 22.418,
+        "rss_mib": 13.87,
+        "private_mib": 6.05,
+        "read_bytes": 3715072,
+        "write_bytes": 1668600,
+        "read_operations": 907,
+        "write_operations": 810
+      },
+      {
+        "wall_ms": 149.40159999241587,
+        "cpu_seconds": 0.125,
+        "cpu_percent": 20.9168,
+        "rss_mib": 13.23,
+        "private_mib": 5.34,
+        "read_bytes": 5373952,
+        "write_bytes": 3327512,
+        "read_operations": 1312,
+        "write_operations": 1216
+      }
+    ],
+    "idle_status_polling": {
+      "cpu_seconds": 0.515625,
+      "cpu_percent": 0.644,
+      "rss_mib": 13.56,
+      "private_mib": 5.53,
+      "read_bytes": 81735680,
+      "write_bytes": 0,
+      "read_operations": 19955,
+      "write_operations": 0,
+      "seconds": 20.016906100005144,
+      "requests": 40
+    }
+  },
+  "after": {
+    "binary_sha256": "fd5c6ac50cc467f9c805e3f7df73258cf4a4b83fd01335686f7e3f6014d5ab25",
+    "status_20": {
+      "cpu_seconds": 0.015625,
+      "cpu_percent": 18.3826,
+      "rss_mib": 12.04,
+      "private_mib": 5.42,
+      "read_bytes": 24576,
+      "write_bytes": 0,
+      "read_operations": 6,
+      "write_operations": 0,
+      "median_ms": 0.9577500022714958
+    },
+    "unchanged_captures": [
+      {
+        "wall_ms": 89.96740001020953,
+        "cpu_seconds": 0.09375,
+        "cpu_percent": 26.0511,
+        "rss_mib": 11.92,
+        "private_mib": 6.51,
+        "read_bytes": 3731456,
+        "write_bytes": 0,
+        "read_operations": 911,
+        "write_operations": 0
+      },
+      {
+        "wall_ms": 94.31770000082906,
+        "cpu_seconds": 0.09375,
+        "cpu_percent": 24.8495,
+        "rss_mib": 12.1,
+        "private_mib": 6.38,
+        "read_bytes": 3731456,
+        "write_bytes": 0,
+        "read_operations": 911,
+        "write_operations": 0
+      },
+      {
+        "wall_ms": 93.93000000272878,
+        "cpu_seconds": 0.09375,
+        "cpu_percent": 24.9521,
+        "rss_mib": 11.93,
+        "private_mib": 5.19,
+        "read_bytes": 3731456,
+        "write_bytes": 0,
+        "read_operations": 911,
+        "write_operations": 0
+      }
+    ],
+    "idle_status_polling": {
+      "cpu_seconds": 0.0,
+      "cpu_percent": 0.0,
+      "rss_mib": 11.94,
+      "private_mib": 5.2,
+      "read_bytes": 0,
+      "write_bytes": 0,
+      "read_operations": 0,
+      "write_operations": 0,
+      "seconds": 20.037036599998828,
+      "requests": 2
+    }
+  }
+}

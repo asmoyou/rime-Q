@@ -31,7 +31,7 @@ namespace RimeQ {
         static string revision,version,lastAppliedState;
         static string startupFailure;
         static readonly Stopwatch retryClock=Stopwatch.StartNew();
-        static long retryAfter;
+        static long retryAfter,nextCheck,nextExport;
         static readonly Stopwatch stageClock=Stopwatch.StartNew();
         static string stage;
         static void Stage(string value){if(stage!=value){stage=value;stageClock.Restart();if(Changed!=null)Changed();}}
@@ -59,7 +59,7 @@ namespace RimeQ {
             bool waiting=local||p!=null&&p.confirmed<p.total&&p.total>1;
             if(waiting)text+=" · 已持续 "+seconds+" 秒";
             if(waiting&&seconds>=30)text+=" · 等待较久，请查看设备状态或重试";
-            if(p!=null){text+="\n当前已知变更："+p.confirmed+" / "+p.total+" 台设备已确认";if(!string.IsNullOrEmpty(p.transfer))text+="\n"+p.transfer+" · "+p.transfer_seconds+" 秒";}
+            if(p!=null)text+="\n当前已知变更："+p.confirmed+" / "+p.total+" 台设备已确认";
             return text;
         }
         // Assigned only by the isolated coordinator test, never by application settings.
@@ -70,19 +70,18 @@ namespace RimeQ {
                 try{return await Call<SyncStatus>(new {action="status"});}catch(IOException){}catch(SocketException){}catch(TimeoutException){}
             if(Paths.Get("SyncStarted","0")!="1")
                 return new SyncStatus {members=new List<SyncMember>(),pending=new List<SyncPending>(),discovered=new List<SyncNearby>()};
-            await EnsureStarted();
-            return await Call<SyncStatus>(new {action="status"});
+            return await EnsureStarted();
         }
-        internal static async Task EnsureStarted(bool retry=false) {
+        internal static async Task<SyncStatus> EnsureStarted(bool retry=false) {
             if(retry)startupFailure=null;
-            if(File.Exists(Path.Combine(Root,"control.json")))try{await Call<SyncStatus>(new {action="status"});startupFailure=null;return;}catch(IOException){}catch(SocketException){}catch(TimeoutException){}
+            if(File.Exists(Path.Combine(Root,"control.json")))try{var status=await Call<SyncStatus>(new {action="status"});startupFailure=null;return status;}catch(IOException){}catch(SocketException){}catch(TimeoutException){}
             if(startupFailure!=null)throw new IOException(startupFailure);
-            if(starting){for(int i=0;i<40&&starting;i++)await Task.Delay(100);if(startupFailure!=null)throw new IOException(startupFailure);return;}
+            if(starting){for(int i=0;i<40&&starting;i++)await Task.Delay(100);if(startupFailure!=null)throw new IOException(startupFailure);return await Call<SyncStatus>(new {action="status"});}
             starting=true;
             try{
                 if(!File.Exists(Path.Combine(Paths.App,"RimeQ.Sync.exe")))throw new IOException("同步组件缺失，请安装包含此功能的完整版本。");
                 Paths.Start("RimeQ.Sync.exe","serve --root \""+Root+"\"");
-                for(int i=0;i<40;i++){await Task.Delay(100);try{await Call<SyncStatus>(new {action="status"});startupFailure=null;return;}catch(IOException){}catch(SocketException){}catch(TimeoutException){}}
+                for(int i=0;i<40;i++){await Task.Delay(100);try{var status=await Call<SyncStatus>(new {action="status"});startupFailure=null;return status;}catch(IOException){}catch(SocketException){}catch(TimeoutException){}}
                 throw new IOException("同步服务未能启动，请稍后重试。");
             }catch(Exception error){startupFailure=error.Message;throw;}finally{starting=false;}
         }
@@ -126,12 +125,15 @@ namespace RimeQ {
         internal static List<DictionaryRow> FromSync(IEnumerable<SyncRow> rows){return rows.Select(r=>new DictionaryRow {Text=r.key.text,Code=r.key.code,Weight=r.weight}).ToList();}
         internal static bool Same(IEnumerable<SyncRow> left,IEnumerable<SyncRow> right){return left.OrderBy(r=>r.key.text,StringComparer.Ordinal).ThenBy(r=>r.key.code,StringComparer.Ordinal).Select(r=>r.key.text+"\t"+r.key.code+"\t"+r.weight).SequenceEqual(right.OrderBy(r=>r.key.text,StringComparer.Ordinal).ThenBy(r=>r.key.code,StringComparer.Ordinal).Select(r=>r.key.text+"\t"+r.key.code+"\t"+r.weight));}
         internal static async Task Tick(bool force=false){
-            if(busy||Paths.Get("SyncStarted","0")!="1"||(!force&&retryClock.ElapsedMilliseconds<retryAfter))return;busy=true;
+            if(busy||Paths.Get("SyncStarted","0")!="1"||(!force&&retryClock.ElapsedMilliseconds<Math.Max(retryAfter,nextCheck)))return;busy=true;
             try{
-                await EnsureStarted();var status=await Call<SyncStatus>(new {action="status"});if(!status.enabled||status.group==null)return;
+                nextCheck=retryClock.ElapsedMilliseconds+10000;
+                var status=await EnsureStarted();if(!status.enabled||status.group==null)return;
                 var probe=await EngineRequest(10);if(!probe.Ready||!probe.Handled){LastState="等待当前输入结束";Stage(probe.Ready?"等待当前输入结束":"等待输入引擎就绪");return;}
                 var remote=status.revision;
                 if(!force&&LastError==null&&probe.Message==revision&&remote==version&&!status.waiting_input){LastState=lastAppliedState;Stage(null);return;}
+                if(!force&&!status.waiting_input&&LastError==null&&retryClock.ElapsedMilliseconds<nextExport)return;
+                nextExport=retryClock.ElapsedMilliseconds+30000;
                 Stage("正在读取本机学习记录");
                 var exported=await EngineRequest(11);if(!exported.Handled){LastState="等待当前输入结束";Stage(LastState);return;}
                 var path=Path.Combine(Root,"engine","current.tsv");var actual=ToSync(DictionaryData.Parse(File.ReadAllText(path,new UTF8Encoding(false,true))));

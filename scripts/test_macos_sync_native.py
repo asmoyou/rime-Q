@@ -127,6 +127,8 @@ def run(binary, output):
                 cases.append('six_swift_adapters_real_librime_tls_nonfounder_invitations')
                 until(lambda: all(m['applied'] for m in nodes[0].call('status')['members']), 'missing signed engine receipts', 60)
                 cases.append('six_signed_readback_receipts')
+                assert engines[0].call('throttle')['requests'] == 0
+                cases.append('background_check_rate_limit')
                 engines[0].call('ui')
                 # This loopback harness deliberately disables mDNS. Refresh the
                 # changed listener address after resume, as discovery does on LAN.

@@ -61,6 +61,8 @@ namespace RimeQ {
             Require(status.members.Single(m=>m.self).applied,"Local receipt not applied");
             Require(status.last_sync_at==0&&DeviceSync.SuccessTime(0)=="尚无成功记录","Single-node capture claimed cross-device success");
             Require(Read().Count==6,"Initial capture lost local records");
+            int initialCalls=calls;await DeviceSync.Tick();await DeviceSync.Tick();
+            Require(calls==initialCalls,"Background sync ignored its minimum check interval");
             var remote=Row("合成远端","yuan duan",7);
             await Change(local,null);await Change(remote,7);await DeviceSync.Tick(true);
             Require(DeviceSync.LastError==null,"Remote apply failed: "+DeviceSync.LastError);

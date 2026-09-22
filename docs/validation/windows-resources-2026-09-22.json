@@ -1,0 +1,2201 @@
+{
+  "started_at": "2026-09-22T06:17:38.742988+00:00",
+  "logical_processors": 4,
+  "status_before": {
+    "enabled": true,
+    "rows": 7908,
+    "members": 2,
+    "online": 2,
+    "confirmed": 2,
+    "needs_upgrade": 0,
+    "waiting_input": false,
+    "stage": "当前已知变更已确认"
+  },
+  "samples": [
+    {
+      "elapsed_seconds": 1.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7808,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.015625,
+          "cpu_percent": 0.3904,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5603328,
+          "write_bytes": 0,
+          "read_operations": 1368,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 2.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.015625,
+          "cpu_percent": 0.3904,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 20,
+          "write_bytes": 56,
+          "read_operations": 3,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7807,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 3.0,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.046875,
+          "cpu_percent": 1.1729,
+          "rss_mib": 18.72,
+          "private_mib": 9.76,
+          "read_bytes": 5619712,
+          "write_bytes": 0,
+          "read_operations": 1372,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 4.0,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7813,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5586944,
+          "write_bytes": 0,
+          "read_operations": 1364,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 5.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.046875,
+          "cpu_percent": 1.1712,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 6.0,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.078125,
+          "cpu_percent": 1.9544,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5603328,
+          "write_bytes": 0,
+          "read_operations": 1368,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 7.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.046875,
+          "cpu_percent": 1.1715,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 8.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.27,
+          "private_mib": 124.41,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.046875,
+          "cpu_percent": 1.1714,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5619712,
+          "write_bytes": 0,
+          "read_operations": 1372,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 9.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.27,
+          "private_mib": 124.41,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7816,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5586944,
+          "write_bytes": 0,
+          "read_operations": 1364,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 10.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.28,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7813,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 11.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7808,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5603328,
+          "write_bytes": 0,
+          "read_operations": 1368,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 12.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.015625,
+          "cpu_percent": 0.3906,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7813,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 13.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.015625,
+          "cpu_percent": 0.3908,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.0625,
+          "cpu_percent": 1.5634,
+          "rss_mib": 18.72,
+          "private_mib": 9.76,
+          "read_bytes": 5619712,
+          "write_bytes": 0,
+          "read_operations": 1372,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 14.0,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 20,
+          "write_bytes": 56,
+          "read_operations": 3,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7814,
+          "rss_mib": 18.72,
+          "private_mib": 9.76,
+          "read_bytes": 5586944,
+          "write_bytes": 0,
+          "read_operations": 1364,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 15.0,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7813,
+          "rss_mib": 18.72,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 16.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.046875,
+          "cpu_percent": 1.1714,
+          "rss_mib": 18.72,
+          "private_mib": 9.76,
+          "read_bytes": 5603328,
+          "write_bytes": 0,
+          "read_operations": 1368,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 17.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.015625,
+          "cpu_percent": 0.3907,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7814,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 18.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.046875,
+          "cpu_percent": 1.1718,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5619712,
+          "write_bytes": 0,
+          "read_operations": 1372,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 19.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.0625,
+          "cpu_percent": 1.5627,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5586944,
+          "write_bytes": 0,
+          "read_operations": 1364,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 20.002,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.046875,
+          "cpu_percent": 1.1705,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 21.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7817,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5603328,
+          "write_bytes": 0,
+          "read_operations": 1368,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 22.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7813,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.015625,
+          "cpu_percent": 0.3907,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 23.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.0625,
+          "cpu_percent": 1.5624,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5603328,
+          "write_bytes": 0,
+          "read_operations": 1368,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 24.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.046875,
+          "cpu_percent": 1.172,
+          "rss_mib": 18.72,
+          "private_mib": 9.76,
+          "read_bytes": 5603328,
+          "write_bytes": 0,
+          "read_operations": 1368,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 25.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.27,
+          "private_mib": 124.41,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 20,
+          "write_bytes": 56,
+          "read_operations": 3,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.781,
+          "rss_mib": 18.72,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 26.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.27,
+          "private_mib": 124.41,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7814,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5603328,
+          "write_bytes": 0,
+          "read_operations": 1368,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 27.002,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.28,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.015625,
+          "cpu_percent": 0.3901,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7801,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 28.0,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.015625,
+          "cpu_percent": 0.3914,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7828,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5619712,
+          "write_bytes": 0,
+          "read_operations": 1372,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 29.0,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7814,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5586944,
+          "write_bytes": 0,
+          "read_operations": 1364,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 30.0,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.046875,
+          "cpu_percent": 1.172,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 31.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.0625,
+          "cpu_percent": 1.5609,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5603328,
+          "write_bytes": 0,
+          "read_operations": 1368,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 32.0,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.015625,
+          "cpu_percent": 0.3909,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7819,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 33.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.046875,
+          "cpu_percent": 1.1718,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5603328,
+          "write_bytes": 0,
+          "read_operations": 1368,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 34.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.09375,
+          "cpu_percent": 2.3426,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5603328,
+          "write_bytes": 0,
+          "read_operations": 1368,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 35.0,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7817,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 36.0,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.046875,
+          "cpu_percent": 1.1718,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5603328,
+          "write_bytes": 0,
+          "read_operations": 1368,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 37.0,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 20,
+          "write_bytes": 56,
+          "read_operations": 3,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7813,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 38.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.0625,
+          "cpu_percent": 1.5616,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5619712,
+          "write_bytes": 0,
+          "read_operations": 1372,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 39.0,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7818,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5586944,
+          "write_bytes": 0,
+          "read_operations": 1364,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 40.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.0625,
+          "cpu_percent": 1.562,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 41.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.046875,
+          "cpu_percent": 1.1717,
+          "rss_mib": 119.29,
+          "private_mib": 124.46,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7812,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5603328,
+          "write_bytes": 0,
+          "read_operations": 1368,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 42.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.27,
+          "private_mib": 124.41,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.046875,
+          "cpu_percent": 1.1713,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 43.0,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.015625,
+          "cpu_percent": 0.391,
+          "rss_mib": 119.27,
+          "private_mib": 124.41,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.015625,
+          "cpu_percent": 0.391,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.046875,
+          "cpu_percent": 1.1729,
+          "rss_mib": 18.72,
+          "private_mib": 9.76,
+          "read_bytes": 5603328,
+          "write_bytes": 0,
+          "read_operations": 1368,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 44.0,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.27,
+          "private_mib": 124.41,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7813,
+          "rss_mib": 18.72,
+          "private_mib": 9.76,
+          "read_bytes": 5603328,
+          "write_bytes": 0,
+          "read_operations": 1368,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 45.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.015625,
+          "cpu_percent": 0.3904,
+          "rss_mib": 119.27,
+          "private_mib": 124.41,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7809,
+          "rss_mib": 18.72,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 46.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.046875,
+          "cpu_percent": 1.1715,
+          "rss_mib": 119.27,
+          "private_mib": 124.41,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.09375,
+          "cpu_percent": 2.343,
+          "rss_mib": 18.72,
+          "private_mib": 9.76,
+          "read_bytes": 5603328,
+          "write_bytes": 0,
+          "read_operations": 1368,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 47.0,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.27,
+          "private_mib": 124.41,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7819,
+          "rss_mib": 18.72,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 48.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.27,
+          "private_mib": 124.41,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7806,
+          "rss_mib": 18.71,
+          "private_mib": 9.76,
+          "read_bytes": 5619712,
+          "write_bytes": 0,
+          "read_operations": 1372,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 49.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.015625,
+          "cpu_percent": 0.3906,
+          "rss_mib": 119.27,
+          "private_mib": 124.48,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 20,
+          "write_bytes": 56,
+          "read_operations": 3,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.015625,
+          "cpu_percent": 0.3906,
+          "rss_mib": 18.72,
+          "private_mib": 9.76,
+          "read_bytes": 5586944,
+          "write_bytes": 0,
+          "read_operations": 1364,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 50.0,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.27,
+          "private_mib": 124.48,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.046875,
+          "cpu_percent": 1.1727,
+          "rss_mib": 18.72,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 51.0,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0625,
+          "cpu_percent": 1.5629,
+          "rss_mib": 119.27,
+          "private_mib": 124.48,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7815,
+          "rss_mib": 18.71,
+          "private_mib": 9.76,
+          "read_bytes": 5603328,
+          "write_bytes": 0,
+          "read_operations": 1368,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 52.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.52,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.015625,
+          "cpu_percent": 0.3904,
+          "rss_mib": 18.71,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 53.0,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.52,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.0625,
+          "cpu_percent": 1.5633,
+          "rss_mib": 18.71,
+          "private_mib": 9.76,
+          "read_bytes": 5603328,
+          "write_bytes": 0,
+          "read_operations": 1368,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 54.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.52,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7806,
+          "rss_mib": 18.71,
+          "private_mib": 9.76,
+          "read_bytes": 5603328,
+          "write_bytes": 0,
+          "read_operations": 1368,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 55.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.52,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.015625,
+          "cpu_percent": 0.3908,
+          "rss_mib": 18.71,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 56.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.52,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.015625,
+          "cpu_percent": 0.3905,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5603328,
+          "write_bytes": 4120,
+          "read_operations": 1368,
+          "write_operations": 2
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 57.0,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7819,
+          "rss_mib": 119.29,
+          "private_mib": 124.52,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 58.0,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.52,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.046875,
+          "cpu_percent": 1.1718,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5603328,
+          "write_bytes": 0,
+          "read_operations": 1368,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 59.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 119.29,
+          "private_mib": 124.52,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 924,
+          "write_bytes": 56,
+          "read_operations": 7,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.03125,
+          "cpu_percent": 0.7806,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 5603328,
+          "write_bytes": 0,
+          "read_operations": 1368,
+          "write_operations": 0
+        }
+      }
+    },
+    {
+      "elapsed_seconds": 60.001,
+      "processes": {
+        "RimeQ": {
+          "cpu_seconds": 0.015625,
+          "cpu_percent": 0.3907,
+          "rss_mib": 119.29,
+          "private_mib": 124.52,
+          "read_bytes": 1150,
+          "write_bytes": 20,
+          "read_operations": 10,
+          "write_operations": 1
+        },
+        "RimeQ.Broker": {
+          "cpu_seconds": 0.0,
+          "cpu_percent": 0.0,
+          "rss_mib": 23.32,
+          "private_mib": 13.99,
+          "read_bytes": 20,
+          "write_bytes": 56,
+          "read_operations": 3,
+          "write_operations": 2
+        },
+        "RimeQ.Sync": {
+          "cpu_seconds": 0.0625,
+          "cpu_percent": 1.5626,
+          "rss_mib": 18.73,
+          "private_mib": 9.76,
+          "read_bytes": 4055040,
+          "write_bytes": 0,
+          "read_operations": 990,
+          "write_operations": 0
+        }
+      }
+    }
+  ],
+  "duration_seconds": 60.00100470000325,
+  "baseline": {
+    "RimeQ": {
+      "cpu_seconds": 0.390625,
+      "cpu_percent": 0.1628,
+      "rss_mib": 119.29,
+      "private_mib": 124.52,
+      "read_bytes": 69000,
+      "write_bytes": 1200,
+      "read_operations": 600,
+      "write_operations": 60
+    },
+    "RimeQ.Broker": {
+      "cpu_seconds": 0.046875,
+      "cpu_percent": 0.0195,
+      "rss_mib": 23.32,
+      "private_mib": 13.99,
+      "read_bytes": 50016,
+      "write_bytes": 3360,
+      "read_operations": 396,
+      "write_operations": 120
+    },
+    "RimeQ.Sync": {
+      "cpu_seconds": 2.40625,
+      "cpu_percent": 1.0026,
+      "rss_mib": 18.73,
+      "private_mib": 9.76,
+      "read_bytes": 299040768,
+      "write_bytes": 4120,
+      "read_operations": 73008,
+      "write_operations": 2
+    }
+  },
+  "status_after": {
+    "enabled": true,
+    "rows": 7908,
+    "members": 2,
+    "online": 2,
+    "confirmed": 2,
+    "needs_upgrade": 0,
+    "waiting_input": false,
+    "stage": "当前已知变更已确认"
+  },
+  "revision_unchanged": true,
+  "status_probe": {
+    "requests": 20,
+    "duration_seconds": 0.347200399999565,
+    "latency_median_ms": 15.933049999148352,
+    "latency_max_ms": 31.06909999769414,
+    "processes": {
+      "RimeQ": {
+        "cpu_seconds": 0.0,
+        "cpu_percent": 0.0,
+        "rss_mib": 119.29,
+        "private_mib": 124.52,
+        "read_bytes": 0,
+        "write_bytes": 0,
+        "read_operations": 0,
+        "write_operations": 0
+      },
+      "RimeQ.Broker": {
+        "cpu_seconds": 0.0,
+        "cpu_percent": 0.0,
+        "rss_mib": 23.32,
+        "private_mib": 13.99,
+        "read_bytes": 0,
+        "write_bytes": 0,
+        "read_operations": 0,
+        "write_operations": 0
+      },
+      "RimeQ.Sync": {
+        "cpu_seconds": 0.328125,
+        "cpu_percent": 23.6265,
+        "rss_mib": 18.73,
+        "private_mib": 9.76,
+        "read_bytes": 41328640,
+        "write_bytes": 0,
+        "read_operations": 10090,
+        "write_operations": 0
+      }
+    }
+  },
+  "machine": "Intel Core i5-6600K @ 3.50GHz; Windows; 4 logical processors",
+  "installed_version": "0.4.5.9140",
+  "conditions": "Existing long-running processes, warm cache, enabled two-device sync; no injected input; status burst excluded from baseline; no real-host typing benchmark."
+}
