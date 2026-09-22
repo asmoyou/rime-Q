@@ -60,7 +60,7 @@ struct SyncApplication: Decodable { let id: String; let before: [SyncRecord]; le
         let seconds = stage != nil ? Int(ProcessInfo.processInfo.systemUptime - stageSince) : p["elapsed_seconds"] as? Int ?? 0
         let waiting = stage != nil || (confirmed < total && total > 1)
         if waiting { text += " · 已持续 \(seconds) 秒" }
-        if waiting && seconds >= 30 { text += " · 等待较久，请查看设备状态或重试" }
+        if waiting && seconds >= 300 { text += " · 等待较久，请查看设备状态或重试" }
         text += "\n当前已知变更：\(confirmed) / \(total) 台设备已确认"
         return text
     }

@@ -327,7 +327,9 @@ import AppKit
 
     func validateUnusedForSmoke() async throws {
         await refresh(); await refresh()
-        let stalled: [String: Any] = ["enabled": true, "progress": ["stage": "等待其他设备应用并确认", "confirmed": 1, "total": 2, "elapsed_seconds": 31]]
+        let normalDelay: [String: Any] = ["enabled": true, "progress": ["stage": "等待其他设备应用并确认", "confirmed": 1, "total": 2, "elapsed_seconds": 60]]
+        try EngineSmoke.check(!sync.progressText(normalDelay).contains("等待较久"), "normal low-frequency delay reported as stalled")
+        let stalled: [String: Any] = ["enabled": true, "progress": ["stage": "等待其他设备应用并确认", "confirmed": 1, "total": 2, "elapsed_seconds": 301]]
         try EngineSmoke.check(sync.progressText(stalled).contains("等待较久") && sync.progressText(stalled).contains("1 / 2"), "stalled confirmation not visible")
         try EngineSmoke.check(DeviceSync.successTime(0) == "尚无成功记录", "missing time reported as success")
         try EngineSmoke.check(loaded && state["group"] is NSNull, "unused sync page did not show setup")

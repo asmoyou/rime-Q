@@ -58,7 +58,7 @@ namespace RimeQ {
             long seconds=local?stageClock.ElapsedMilliseconds/1000:p==null?0:p.elapsed_seconds;
             bool waiting=local||p!=null&&p.confirmed<p.total&&p.total>1;
             if(waiting)text+=" · 已持续 "+seconds+" 秒";
-            if(waiting&&seconds>=30)text+=" · 等待较久，请查看设备状态或重试";
+            if(waiting&&seconds>=300)text+=" · 等待较久，请查看设备状态或重试";
             if(p!=null)text+="\n当前已知变更："+p.confirmed+" / "+p.total+" 台设备已确认";
             return text;
         }
