@@ -67,7 +67,7 @@ namespace RimeQ {
         readonly TextBlock syncTime=Label(""),syncProgress=Label("");
         readonly TextBlock groupTitle=Label(""),groupDetail=Label("");
         readonly StackPanel summary=new StackPanel();
-        readonly Border summaryCard;
+        readonly Border summaryCard,membersCard;
         string pendingKey;
         readonly ProgressBar confirmation=new ProgressBar {Height=4,Margin=new Thickness(0,0,0,16),Visibility=Visibility.Collapsed};
         readonly Button retryButton;
@@ -98,6 +98,7 @@ namespace RimeQ {
         public DeviceSyncWindow(Window owner){
             Window=new Window {Title="附近设备同步",Owner=owner,Width=760,Height=800,MinWidth=620,MinHeight=580,WindowStartupLocation=owner==null?WindowStartupLocation.CenterScreen:WindowStartupLocation.CenterOwner};
             SyncStyle.Apply(Window);
+            membersCard=Card(members,new Thickness(0));
             var panel=new StackPanel {Margin=new Thickness(28,24,28,24)};
             Window.Content=new ScrollViewer {Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
             var heading=new DockPanel {Margin=new Thickness(0,0,0,16)};
@@ -242,7 +243,7 @@ namespace RimeQ {
             actions.Children.Add(more);content.Children.Add(actions);
             var section=Label("已加入的设备");section.FontSize=15;section.FontWeight=FontWeights.SemiBold;content.Children.Add(section);
             search.ToolTip="按设备名称搜索";content.Children.Add(search);content.Children.Add(empty);
-            content.Children.Add(Card(members,new Thickness(0)));content.Children.Add(requests);
+            content.Children.Add(membersCard);content.Children.Add(requests);
         }
         sealed class DeviceRow {
             internal readonly Grid Panel=new Grid {Height=68,Margin=new Thickness(14,0,14,0)};

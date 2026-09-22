@@ -84,6 +84,10 @@ namespace RimeQ {
                     Require(Find<TextBlock>(view.Window).Any(t=>t.Text.Contains("台设备已确认"))&&Find<ProgressBar>(view.Window).Any(),"Confirmation count/progress bar missing");
                     Require(Find<TextBlock>(view.Window).Any(t=>t.Text.Contains("6 台设备")),"Six-device summary missing");
                     Require(Find<TextBlock>(view.Window).Count(t=>t.Text.StartsWith("Test device "))==6,"Device rows missing");
+                    // Leaving and rejoining must not reparent a list still
+                    // owned by an obsolete card from the previous group.
+                    SetPrivate(view,"joined",false);InvokePrivate(view,"Build");
+                    SetPrivate(view,"joined",true);InvokePrivate(view,"Build");InvokePrivate(view,"ShowMembers");InvokePrivate(view,"UpdateProgress");view.Window.UpdateLayout();
                     var shown=(SyncStatus)GetPrivate(view,"current");
                     var progress=(TextBlock)GetPrivate(view,"syncProgress");
                     var searchPosition=((TextBox)GetPrivate(view,"search")).TransformToAncestor(view.Window).Transform(new Point(0,0));
