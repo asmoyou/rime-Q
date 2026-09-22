@@ -133,7 +133,7 @@ namespace RimeQ {
                 var remote=status.revision;
                 if(!force&&LastError==null&&probe.Message==revision&&remote==version&&!status.waiting_input){LastState=lastAppliedState;Stage(null);return;}
                 if(!force&&!status.waiting_input&&LastError==null&&retryClock.ElapsedMilliseconds<nextExport)return;
-                nextExport=retryClock.ElapsedMilliseconds+30000;
+                nextExport=retryClock.ElapsedMilliseconds+60000;
                 Stage("正在读取本机学习记录");
                 var exported=await EngineRequest(11);if(!exported.Handled){LastState="等待当前输入结束";Stage(LastState);return;}
                 var path=Path.Combine(Root,"engine","current.tsv");var actual=ToSync(DictionaryData.Parse(File.ReadAllText(path,new UTF8Encoding(false,true))));

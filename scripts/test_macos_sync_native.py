@@ -155,20 +155,33 @@ def run(binary, output):
                 # Decreasing a weight requires librime deletion followed by restoration.
                 expected[0]['weight'] = 1; engines[0].replace(expected); engines[0].tick(); converge(expected)
                 cases.append('explicit_weight_reduction')
+                # This one-way, discovery-free chain can wait one idle interval
+                # per hop. Verify automatic delivery without forcing network polls.
+                relay_started = time.monotonic()
                 extra = row('输入保护', 'shu ru bao hu', 2)
                 engines[-1].call('begin')
                 expected.append(extra); engines[0].replace(expected); engines[0].tick()
-                until(lambda: nodes[-1].call('status')['rows'] == len(expected), 'update not received during input', 60)
+                until(lambda: nodes[-1].call('status')['rows'] == len(expected), 'update not received during input', 30 * (len(nodes) - 1) + 30)
+                cases.append('low_frequency_relay_without_manual_sync')
+                print(f'Automatic relay delivered in {time.monotonic() - relay_started:.2f}s', flush=True)
                 result = engines[-1].tick()
                 assert result['composition'] and result['document'] == ''
                 assert '等待当前输入结束' in result['progress']
                 engines[-1].call('cancel'); converge(expected)
                 cases.append('active_composition_not_committed_or_overwritten')
 
+                def receive_for_safety_test(message):
+                    # Remaining cases test engine write safety, not network cadence.
+                    # Only drive transport; do not tick the receiving native engine.
+                    def received():
+                        for node in nodes: node.call('sync_now')
+                        return nodes[-1].call('status')['rows'] == len(expected)
+                    until(received, message, 60)
+
                 # Insert a real composition during the capture IPC suspension.
                 extra = row('异步组合', 'yi bu zu he', 2)
                 expected.append(extra); engines[0].replace(expected); engines[0].tick()
-                until(lambda: nodes[-1].call('status')['rows'] == len(expected), 'hook update not received', 60)
+                receive_for_safety_test('hook update not received')
                 engines[-1].call('hook', after='capture', effect='begin')
                 result = engines[-1].tick(); assert result['composition'] and result['document'] == ''
                 assert nodes[-1].call('pending_apply')['job'] is not None
@@ -177,7 +190,7 @@ def run(binary, output):
 
                 extra = row('异步基线', 'yi bu ji xian', 2)
                 expected.append(extra); engines[0].replace(expected); engines[0].tick()
-                until(lambda: nodes[-1].call('status')['rows'] == len(expected), 'stale update not received', 60)
+                receive_for_safety_test('stale update not received')
                 engines[-1].call('hook', after='capture', effect='learn'); engines[-1].tick()
                 assert nodes[-1].call('pending_apply')['job'] is None, 'stale application was not aborted'
                 expected.append(row('异步学习', 'yi bu xue xi', 7)); converge(expected)
@@ -200,7 +213,7 @@ def run(binary, output):
                 # Pending application survives native process death before importing.
                 extra = row('中断恢复', 'zhong duan hui fu', 2)
                 expected.append(extra); engines[0].replace(expected); engines[0].tick()
-                until(lambda: nodes[-1].call('status')['rows'] == len(expected), 'recovery update missing', 60)
+                receive_for_safety_test('recovery update missing')
                 engines[-1].call('hook', after='capture', effect='fail')
                 assert engines[-1].call('tick')['error'] is not None
                 assert nodes[-1].call('pending_apply')['job'] is not None
@@ -211,7 +224,7 @@ def run(binary, output):
                 # Real engine write completed but acknowledgement was not observed.
                 extra = row('回执恢复', 'hui zhi hui fu', 2)
                 expected.append(extra); engines[0].replace(expected); engines[0].tick()
-                until(lambda: nodes[-1].call('status')['rows'] == len(expected), 'ack update missing', 60)
+                receive_for_safety_test('ack update missing')
                 engines[-1].call('hook', after='acknowledge', effect='fail', before=True)
                 assert engines[-1].call('tick')['error'] is not None
                 engines[-1].stop(crash=True); engines[-1] = Engine(binary, engines[-1].root)
@@ -222,7 +235,7 @@ def run(binary, output):
                 # Backup failure must stop before the real engine can be modified.
                 extra = row('备份保护', 'bei fen bao hu', 2)
                 expected.append(extra); engines[0].replace(expected); engines[0].tick()
-                until(lambda: nodes[-1].call('status')['rows'] == len(expected), 'backup update missing', 60)
+                receive_for_safety_test('backup update missing')
                 before = engines[-1].rows()
                 backups = engines[-1].root / 'sync/backups'
                 saved = engines[-1].root / 'sync/backups-saved'
@@ -240,7 +253,7 @@ def run(binary, output):
                 # A pending job plus a different actual dictionary must stop automatic writes.
                 extra = row('冲突恢复', 'chong tu hui fu', 2)
                 expected.append(extra); engines[0].replace(expected); engines[0].tick()
-                until(lambda: nodes[-1].call('status')['rows'] == len(expected), 'conflict update missing', 60)
+                receive_for_safety_test('conflict update missing')
                 engines[-1].call('hook', after='capture', effect='fail')
                 assert engines[-1].call('tick')['error'] is not None
                 local = engines[-1].rows() + [row('本机保留', 'ben ji bao liu', 5)]

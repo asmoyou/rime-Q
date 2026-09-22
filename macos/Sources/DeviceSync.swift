@@ -216,7 +216,7 @@ struct SyncApplication: Decodable { let id: String; let before: [SyncRecord]; le
             let remote = try JSONSerialization.data(withJSONObject: ["revision": status["revision"] ?? ""], options: .sortedKeys)
             guard force || lastError != nil || revision != QRimeLearningRevision() || remote != version || status["waiting_input"] as? Bool == true else { setStage(nil); return }
             guard force || lastError != nil || status["waiting_input"] as? Bool == true || ProcessInfo.processInfo.systemUptime >= nextExport else { return }
-            nextExport = ProcessInfo.processInfo.systemUptime + 30
+            nextExport = ProcessInfo.processInfo.systemUptime + 60
             setStage("正在读取本机学习记录")
             await Task.yield()
             guard !InputSession.hasComposition else { setStage("等待当前输入结束"); return }
