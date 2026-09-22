@@ -46,7 +46,9 @@ namespace RimeQ {
             oldPeer.needs_upgrade=false;Require(DeviceSync.SuccessSummary(statusReason).Contains("等待其他设备连接"),"Missing success time did not explain offline peer");
             oldPeer.online=true;Require(DeviceSync.SuccessSummary(statusReason).Contains("双方应用确认"),"Missing success time did not explain confirmation");
             statusReason.last_sync_at=1;Require(!DeviceSync.SuccessSummary(statusReason).Contains("尚无"),"Recorded success time was hidden by peer state");
-            var stalled=new SyncStatus {enabled=true,progress=new SyncProgress {stage="等待其他设备应用并确认",confirmed=1,total=2,elapsed_seconds=31}};
+            var normalDelay=new SyncStatus {enabled=true,progress=new SyncProgress {stage="等待其他设备应用并确认",confirmed=1,total=2,elapsed_seconds=60}};
+            Require(!DeviceSync.ProgressText(normalDelay).Contains("等待较久"),"Normal low-frequency delay reported as stalled");
+            var stalled=new SyncStatus {enabled=true,progress=new SyncProgress {stage="等待其他设备应用并确认",confirmed=1,total=2,elapsed_seconds=301}};
             Require(DeviceSync.ProgressText(stalled).Contains("等待较久")&&DeviceSync.ProgressText(stalled).Contains("1 / 2"),"Stalled confirmation is not visible");
             stalled.enabled=false;Require(DeviceSync.ProgressText(stalled).StartsWith("已暂停同步"),"Pause was hidden by stale progress");
             var local=Row("合成全拼","ce shi",5);var english=Row("SyntheticEnglish","amazon",17);var abbreviated=Row("合成简码","u",19);
