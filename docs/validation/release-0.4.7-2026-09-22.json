@@ -1,0 +1,97 @@
+{
+  "tag": "v0.4.7",
+  "sha": "bd5f7b2c9be84f3786a162090e35cdeb5e20eebd",
+  "latest_update_endpoint": "https://github.com/asmoyou/rime-Q/releases/tag/v0.4.7",
+  "verified_utc": "2026-09-22T09:20:37.712207+00:00",
+  "assets": [
+    {
+      "name": "RimeQ-0.4.7-macos-SHA256SUMS.txt",
+      "status": 200,
+      "sha256": "2c5c5cd533bd44cf6d860d0a003a09dc5da65786e881643962ef4bbb52033126",
+      "size": 99
+    },
+    {
+      "name": "RimeQ-0.4.7-macos-universal.pkg",
+      "status": 206,
+      "sha256": "6e7b352f2c58d3ee272f2cd973086d16a4edafa524dfe3aa1766d0e98128f8b5",
+      "size": 76127862
+    },
+    {
+      "name": "RimeQ-0.4.7-windows-SHA256SUMS.txt",
+      "status": 200,
+      "sha256": "5439c443d215b7dbd31a3ecb06d95c0cd114587689f5bc37d4b9acda4979bc1e",
+      "size": 95
+    },
+    {
+      "name": "RimeQ-0.4.7-windows-x64.exe",
+      "status": 206,
+      "sha256": "5e7b5816656c8af428569bbf67995c4501c4a72b30c2cdd8125f373bd1d6fd88",
+      "size": 70310400
+    }
+  ],
+  "method": "Unauthenticated latest/tag metadata, public checksum downloads, 64-byte installer range downloads, GitHub full asset SHA256 matched against CI files",
+  "ci": {
+    "sha": "bd5f7b2c9be84f3786a162090e35cdeb5e20eebd",
+    "run": 35707417919,
+    "jobs": [
+      "changes",
+      "windows-registration",
+      "sync-core (macos-14)",
+      "sync-core (windows-2022)",
+      "core (macos-14)",
+      "sync-core (ubuntu-24.04)",
+      "sync-sandboxes",
+      "core (windows-2022)",
+      "windows-package",
+      "core (ubuntu-24.04)",
+      "mac-package",
+      "windows-install"
+    ],
+    "artifacts": [
+      {
+        "name": "RimeQ-macOS-sync-validation",
+        "archive_digest": "sha256:3fd844554340dcad6bfd03fc52854a9744204161b093d85740af5829aa1597cc",
+        "size": 1252562
+      },
+      {
+        "name": "RimeQ-macOS",
+        "archive_digest": "sha256:e1835a77ab9d2e2c9b360f9680f70bdad93f21060e14b0889dcf859f35d63064",
+        "size": 76128038
+      },
+      {
+        "name": "RimeQ-Windows-x64",
+        "archive_digest": "sha256:ff71e9fdbae77fc117280654ad54ee2a818b3032fa525411b5a295799f3f38dc",
+        "size": 70310823
+      },
+      {
+        "name": "RimeQ-Windows-validation",
+        "archive_digest": "sha256:7d22d454f856c0cf816c3bc1f68bf89855122e746fe2f3dfd606168d32807d3a",
+        "size": 2065034
+      }
+    ]
+  },
+  "packages": {
+    "files": [
+      {
+        "name": "RimeQ-0.4.7-macos-universal.pkg",
+        "bytes": 76127862,
+        "sha256": "6e7b352f2c58d3ee272f2cd973086d16a4edafa524dfe3aa1766d0e98128f8b5"
+      },
+      {
+        "name": "RimeQ-0.4.7-windows-x64.exe",
+        "bytes": 70310400,
+        "sha256": "5e7b5816656c8af428569bbf67995c4501c4a72b30c2cdd8125f373bd1d6fd88"
+      }
+    ],
+    "mac_package": {
+      "version": "0.4.7",
+      "build": "1790067375",
+      "bundle": {
+        "path": "./RimeQ.app",
+        "id": "com.asmoyou.inputmethod.RimeQ",
+        "CFBundleShortVersionString": "0.4.7",
+        "CFBundleVersion": "1790067375"
+      }
+    }
+  }
+}

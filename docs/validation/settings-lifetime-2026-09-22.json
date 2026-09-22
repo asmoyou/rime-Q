@@ -55,5 +55,62 @@
   "machine": "Intel Core i5-6600K, 4 logical processors",
   "os": "Windows-10-10.0.19045-SP0",
   "cache": "Warm resource files, two separate fresh WPF test processes",
-  "sample_count": 1
+  "sample_count": 1,
+  "ci_comparison": {
+    "scope": "Same WPF controls in separate fresh processes; old eager/hidden lifetime versus lazy/closed lifetime. No broker, sync, real user data or forced GC in product.",
+    "runs": [
+      {
+        "mode": "eager",
+        "samples": [
+          {
+            "stage": "background_before_open",
+            "rss_bytes": 46354432,
+            "private_bytes": 39575552
+          },
+          {
+            "stage": "settings_open",
+            "rss_bytes": 82771968,
+            "private_bytes": 62644224
+          },
+          {
+            "stage": "after_close_without_forced_gc",
+            "rss_bytes": 79818752,
+            "private_bytes": 62742528
+          },
+          {
+            "stage": "after_test_gc",
+            "rss_bytes": 79765504,
+            "private_bytes": 62595072
+          }
+        ]
+      },
+      {
+        "mode": "lazy",
+        "samples": [
+          {
+            "stage": "background_before_open",
+            "rss_bytes": 27709440,
+            "private_bytes": 33861632
+          },
+          {
+            "stage": "settings_open",
+            "rss_bytes": 81444864,
+            "private_bytes": 62590976
+          },
+          {
+            "stage": "after_close_without_forced_gc",
+            "rss_bytes": 78843904,
+            "private_bytes": 62656512
+          },
+          {
+            "stage": "after_test_gc",
+            "rss_bytes": 77361152,
+            "private_bytes": 60583936
+          }
+        ]
+      }
+    ],
+    "environment": "GitHub Actions windows-2022",
+    "run": 35707417919
+  }
 }
