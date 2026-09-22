@@ -44,7 +44,7 @@ def request(root, action, **values):
     return response["result"]
 
 
-def until(check, message, seconds=30):
+def until(check, message, seconds=60):
     deadline = time.monotonic() + seconds
     last = None
     while time.monotonic() < deadline:
@@ -173,7 +173,9 @@ def check_observability(binary, root):
         # reconnect every two seconds. A real edit must still wake it promptly.
         time.sleep(5)
         seen = [[m['last_seen'] for m in n.call('status')['members']] for n in nodes]
+        wakes = [n.call('status')['scheduler_wakes'] for n in nodes]
         time.sleep(6)
+        assert wakes == [n.call('status')['scheduler_wakes'] for n in nodes], 'Idle scheduler keeps waking without work'
         assert seen == [[m['last_seen'] for m in n.call('status')['members']] for n in nodes], 'Idle pair keeps reconnecting'
 
         time.sleep(1.1)

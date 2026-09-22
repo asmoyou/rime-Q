@@ -21,7 +21,7 @@ use std::{
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     net::{TcpListener, TcpStream},
-    sync::oneshot,
+    sync::{oneshot, Notify},
 };
 
 pub fn now() -> u64 {
@@ -70,6 +70,7 @@ struct Peer {
     next_attempt: Instant,
     failures: u32,
     in_flight: bool,
+    reschedule: bool,
 }
 #[derive(Clone, Serialize, Deserialize)]
 struct Completion {
@@ -99,6 +100,8 @@ impl Drop for TransferGuard {
     fn drop(&mut self) { if let Ok(mut s) = self.shared.lock() { s.transfers.remove(&self.id); } }
 }
 struct State {
+    wake: Arc<Notify>,
+    scheduler_wakes: u64,
     store: Store,
     root: PathBuf,
     token: String,
@@ -705,7 +708,7 @@ async fn join(
                 address,
                 last_seen: now(),
                 next_attempt: Instant::now(),
-                failures: 0, in_flight: false,
+                failures: 0, in_flight: false, reschedule: false,
             },
         );
         persist_peers(&s)?;
@@ -713,8 +716,9 @@ async fn join(
     Ok(json!({"joined":true,"id":id}))
 }
 fn wake_peers(s: &mut State) {
+    s.wake.notify_one();
     for p in s.peers.values_mut() {
-        if p.failures == 0 { p.next_attempt = Instant::now(); }
+        if p.failures == 0 { p.next_attempt = Instant::now(); p.reschedule |= p.in_flight; }
     }
 }
 fn exchange_key(s: &State) -> Result<String> {
@@ -772,9 +776,9 @@ fn status(s: &State) -> Result<Value> {
     let last_sync_at = valid.iter().filter_map(|m| m["last_sync_at"].as_u64()).max().unwrap_or(0);
     let progress = json!({"stage":stage,"key":key,"elapsed_seconds":elapsed,"confirmed":confirmed,"total":total,
         "transfer":transfer.map(|t|t.label),"transfer_seconds":transfer.map(|t|t.started.elapsed().as_secs()).unwrap_or(0)});
-    Ok(
-        json!({"protocol":PROTOCOL,"id":s.store.id(),"group":s.store.get::<Group>("group")?,"enabled":s.store.enabled(),"can_remove":can_remove,"members":members,"pending":pending,"discovered":s.discovered.values().collect::<Vec<_>>(),"port":s.port,"bind":s.bind.to_string(),"rows":s.store.row_count()?,"version":version,"revision":revision,"waiting_input":s.store.has_pending_application()?,"network_error":network_error,"last_sync_at":last_sync_at,"progress":progress}),
-    )
+    let mut result = json!({"protocol":PROTOCOL,"id":s.store.id(),"group":s.store.get::<Group>("group")?,"enabled":s.store.enabled(),"can_remove":can_remove,"members":members,"pending":pending,"discovered":s.discovered.values().collect::<Vec<_>>(),"port":s.port,"bind":s.bind.to_string(),"rows":s.store.row_count()?,"version":version,"revision":revision,"waiting_input":s.store.has_pending_application()?,"network_error":network_error,"last_sync_at":last_sync_at,"progress":progress});
+    if s.isolated { result["scheduler_wakes"] = json!(s.scheduler_wakes); }
+    Ok(result)
 }
 
 async fn control(shared: Shared, value: Value) -> Result<Value> {
@@ -919,7 +923,7 @@ async fn control(shared: Shared, value: Value) -> Result<Value> {
                     address,
                     last_seen: 0,
                     next_attempt: Instant::now(),
-                    failures: 0, in_flight: false,
+                    failures: 0, in_flight: false, reschedule: false,
                 },
             );
             persist_peers(&s)?;
@@ -928,6 +932,7 @@ async fn control(shared: Shared, value: Value) -> Result<Value> {
         "sync_now" => {
             for p in s.peers.values_mut() {
                 p.next_attempt = Instant::now();
+                p.reschedule |= p.in_flight;
             }
             Ok(json!({"scheduled":true}))
         }
@@ -1099,7 +1104,7 @@ pub async fn run(
                     address,
                     last_seen: 0,
                     next_attempt: Instant::now(),
-                    failures: 0, in_flight: false,
+                    failures: 0, in_flight: false, reschedule: false,
                 },
             );
         }
@@ -1116,7 +1121,10 @@ pub async fn run(
         &serde_json::to_vec(&descriptor)?,
     )?;
     let seen = store.get("seen")?.unwrap_or_default();
+    let wake = Arc::new(Notify::new());
     let shared = Arc::new(Mutex::new(State {
+        wake: wake.clone(),
+        scheduler_wakes: 0,
         store,
         root,
         token,
@@ -1162,10 +1170,12 @@ pub async fn run(
                         same_secret(&s.lock().unwrap().token, &request.token),
                         "local control authentication failed"
                     );
-                    let response = match control(s, request.request).await {
+                    let should_wake = request.request["action"] != "status" && request.request["action"] != "fixture_rows";
+                    let response = match control(s.clone(), request.request).await {
                         Ok(v) => json!({"ok":true,"result":v}),
                         Err(e) => json!({"ok":false,"error":e.to_string()}),
                     };
+                    if should_wake { s.lock().unwrap().wake.notify_one(); }
                     network::write_limit(&mut stream, &response, MAX_CONTROL).await
                 };
                 let _: Result<_> = tokio::time::timeout(Duration::from_secs(145), operation)
@@ -1181,9 +1191,48 @@ pub async fn run(
     let mut discovery_state = String::new();
     let mut discovery_retry = Instant::now();
     let peer_permits = Arc::new(tokio::sync::Semaphore::new(8));
-    let mut tick = tokio::time::interval(Duration::from_millis(500));
+    let mut bind_retry = Instant::now();
+    wake.notify_one(); // Initial setup; afterwards wait for work or a deadline.
     loop {
-        tick.tick().await;
+        let deadline = {
+            let s = shared.lock().unwrap();
+            let current = Instant::now();
+            // Bound parent death detection without scanning every half second.
+            let mut next = current + Duration::from_secs(if parent_pid.is_some() { 5 } else { 60 });
+            let enabled = s.store.enabled();
+            let browsing = s.discover_until.is_some_and(|t| t > current);
+            if enabled {
+                if listener.is_none() { next = next.min(bind_retry); }
+                for peer in s.peers.values().filter(|p| !p.in_flight) { next = next.min(peer.next_attempt); }
+                if let Some(invite) = &s.invite { if invite.expires > current { next = next.min(invite.expires); } }
+            }
+            if browsing { next = next.min(s.discover_until.unwrap()); }
+            if !no_discovery && (enabled || browsing) && discovery.is_none() { next = next.min(discovery_retry); }
+            next
+        };
+        tokio::select! {
+            _ = wake.notified() => {},
+            _ = tokio::time::sleep_until(deadline.into()) => {},
+            accepted = async {
+                if let Some(l) = &listener { l.accept().await }
+                else { std::future::pending().await }
+            } => {
+                match accepted {
+                    Ok((stream, source)) if network::lan(source.ip(), isolated) => {
+                        if let Ok(permit) = peer_permits.clone().try_acquire_owned() {
+                            let s = shared.clone(); let a = acceptor.clone();
+                            tokio::spawn(async move {
+                                let _permit = permit;
+                                let _ = tokio::time::timeout(Duration::from_secs(140), serve_peer(s, stream, a)).await;
+                            });
+                        }
+                    },
+                    Err(_) => { listener = None; bind_retry = Instant::now() + Duration::from_secs(5); },
+                    _ => {},
+                }
+            }
+        }
+        shared.lock().unwrap().scheduler_wakes += 1;
         #[cfg(unix)]
         if parent_pid.is_some_and(|pid| pid != unsafe { libc::getppid() } as u32) {
             break;
@@ -1219,7 +1268,7 @@ pub async fn run(
             }
             continue;
         }
-        if listener.is_none() {
+        if listener.is_none() && Instant::now() >= bind_retry {
             match TcpListener::bind(SocketAddr::new(bind, port)).await {
                 Ok(l) => {
                     let p = l.local_addr()?.port();
@@ -1230,6 +1279,7 @@ pub async fn run(
                 Err(_) => {
                     shared.lock().unwrap().network_error =
                         Some("无法监听本地网络，请检查网络与防火墙。".into());
+                    bind_retry = Instant::now() + Duration::from_secs(5);
                     continue;
                 }
             }
@@ -1274,28 +1324,6 @@ pub async fn run(
                 }
             }
         }
-        if let Some(l) = &listener {
-            for _ in 0..8 {
-                let accepted = tokio::time::timeout(Duration::from_millis(1), l.accept()).await;
-                let Ok(Ok((stream, source))) = accepted else {
-                    break;
-                };
-                if !network::lan(source.ip(), isolated) {
-                    continue;
-                }
-                let Ok(permit) = peer_permits.clone().try_acquire_owned() else {
-                    continue;
-                };
-                let s = shared.clone();
-                let a = acceptor.clone();
-                tokio::spawn(async move {
-                    let _permit = permit;
-                    let _ =
-                        tokio::time::timeout(Duration::from_secs(140), serve_peer(s, stream, a))
-                            .await;
-                });
-            }
-        }
         let targets = {
             let mut s = shared.lock().unwrap();
             let mut targets = Vec::new();
@@ -1308,6 +1336,7 @@ pub async fn run(
             for (id, p) in due.into_iter().take(2) {
                 targets.push((id.clone(), p.address));
                 p.in_flight = true;
+                p.reschedule = false;
                 p.next_attempt = Instant::now() + Duration::from_secs(30);
             }
             targets
@@ -1319,8 +1348,10 @@ pub async fn run(
                     tokio::time::timeout(Duration::from_secs(12), sync_peer(s.clone(), address))
                         .await;
                 let mut state = s.lock().unwrap();
+                state.wake.notify_one();
                 match result {
                     Ok(Ok((id, changed))) => {
+                        let reschedule = state.peers.get(&key).is_some_and(|p| p.reschedule);
                         state.incompatible_peers.remove(&key);
                         state.incompatible_peers.retain(|key,hint|key!=&id && hint!=&id);
                         state.peers.remove(&key);
@@ -1330,8 +1361,8 @@ pub async fn run(
                             Peer {
                                 address,
                                 last_seen: now(),
-                                next_attempt: Instant::now() + Duration::from_secs(if changed { 2 } else { 30 }),
-                                failures: 0, in_flight: false,
+                                next_attempt: Instant::now() + Duration::from_secs(if changed || reschedule { 2 } else { 30 }),
+                                failures: 0, in_flight: false, reschedule: false,
                             },
                         );
                         let _ = persist_peers(&state);
@@ -1468,9 +1499,10 @@ fn discover(shared: Shared, port: u16) -> Result<Discovery> {
                             address,
                             last_seen: 0,
                             next_attempt: Instant::now(),
-                            failures: 0, in_flight: false,
+                            failures: 0, in_flight: false, reschedule: false,
                         });
                     }
+                    s.wake.notify_one();
                     s.discovered.insert(key,json!({"address":address.to_string(),"invite":info.get_property_val_str("invite").unwrap_or(""),"name":info.get_property_val_str("name").filter(|n|!n.is_empty()).unwrap_or_else(||info.get_fullname().split('.').next().unwrap_or("Rime Q")).chars().filter(|c|!c.is_control()).take(128).collect::<String>()}));
                     break;
                 }

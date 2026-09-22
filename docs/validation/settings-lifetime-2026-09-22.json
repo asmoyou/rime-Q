@@ -1,0 +1,59 @@
+{
+  "scope": "Same WPF controls in separate fresh processes; old eager/hidden lifetime versus lazy/closed lifetime. No broker, sync, real user data or forced GC in product.",
+  "runs": [
+    {
+      "mode": "eager",
+      "samples": [
+        {
+          "stage": "background_before_open",
+          "rss_bytes": 58441728,
+          "private_bytes": 53837824
+        },
+        {
+          "stage": "settings_open",
+          "rss_bytes": 97947648,
+          "private_bytes": 98791424
+        },
+        {
+          "stage": "after_close_without_forced_gc",
+          "rss_bytes": 98095104,
+          "private_bytes": 98910208
+        },
+        {
+          "stage": "after_test_gc",
+          "rss_bytes": 98021376,
+          "private_bytes": 98713600
+        }
+      ]
+    },
+    {
+      "mode": "lazy",
+      "samples": [
+        {
+          "stage": "background_before_open",
+          "rss_bytes": 31756288,
+          "private_bytes": 31567872
+        },
+        {
+          "stage": "settings_open",
+          "rss_bytes": 99545088,
+          "private_bytes": 102531072
+        },
+        {
+          "stage": "after_close_without_forced_gc",
+          "rss_bytes": 99737600,
+          "private_bytes": 102428672
+        },
+        {
+          "stage": "after_test_gc",
+          "rss_bytes": 96808960,
+          "private_bytes": 99127296
+        }
+      ]
+    }
+  ],
+  "machine": "Intel Core i5-6600K, 4 logical processors",
+  "os": "Windows-10-10.0.19045-SP0",
+  "cache": "Warm resource files, two separate fresh WPF test processes",
+  "sample_count": 1
+}

@@ -11,6 +11,19 @@ struct SyncRecord: Codable, Equatable {
 }
 struct SyncApplication: Decodable { let id: String; let before: [SyncRecord]; let after: [SyncRecord] }
 
+struct SyncExportSchedule {
+    private var observed: UInt64?
+    private var firstChange: TimeInterval = 0
+    private var lastChange: TimeInterval = 0
+    mutating func observe(_ value: UInt64, at now: TimeInterval) {
+        guard observed != value else { return }
+        if observed == nil { firstChange = now }
+        observed = value; lastChange = now
+    }
+    func due(at now: TimeInterval) -> Bool { observed != nil && (now - lastChange >= 60 || now - firstChange >= 300) }
+    mutating func reset() { observed = nil }
+}
+
 @MainActor final class DeviceSync {
     static let shared = DeviceSync()
     static let changed = Notification.Name("RimeQDeviceSyncChanged")
@@ -40,6 +53,7 @@ struct SyncApplication: Decodable { let id: String; let before: [SyncRecord]; le
     private var retryAfter: TimeInterval = 0
     private var nextCheck: TimeInterval = 0
     private var nextExport: TimeInterval = 0
+    private var exportSchedule = SyncExportSchedule()
     private var stage: String?
     private var stageSince = ProcessInfo.processInfo.systemUptime
     private func setStage(_ value: String?) {
@@ -214,8 +228,11 @@ struct SyncApplication: Decodable { let id: String; let before: [SyncRecord]; le
             guard Engine.ready else { setStage("等待输入引擎就绪"); return }
             guard !InputSession.hasComposition else { setStage("等待当前输入结束"); return }
             let remote = try JSONSerialization.data(withJSONObject: ["revision": status["revision"] ?? ""], options: .sortedKeys)
+            let clock = ProcessInfo.processInfo.systemUptime
+            if revision != QRimeLearningRevision() { exportSchedule.observe(QRimeLearningRevision(), at: clock) } else { exportSchedule.reset() }
+            let urgent = remote != version || status["waiting_input"] as? Bool == true || lastError != nil
             guard force || lastError != nil || revision != QRimeLearningRevision() || remote != version || status["waiting_input"] as? Bool == true else { setStage(nil); return }
-            guard force || lastError != nil || status["waiting_input"] as? Bool == true || ProcessInfo.processInfo.systemUptime >= nextExport else { return }
+            guard force || urgent || (exportSchedule.due(at: clock) && clock >= nextExport) else { setStage(nil); return }
             nextExport = ProcessInfo.processInfo.systemUptime + 60
             setStage("正在读取本机学习记录")
             await Task.yield()
@@ -243,7 +260,11 @@ struct SyncApplication: Decodable { let id: String; let before: [SyncRecord]; le
                 setStage("正在校验写入并确认")
                 _ = try await request(["action": "acknowledge", "id": value.id, "rows": observed.map(\.object)])
             }
-            revision = capturedRevision; version = remote; lastError = nil; retryAfter = 0; setStage(nil)
+            let completed = try await request(["action": "status"])
+            let applied = (completed["members"] as? [[String: Any]])?.contains { $0["self"] as? Bool == true && $0["applied"] as? Bool == true } ?? false
+            // Do not cache a newer remote revision which has not reached this engine.
+            if applied { version = try JSONSerialization.data(withJSONObject: ["revision": completed["revision"] ?? ""], options: .sortedKeys) } else { version = remote }
+            exportSchedule.reset(); revision = capturedRevision; lastError = nil; retryAfter = 0; setStage(nil)
         } catch {
             lastError = error.localizedDescription + "\n30 秒后自动重试，也可点“立即同步”。"
             retryAfter = ProcessInfo.processInfo.systemUptime + 30

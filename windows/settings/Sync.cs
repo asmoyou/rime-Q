@@ -22,6 +22,18 @@ namespace RimeQ {
     internal sealed class SyncStatus {public string id {get;set;} public SyncGroup group {get;set;} public bool enabled {get;set;} public List<SyncMember> members {get;set;} public List<SyncPending> pending {get;set;} public List<SyncNearby> discovered {get;set;} public int port {get;set;} public bool waiting_input {get;set;} public Dictionary<string,long> version {get;set;} public string network_error {get;set;} public string revision {get;set;} public bool can_remove {get;set;} public long last_sync_at {get;set;} public SyncProgress progress {get;set;}}
     internal sealed class SyncInvitation {public string invite {get;set;} public string code {get;set;} public int expires_in {get;set;} public int port {get;set;}}
     internal sealed class SyncDescriptor {public string address {get;set;} public string token {get;set;}}
+    // Coalesce local learning; the clock is supplied so boundaries are testable.
+    internal sealed class SyncExportSchedule {
+        string observed;
+        long firstChange, lastChange;
+        internal void Observe(string value,long now) {
+            if(observed==value)return;
+            if(observed==null)firstChange=now;
+            observed=value;lastChange=now;
+        }
+        internal bool Due(long now) { return observed!=null && (now-lastChange>=60000 || now-firstChange>=300000); }
+        internal void Reset() { observed=null; }
+    }
     internal static class DeviceSync {
         internal static string Root {get{return Path.Combine(Paths.Root,"sync");}}
         internal static string LastError {get;private set;}
@@ -32,6 +44,7 @@ namespace RimeQ {
         static string startupFailure;
         static readonly Stopwatch retryClock=Stopwatch.StartNew();
         static long retryAfter,nextCheck,nextExport;
+        static readonly SyncExportSchedule exportSchedule = new SyncExportSchedule();
         static readonly Stopwatch stageClock=Stopwatch.StartNew();
         static string stage;
         static void Stage(string value){if(stage!=value){stage=value;stageClock.Restart();if(Changed!=null)Changed();}}
@@ -131,8 +144,11 @@ namespace RimeQ {
                 var status=await EnsureStarted();if(!status.enabled||status.group==null)return;
                 var probe=await EngineRequest(10);if(!probe.Ready||!probe.Handled){LastState="等待当前输入结束";Stage(probe.Ready?"等待当前输入结束":"等待输入引擎就绪");return;}
                 var remote=status.revision;
+                if(probe.Message!=revision)exportSchedule.Observe(probe.Message,retryClock.ElapsedMilliseconds);
+                else exportSchedule.Reset();
+                bool urgent=remote!=version||status.waiting_input||LastError!=null;
                 if(!force&&LastError==null&&probe.Message==revision&&remote==version&&!status.waiting_input){LastState=lastAppliedState;Stage(null);return;}
-                if(!force&&!status.waiting_input&&LastError==null&&retryClock.ElapsedMilliseconds<nextExport)return;
+                if(!force&&!urgent&&(!exportSchedule.Due(retryClock.ElapsedMilliseconds)||retryClock.ElapsedMilliseconds<nextExport)){Stage(null);return;}
                 nextExport=retryClock.ElapsedMilliseconds+60000;
                 Stage("正在读取本机学习记录");
                 var exported=await EngineRequest(11);if(!exported.Handled){LastState="等待当前输入结束";Stage(LastState);return;}
@@ -152,7 +168,11 @@ namespace RimeQ {
                     actual=ToSync(DictionaryData.Parse(File.ReadAllText(path,new UTF8Encoding(false,true))));
                     await Call<object>(new {action="acknowledge",id=job.id,rows=actual});revision=applied.Message;
                 }else revision=exported.Message;
-                version=remote;LastError=null;retryAfter=0;LastState=lastAppliedState="本机学习记录已完整应用";Stage(null);
+                // Only remember a revision confirmed applied by this engine.
+                // New remote rows can arrive between capture and this status read.
+                var completed=await Call<SyncStatus>(new {action="status"});
+                version=completed.members!=null&&completed.members.Any(m=>m.self&&m.applied)?completed.revision:remote;
+                exportSchedule.Reset();LastError=null;retryAfter=0;LastState=lastAppliedState="本机学习记录已完整应用";Stage(null);
             }catch(Exception error){LastError=error.Message;LastState="同步暂未完成，30 秒后自动重试";Stage("同步失败，等待自动重试");retryAfter=retryClock.ElapsedMilliseconds+30000;}finally{busy=false;if(Changed!=null)Changed();}
         }
         internal static async Task RecoverLocal(){

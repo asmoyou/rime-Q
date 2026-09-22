@@ -67,7 +67,7 @@ namespace RimeQ {
             input.TextChanged+=(s,e)=>update();input.GotKeyboardFocus+=(s,e)=>update();input.LostKeyboardFocus+=(s,e)=>update();update();return host;
         }
         void DictionaryStatus(string text) { if(dictionaryStatus!=null) dictionaryStatus.Text=text; }
-        async void LoadDictionaryOnOpen() { try { await LoadDictionary(); } catch(Exception error) { if(selected==1) Error(error); } }
+        async void LoadDictionaryOnOpen() { try { await LoadDictionary(); } catch(Exception error) { if(!closed&&selected==1) Error(error); } }
         async Task LoadDictionary() {
             var target=dictionary;int version=++dictionaryLoadVersion;dictionaryBusy=true;DictionaryStatus("正在读取…");UpdateDictionaryActions();
             try { var loaded=await DictionaryLoader();if(selected!=1||dictionary!=target||dictionaryLoadVersion!=version)return;SetDictionaryRows(loaded); }
@@ -96,7 +96,7 @@ namespace RimeQ {
         }
         async Task ChangeDictionary(string pending,Func<Task<List<DictionaryRow>>> operation) {
             dictionaryBusy=true;DictionaryStatus(pending);UpdateDictionaryActions();
-            try { var loaded=await operation();if(selected==1)SetDictionaryRows(loaded); }
+            try { var loaded=await operation();if(!closed&&selected==1)SetDictionaryRows(loaded); }
             finally { dictionaryBusy=false;if(selected==1)UpdateDictionaryActions(); }
         }
         async Task EditDictionary(DictionaryRow entry) {

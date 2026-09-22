@@ -29,7 +29,8 @@ namespace RimeQ {
         readonly Dictionary<int, TextBlock> checks = new Dictionary<int, TextBlock>();
         readonly List<NativePreview> previews = new List<NativePreview>();
         int selected, dictionaryLoadVersion;
-        bool dark, dictionaryBusy;
+        bool dark, dictionaryBusy, closed;
+        internal int SelectedPage { get { return selected; } }
         TextBlock updateStatus, updateCheckedAt, modelStatus, selectionStatus;
         ProgressBar modelProgress;
         Button download, cancel, remove, catUse;
@@ -64,12 +65,12 @@ namespace RimeQ {
             footer.Children.Add(Navigation("使用说明","help",() => Paths.Open(Path.Combine(Paths.App,"help","index.html"))));
             footer.Children.Add(Navigation("GitHub 项目","code",() => Paths.Open(Paths.Project))); AddNav("版本与更新",3,"update",footer);
             updates.Changed += UpdateChanged; model.Changed += ModelChanged; this.resources.Changed += ResourcesChanged; SystemEvents.UserPreferenceChanged += SystemChanged;
-            Window.Closed += (s,e) => { updates.Changed -= UpdateChanged; model.Changed -= ModelChanged; this.resources.Changed -= ResourcesChanged; SystemEvents.UserPreferenceChanged -= SystemChanged; };
+            Window.Closed += (s,e) => { closed=true; ++dictionaryLoadVersion; page.Children.Clear(); pageAction.Children.Clear(); previews.Clear(); rows=null; dictionaryAll=null; if(dictionary!=null)dictionary.ItemsSource=null; updates.Changed -= UpdateChanged; model.Changed -= ModelChanged; this.resources.Changed -= ResourcesChanged; SystemEvents.UserPreferenceChanged -= SystemChanged; };
             ShowPage(0);
         }
-        void UpdateChanged() { Window.Dispatcher.BeginInvoke(new Action(RefreshUpdate)); }
-        void ModelChanged() { Window.Dispatcher.BeginInvoke(new Action(() => { RefreshModel(); RefreshResources(); })); }
-        void ResourcesChanged() { Window.Dispatcher.BeginInvoke(new Action(RefreshResources)); }
+        void UpdateChanged() { if(!closed)Window.Dispatcher.BeginInvoke(new Action(() => {if(!closed)RefreshUpdate();})); }
+        void ModelChanged() { if(!closed)Window.Dispatcher.BeginInvoke(new Action(() => { if(!closed) { RefreshModel(); RefreshResources(); } })); }
+        void ResourcesChanged() { if(!closed)Window.Dispatcher.BeginInvoke(new Action(() => {if(!closed)RefreshResources();})); }
         void SystemChanged(object sender, UserPreferenceChangedEventArgs args) { Window.Dispatcher.BeginInvoke(new Action(() => SetAppearance(Appearance.SystemDark))); }
         internal void SetAppearance(bool value) { dark = value; Appearance.Apply(Window,dark); foreach (var preview in previews) preview.Dark = dark; }
         Brush Brush(string color) { return new SolidColorBrush((Color)ColorConverter.ConvertFromString(color)); }
@@ -147,6 +148,8 @@ namespace RimeQ {
             previews.Add(preview); return preview;
         }
         internal void ShowPage(int id) {
+            if(closed)return;
+            ++dictionaryLoadVersion; rows=null; dictionaryAll=null; if(dictionary!=null)dictionary.ItemsSource=null; dictionary=null;
             selected = id; page.Children.Clear(); pageAction.Children.Clear(); previews.Clear(); choices.Clear(); checks.Clear();
             updateStatus = updateCheckedAt = modelStatus = selectionStatus = null; grammar = null; modelProgress = null; download = cancel = remove = catUse = null; advancedCard = null;
             resourceTable=null;resourceProgress=null;resourceDetail=resourceStatus=null;resourceImport=resourceToggle=resourceRemove=resourceBrowse=resourceExport=resourceApply=null;resourceRows=null;

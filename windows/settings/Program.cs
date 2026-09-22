@@ -15,7 +15,11 @@ namespace RimeQ {
     internal static class Program {
         static Application app;
         static SettingsWindow settings;
-        static bool exiting;
+        static Updates updates;
+        static ModelManager model;
+        static DictionaryResources resources;
+        static int lastPage;
+        static bool maintaining;
         internal static void About() {
             var window=new Window { Title="关于 Rime Q",Width=460,Height=285,ResizeMode=ResizeMode.NoResize,WindowStartupLocation=WindowStartupLocation.CenterScreen,ShowInTaskbar=false };
             if(settings!=null&&settings.Window.IsVisible){window.Owner=settings.Window;window.WindowStartupLocation=WindowStartupLocation.CenterOwner;}
@@ -79,9 +83,7 @@ namespace RimeQ {
                     using (var quit = new EventWaitHandle(false, EventResetMode.AutoReset, prefix + "Quit", out created, security)) {
                         app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
                         app.DispatcherUnhandledException += (s,e) => { MessageBox.Show("操作未完成：" + e.Exception.Message, "Rime Q", MessageBoxButton.OK, MessageBoxImage.Warning); e.Handled = true; };
-                        var updates = new Updates(); var model = new ModelManager(); var resources = new DictionaryResources();
-                        settings = new SettingsWindow(updates, model, resources);
-                        settings.Window.Closing += (s,e) => { if (!exiting) { e.Cancel = true; settings.Window.Hide(); } };
+                        updates = new Updates(); model = new ModelManager(); resources = new DictionaryResources();
                         var tray = new Forms.NotifyIcon { Text = "Rime Q", Icon = System.Drawing.Icon.ExtractAssociatedIcon(Path.Combine(Paths.App, "RimeQ.exe")), Visible = true };
                         var menu = new Forms.ContextMenuStrip();
                         menu.Items.Add("设置", null, (s,e) => Show(null));
@@ -94,16 +96,21 @@ namespace RimeQ {
                         updates.Changed += () => { tray.Text=updates.Result.State=="available"?"Rime Q · 有新版本":"Rime Q";updateItem.Text=updates.Result.State=="available"?"发现新版本 "+updates.Result.Tag+"…":"检查更新…"; };
                         Paths.Start("RimeQ.Broker.exe", "--serve");
                         var launchTime = DateTime.UtcNow;
-                        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+                        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
+                        // Wait on kernel events instead of polling them every second.
+                        var showWait = ThreadPool.RegisterWaitForSingleObject(show, (state, timedOut) => app.Dispatcher.BeginInvoke(new Action(() => Show(Paths.Get("RequestedPage") == "3" ? 3 : (int?)null))), null, Timeout.Infinite, false);
+                        var quitWait = ThreadPool.RegisterWaitForSingleObject(quit, (state, timedOut) => app.Dispatcher.BeginInvoke(new Action(() => app.Shutdown())), null, Timeout.Infinite, true);
                         timer.Tick += async (s,e) => {
-                            if (quit.WaitOne(0)) { exiting = true; tray.Dispose(); timer.Stop(); app.Shutdown(); return; }
-                            if (show.WaitOne(0)) Show(Paths.Get("RequestedPage") == "3" ? 3 : (int?)null);
-                            if (DateTime.UtcNow - launchTime >= TimeSpan.FromSeconds(30)) {
-                                try { await updates.Check(false); } catch (System.IO.IOException) { } catch (UnauthorizedAccessException) { }
-                            }
-                            if (model.Valid && !File.Exists(Paths.Model) && !model.Busy) await model.Restore();
-                            model.RefreshEngineStatus();
-                            await DeviceSync.Tick();
+                            if (maintaining) return;
+                            maintaining = true;
+                            try {
+                                if (DateTime.UtcNow - launchTime >= TimeSpan.FromSeconds(30)) {
+                                    try { await updates.Check(false); } catch (System.IO.IOException) { } catch (UnauthorizedAccessException) { }
+                                }
+                                if (model.Valid && !File.Exists(Paths.Model) && !model.Busy) await model.Restore();
+                                model.RefreshEngineStatus();
+                                await DeviceSync.Tick();
+                            } finally { maintaining = false; }
                         };
                         timer.Start();
                         app.Startup += async (s,e) => {
@@ -114,7 +121,10 @@ namespace RimeQ {
                             } catch(Exception error) { Paths.Set("DictionaryStatus","词库配置更新失败，继续使用原资源："+error.Message); }
                         };
                         if (action != "--background") Show(action == "--updates" ? 3 : (int?)null);
-                        app.Run(); DeviceSync.Stop(); tray.Dispose(); mutex.ReleaseMutex();
+                        try { app.Run(); } finally {
+                            showWait.Unregister(null); quitWait.Unregister(null); timer.Stop();
+                            DeviceSync.Stop(); tray.Dispose(); mutex.ReleaseMutex();
+                        }
                     }
                 }
                 return 0;
@@ -122,6 +132,20 @@ namespace RimeQ {
                 MessageBox.Show("Rime Q 未能完成操作：" + error.Message, "Rime Q", MessageBoxButton.OK, MessageBoxImage.Warning); return 1;
             }
         }
-        static void Show(int? page) { if(page.HasValue)settings.ShowPage(page.Value);else settings.ActivateCurrent();settings.Window.Show();settings.Window.WindowState=WindowState.Normal;settings.Window.Activate(); }
+        internal static SettingsWindow OpenSettings(Updates updates, ModelManager model, DictionaryResources resources, int? page) {
+            if(settings==null) {
+                var created = new SettingsWindow(updates, model, resources);
+                settings = created;
+                created.Window.Closed += (s,e) => {
+                    lastPage = created.SelectedPage;
+                    if(ReferenceEquals(settings,created)) settings = null;
+                };
+                if(created.SelectedPage!=(page ?? lastPage))created.ShowPage(page ?? lastPage);
+            } else if(page.HasValue) settings.ShowPage(page.Value);
+            else settings.ActivateCurrent();
+            settings.Window.Show();settings.Window.WindowState=WindowState.Normal;settings.Window.Activate();
+            return settings;
+        }
+        static void Show(int? page) { OpenSettings(updates,model,resources,page); }
     }
 }

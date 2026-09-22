@@ -68,6 +68,15 @@ import QRimeBridge
                     response = ["error": sync.lastError as Any? ?? NSNull(), "composition": InputSession.hasComposition, "document": client.document,
                                 "progress": sync.progressText(["enabled": true])]
                 case "throttle":
+                    var schedule = SyncExportSchedule()
+                    try EngineSmoke.check(!schedule.due(at: 900), "clean dictionary scheduled export")
+                    schedule.observe(1, at: 1)
+                    try EngineSmoke.check(!schedule.due(at: 60.9) && schedule.due(at: 61), "quiet window boundary")
+                    schedule.reset(); schedule.observe(1, at: 1)
+                    for i in 1...29 { schedule.observe(UInt64(i+1), at: Double(1+i*10)) }
+                    try EngineSmoke.check(!schedule.due(at: 300.9) && schedule.due(at: 301), "continuous learning bound")
+                    schedule.reset()
+                    try EngineSmoke.check(!schedule.due(at: 900), "completed export left dirty schedule")
                     defaults.set(true, forKey: "SyncStarted")
                     try wait { await sync.tick(force: true) }
                     var requests = 0
