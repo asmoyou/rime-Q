@@ -1,5 +1,6 @@
 #include "candidate.h"
 #include "identity.h"
+#include "taskbar_icon.h"
 #include <msctf.h>
 #include <ctffunc.h>
 #include <ctfutb.h>
@@ -125,7 +126,7 @@ public:
 HICON modeIcon(bool ascii) {
     const int size = std::clamp(GetSystemMetrics(SM_CXSMICON), 16, 64);
     // GDI text does not supply alpha. Render grayscale coverage first, then build
-    // premultiplied white pixels; ClearType would leave coloured fringes in a tray icon.
+    // premultiplied taskbar-theme pixels; ClearType would leave coloured fringes.
     std::vector<DWORD> coverage(size * size);
     const int maskStride = ((size + 15) / 16) * 2;
     std::vector<BYTE> maskBits(maskStride * size, 0xff);
@@ -155,11 +156,12 @@ HICON modeIcon(bool ascii) {
     // Centre the visible strokes, rather than the font's advance and baseline box.
     const int dx = (size - (right - left + 1)) / 2 - left;
     const int dy = (size - (bottom - top + 1)) / 2 - top;
+    const auto ink = rq::taskbarInk();
     std::fill_n(pixels, size * size, 0);
     for (int y = top; y <= bottom; ++y) for (int x = left; x <= right; ++x) {
         auto alpha = coverage[y * size + x];
         const int px = x + dx, py = y + dy;
-        pixels[py * size + px] = alpha * 0x01010101u;
+        pixels[py * size + px] = rq::taskbarPixel(alpha, ink);
         if (alpha) maskBits[py * maskStride + px / 8] &= static_cast<BYTE>(~(0x80u >> (px % 8)));
     }
     auto mask = CreateBitmap(size, size, 1, 1, maskBits.data());
@@ -173,6 +175,7 @@ public:
     std::function<void()> action;
     ModeBar(){InterlockedIncrement(&rqObjects);}~ModeBar(){InterlockedDecrement(&rqObjects);}
     void set(bool ascii){if(ascii_==ascii)return;ascii_=ascii;if(sink_)sink_->OnUpdate(TF_LBI_BTNALL|TF_LBI_STATUS);}
+    void iconChanged(){if(sink_)sink_->OnUpdate(TF_LBI_ICON);}
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid,void** out) override {
         if(!out)return E_POINTER;*out=nullptr;
         if(iid==IID_IUnknown||iid==IID_ITfLangBarItem||iid==IID_ITfLangBarItemButton)*out=static_cast<ITfLangBarItemButton*>(this);
@@ -200,6 +203,7 @@ public:
     LanguageBar() { InterlockedIncrement(&rqObjects); }
     ~LanguageBar() { InterlockedDecrement(&rqObjects); }
     void changed(){if(sink_)sink_->OnUpdate(TF_LBI_STATUS);}
+    void iconChanged(){if(sink_)sink_->OnUpdate(TF_LBI_ICON);}
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** out) override {
         if (!out) return E_POINTER; *out = nullptr;
         if (iid == IID_IUnknown || iid == IID_ITfLangBarItem || iid == IID_ITfLangBarItemButton) *out = static_cast<ITfLangBarItemButton*>(this);
@@ -232,7 +236,10 @@ public:
     }
     HRESULT STDMETHODCALLTYPE OnMenuSelect(UINT id) override { if (id > 6) return E_INVALIDARG; if (action) action(id); return S_OK; }
     HRESULT STDMETHODCALLTYPE GetIcon(HICON* out) override {
-        if (!out) return E_POINTER; *out = static_cast<HICON>(LoadImageW(rqModule, MAKEINTRESOURCEW(101), IMAGE_ICON, 16, 16, 0)); return *out ? S_OK : E_FAIL;
+        if (!out) return E_POINTER; *out = nullptr;
+        try { *out = rq::taskbarIcon(rqModule, std::clamp(GetSystemMetrics(SM_CXSMICON), 16, 64), rq::taskbarInk()); }
+        catch (...) { return E_OUTOFMEMORY; }
+        return *out ? S_OK : E_FAIL;
     }
     HRESULT STDMETHODCALLTYPE GetText(BSTR* out) override { if (!out) return E_POINTER; *out = SysAllocString(L"Rime Q"); return *out ? S_OK : E_OUTOFMEMORY; }
     HRESULT STDMETHODCALLTYPE AdviseSink(REFIID iid, IUnknown* unknown, DWORD* cookie) override {
@@ -516,6 +523,10 @@ class Service final : public ITfTextInputProcessorEx, public ITfKeyEventSink, pu
             self = static_cast<Service*>(reinterpret_cast<CREATESTRUCTW*>(lparam)->lpCreateParams);
             SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
         }
+        if (self && (message == WM_SETTINGCHANGE || message == WM_THEMECHANGED || message == WM_SYSCOLORCHANGE || message == WM_DISPLAYCHANGE)) {
+            if (self->languageBar_) self->languageBar_->iconChanged();
+            if (self->modeBar_) self->modeBar_->iconChanged();
+        }
         if (self && message == WM_TIMER && !self->ready_) {
             rq::State state;
             if (self->client_.exchange({rq::Command::hello}, state, 30) && state.ready) { self->ready_ = true; self->state_ = std::move(state); self->initializeMode(); }
@@ -577,7 +588,8 @@ public:
             modeBar_.Attach(new ModeBar());modeBar_->action=[this]{toggleMode();};modeBar_->set(state_.ascii);
             if(SUCCEEDED(CoCreateInstance(CLSID_TF_LangBarItemMgr,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(&barManager_)))&&barManager_){barManager_->AddItem(languageBar_.Get());barManager_->AddItem(modeBar_.Get());}
             WNDCLASSEXW wc{sizeof(wc)}; wc.hInstance = rqModule; wc.lpfnWndProc = timerProcedure; wc.lpszClassName = L"RimeQ.TsfTimer.v1";
-            RegisterClassExW(&wc); timer_ = CreateWindowExW(0, wc.lpszClassName, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, rqModule, this);
+            // An invisible top-level window receives theme broadcasts; message-only windows do not.
+            RegisterClassExW(&wc); timer_ = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, wc.lpszClassName, L"", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, rqModule, this);
             if (timer_) SetTimer(timer_, 1, 500, nullptr);
             rq::State state;
             if (client_.exchange({rq::Command::hello}, state, 150) && state.ready) { ready_ = true; state_ = std::move(state); initializeMode(); }

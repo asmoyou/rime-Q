@@ -62,10 +62,12 @@ def csharp(output, sources, build, resources=(), main=None, console=False):
     for name in references: options.append('/reference:' + str(framework / (name + '.dll')))
     for name in ['PresentationCore', 'PresentationFramework', 'WindowsBase', 'UIAutomationTypes']: options.append('/reference:' + str(framework / 'WPF' / (name + '.dll')))
     for path, name in resources: options.append('/resource:' + str(path) + ',' + name)
+    options.append('/resource:' + str(ROOT / 'windows/resources/Brand.xaml') + ',Brand.xaml')
+    options.append('/resource:' + str(ROOT / 'windows/resources/TaskbarQ.ico') + ',TaskbarQ.ico')
     if main: options.append('/main:' + main)
     metadata = ROOT / 'build-windows/AssemblyVersion.cs'
     metadata.write_text('using System.Reflection;\n[assembly: AssemblyTitle("Rime Q")]\n[assembly: AssemblyProduct("Rime Q")]\n'
-                        f'[assembly: AssemblyVersion("0.4.7.{build}")]\n[assembly: AssemblyFileVersion("0.4.7.{build}")]\n', encoding='utf-8')
+                        f'[assembly: AssemblyVersion("0.4.8.{build}")]\n[assembly: AssemblyFileVersion("0.4.8.{build}")]\n', encoding='utf-8')
     options.extend([metadata, *sources]); run(*options)
 
 
@@ -75,6 +77,7 @@ def build(args):
     if args.smoke: run('python', ROOT / 'scripts/test_windows_resources.py')
     output = ROOT / 'build-windows'; output.mkdir(exist_ok=True); icon(output / 'RimeQ.ico')
     if args.smoke: run('python', ROOT / 'scripts/test_windows_installer_ui.py')
+    if args.smoke: run('python', ROOT / 'scripts/test_windows_taskbar_icon.py')
     if args.smoke or args.installer_tests_only:
         csharp(output / 'Installer.Tests.exe', [ROOT / 'windows/installer/Setup.cs', ROOT / 'windows/tests/InstallerRegistryTests.cs'],
                args.build, main='RimeQ.InstallerRegistryTests', console=True)
@@ -141,7 +144,7 @@ def build(args):
     if list(stage.rglob('*.gram')): raise RuntimeError('Optional model found in installation payload')
     files = {str(file.relative_to(stage)).replace('\\','/'): hashlib.sha256(file.read_bytes()).hexdigest()
              for file in sorted(stage.rglob('*')) if file.is_file() and file.name != 'payload.json'}
-    (stage / 'payload.json').write_text(json.dumps({'version':'0.4.7', 'build':args.build, 'files':files}, indent=2), encoding='utf-8')
+    (stage / 'payload.json').write_text(json.dumps({'version':'0.4.8', 'build':args.build, 'files':files}, indent=2), encoding='utf-8')
     payload = output / 'payload.zip'
     # Crate source notices may retain epoch timestamps. Clamp ZIP metadata to
     # its supported range while preserving the licensed source bytes.
@@ -149,19 +152,19 @@ def build(args):
         for file in sorted(stage.rglob('*')):
             if file.is_file(): archive.write(file, file.relative_to(stage))
     dist = ROOT / 'dist'; dist.mkdir(exist_ok=True)
-    setup = dist / 'RimeQ-0.4.7-windows-x64.exe'
+    setup = dist / 'RimeQ-0.4.8-windows-x64.exe'
     csharp(setup, [ROOT / 'windows/installer/Setup.cs'], args.build, [(payload, 'payload.zip')], main='RimeQ.Setup')
     import tempfile
     with tempfile.TemporaryDirectory(prefix='rimeq-package-') as verified:
         run(setup, '--verify-payload', verified)
     checksum = hashlib.sha256(setup.read_bytes()).hexdigest()
-    (dist / 'RimeQ-0.4.7-windows-SHA256SUMS.txt').write_text(checksum + '  ' + setup.name + '\n', encoding='utf-8')
+    (dist / 'RimeQ-0.4.8-windows-SHA256SUMS.txt').write_text(checksum + '  ' + setup.name + '\n', encoding='utf-8')
     print(f'Built {setup}\nSHA-256 {checksum}')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--build', type=int, default=9145)
+    parser.add_argument('--build', type=int, default=9149)
     parser.add_argument('--reuse-resources', action='store_true')
     parser.add_argument('--smoke', action='store_true')
     parser.add_argument('--no-package', action='store_true')

@@ -1,3 +1,5 @@
 #define RIMEQ_FILETYPE VFT_DLL
 #include "version.rcinc"
-101 ICON "RimeQ.ico"
+// The registered input-source indicator extracts index 0 independently of GetIcon.
+101 ICON "TaskbarQ.ico"
+102 ICON "TaskbarQ.ico"

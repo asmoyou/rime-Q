@@ -83,11 +83,11 @@ namespace RimeQ {
             var versionLabel=Text("版本 "+version.ToString(3)+"  ·  构建 "+version.Revision,11,true);versionLabel.VerticalAlignment=VerticalAlignment.Bottom;DockPanel.SetDock(versionLabel,Dock.Bottom);side.Children.Add(versionLabel);
             var sideContent=new StackPanel();side.Children.Add(sideContent);
             var brand=new StackPanel {Orientation=Orientation.Horizontal,Margin=new Thickness(0,0,0,38)};
-            try {
-                using(var icon=System.Drawing.Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location)) {
-                    var source=System.Windows.Interop.Imaging.CreateBitmapSourceFromHIcon(icon.Handle,Int32Rect.Empty,BitmapSizeOptions.FromWidthAndHeight(42,42));source.Freeze();brand.Children.Add(new Image {Source=source,Width=42,Height=42,Margin=new Thickness(0,0,11,0)});
-                }
-            } catch { var mark=Text("Q",30);mark.FontWeight=FontWeights.Bold;mark.SetResourceReference(TextBlock.ForegroundProperty,"Accent");mark.Margin=new Thickness(0,0,11,0);brand.Children.Add(mark); }
+            using(var stream=Assembly.GetExecutingAssembly().GetManifestResourceStream("Brand.xaml")) {
+                var mark=(FrameworkElement)System.Windows.Markup.XamlReader.Load(stream);
+                mark.Width=42;mark.Height=42;mark.Margin=new Thickness(0,0,11,0);mark.IsHitTestVisible=false;
+                brand.Children.Add(mark);
+            }
             var names=new StackPanel {VerticalAlignment=VerticalAlignment.Center};var product=Text("Rime Q",18);product.FontWeight=FontWeights.SemiBold;names.Children.Add(product);names.Children.Add(Text(uninstall?"卸载程序":"安装程序",11,true));brand.Children.Add(names);sideContent.Children.Add(brand);
             var steps=new StackPanel();Step(steps,0,"准备");Step(steps,1,uninstall?"移除":"安装");Step(steps,2,"完成");sideContent.Children.Add(steps);
 

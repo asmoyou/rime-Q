@@ -119,7 +119,9 @@ Mac 保留原来的单个 Rime Q 输入源和 Q 图标，输入时另用“中 /
 
 ## 从源码构建
 
-Windows 客户端构建：`python scripts/build_windows.py --smoke`，产物为 `dist/RimeQ-0.4.7-windows-x64.exe`。原生 TSF、独立引擎服务、WPF 设置、个人词库、词库资源、可选模型及安装步骤见 [Windows 说明](docs/WINDOWS.md)。macOS 与 Windows 使用相同的设置页能力、词库与模型规则及操作流程，系统输入接入和原生控件分别适配；一致性契约见 [客户端功能一致性](docs/CLIENT_PARITY.md)。
+Windows 客户端构建：`python scripts/build_windows.py --smoke`，产物为 `dist/RimeQ-0.4.8-windows-x64.exe`。原生 TSF、独立引擎服务、WPF 设置、个人词库、词库资源、可选模型及安装步骤见 [Windows 说明](docs/WINDOWS.md)。macOS 与 Windows 使用相同的设置页能力、词库与模型规则及操作流程，系统输入接入和原生控件分别适配；一致性契约见 [客户端功能一致性](docs/CLIENT_PARITY.md)。
+
+正在准备 0.4.8：Windows 单色 Q 新图标已接入源码，深色任务栏使用纯白字形，尚未公开发布；各图标入口的显示规则与素材生成方式见 [图标说明](docs/plans/2026-09-27-windows-logo-design.md)。
 
 macOS 客户端构建需要 macOS 13+、Xcode 工具链和 Python 3.10+。首次构建会下载并核验固定版本依赖。
 
@@ -129,7 +131,7 @@ cd rime-Q
 python3 scripts/build_macos.py --universal --smoke
 ```
 
-产物为 `dist/RimeQ-0.4.7-macos-universal.pkg`。已有资源缓存时可加 `--reuse-resources`；默认只保留 PKG，临时应用在打包后清理。
+产物为 `dist/RimeQ-0.4.8-macos-universal.pkg`。已有资源缓存时可加 `--reuse-resources`；默认只保留 PKG，临时应用在打包后清理。
 
 构建检查包括真实引擎与学习、快捷输入、词库管理、原生设置操作、候选皮肤、安装状态、更新版本比较和每日调度。CI 还会在独立运行环境安装实际 PKG，核验启用或明确的待启用处理，并验证卸载保留数据。
 

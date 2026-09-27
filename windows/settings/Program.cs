@@ -84,7 +84,9 @@ namespace RimeQ {
                         app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
                         app.DispatcherUnhandledException += (s,e) => { MessageBox.Show("操作未完成：" + e.Exception.Message, "Rime Q", MessageBoxButton.OK, MessageBoxImage.Warning); e.Handled = true; };
                         updates = new Updates(); model = new ModelManager(); resources = new DictionaryResources();
-                        var tray = new Forms.NotifyIcon { Text = "Rime Q", Icon = System.Drawing.Icon.ExtractAssociatedIcon(Path.Combine(Paths.App, "RimeQ.exe")), Visible = true };
+                        var tray = new Forms.NotifyIcon { Text = "Rime Q" };
+                        var taskbarIcon = new TaskbarIcon(tray, app.Dispatcher);
+                        tray.Visible = true;
                         var menu = new Forms.ContextMenuStrip();
                         menu.Items.Add("设置", null, (s,e) => Show(null));
                         menu.Items.Add("个人数据文件夹", null, (s,e) => Paths.Open(Paths.Root));
@@ -123,7 +125,7 @@ namespace RimeQ {
                         if (action != "--background") Show(action == "--updates" ? 3 : (int?)null);
                         try { app.Run(); } finally {
                             showWait.Unregister(null); quitWait.Unregister(null); timer.Stop();
-                            DeviceSync.Stop(); tray.Dispose(); mutex.ReleaseMutex();
+                            DeviceSync.Stop(); taskbarIcon.Dispose(); tray.Dispose(); mutex.ReleaseMutex();
                         }
                     }
                 }

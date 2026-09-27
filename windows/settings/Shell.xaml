@@ -94,7 +94,7 @@
     <Border Background="{DynamicResource SidebarBackground}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,1,0">
       <DockPanel Margin="12,26,12,16">
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,28">
-          <Image x:Name="BrandIcon" Width="34" Height="34" Margin="0,0,10,0"/>
+          <ContentControl x:Name="BrandIcon" Width="34" Height="34" Margin="0,0,10,0" Focusable="False" IsHitTestVisible="False"/>
           <StackPanel VerticalAlignment="Center"><TextBlock Text="Rime Q" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="输入法设置" FontSize="11" Foreground="{DynamicResource SecondaryColor}" Margin="0,2,0,0"/></StackPanel>
         </StackPanel>
         <StackPanel x:Name="Footer" DockPanel.Dock="Bottom"/>

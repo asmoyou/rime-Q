@@ -1,0 +1,28 @@
+{
+  "build": "0.4.7.9147",
+  "installed_directory": "C:\\Program Files\\RimeQ\\versions\\0.4.7.9147-0d39a5a3f8fc4ee09a6c067dd8de9c38",
+  "system_preferences": {
+    "SystemUsesLightTheme": 0,
+    "AppsUseLightTheme": 1
+  },
+  "expected_taskbar_ink": "#FFFFFF",
+  "checks": {
+    "RimeQ.Control.exe--verify": {
+      "exit_code": 0,
+      "status": "enabled-or-completed hr=0x0"
+    },
+    "RimeQ.Broker.exe--ping": {
+      "exit_code": 0,
+      "status": "ready"
+    }
+  },
+  "installed_files_sha256": {
+    "RimeQ.ico": "0e149080ea18ba965d43f5cd681cf21137e343a920e4eb4b2fa8ba94d05a3156",
+    "RimeQ.exe": "a252f37969154677c92038cd6c990626db4caecf810af8900caa2335a6775aa7",
+    "RimeQ.Broker.exe": "b677cadd55a0989ec11a78ee0334bab9e18035e5ae8df52327d5ef8bd41bc99e",
+    "x64/RimeQ.Tip.dll": "6697a5d6b5686cf780079adc5475aedc078cc65f36afcaeefe54765275e5dc89",
+    "x86/RimeQ.Tip.dll": "32f5806d38b268910e2f8104d71ef51a46a2cfe4b7688c7b8c9acf6d419bcd8a"
+  },
+  "package_sha256": "d90959e719abc92a28f76c260263e0e54d3987f15bfb4218c733d1885b250b6d",
+  "validation": "Managed icon palette/pixels/7 sizes/disposal passed; x64/x86 CTest 3/3 passed each; installer completed; actual taskbar visual awaits user confirmation."
+}

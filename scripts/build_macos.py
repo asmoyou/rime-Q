@@ -17,7 +17,7 @@ from prepare_resources import digest
 
 ROOT = Path(__file__).resolve().parents[1]
 IDENTIFIER = "com.asmoyou.inputmethod.RimeQ"
-VERSION = "0.4.7"
+VERSION = "0.4.8"
 
 
 def run(*args):

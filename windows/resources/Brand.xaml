@@ -1,0 +1,8 @@
+<Viewbox xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+  <Canvas Width="100" Height="100">
+    <Ellipse Canvas.Left="16" Canvas.Top="10" Width="64" Height="72"
+             Stroke="{DynamicResource TextColor}" StrokeThickness="11"/>
+    <Path Data="M57,61 L79,83" Stroke="{DynamicResource TextColor}"
+          StrokeThickness="11" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+  </Canvas>
+</Viewbox>

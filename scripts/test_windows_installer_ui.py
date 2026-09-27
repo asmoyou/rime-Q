@@ -18,8 +18,7 @@ def png_size(path):
 def main():
     output = ROOT / 'build-windows/Installer.UI.Preview.exe'
     icon = ROOT / 'build-windows/RimeQ.ico'
-    if not icon.is_file():
-        build_windows.icon(icon)
+    build_windows.icon(icon)
     build_windows.csharp(output, [ROOT / 'windows/installer/Setup.cs'], 9140,
                          main='RimeQ.Setup', console=True)
     destination = ROOT / 'artifacts/windows-installer-ui'

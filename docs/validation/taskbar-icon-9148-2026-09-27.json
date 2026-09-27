@@ -1,0 +1,28 @@
+{
+  "build": "0.4.7.9148",
+  "installed_directory": "C:\\Program Files\\RimeQ\\versions\\0.4.7.9148-dc9dcbd625984191970409833c67ff84",
+  "checks": {
+    "RimeQ.Control.exe--verify": {
+      "exit_code": 0,
+      "status": "enabled-or-completed hr=0x0"
+    },
+    "RimeQ.Broker.exe--ping": {
+      "exit_code": 0,
+      "status": "ready"
+    }
+  },
+  "installed_files_sha256": {
+    "RimeQ.exe": "afa1da062973e3527bf3c51aa028ab476ab1f68598943555402003f12b3a28ce",
+    "RimeQ.Broker.exe": "30ef6f3b3e32975834658df4a785900aa7bddbba74f06fa648db5676fdf41c64",
+    "x64/RimeQ.Tip.dll": "ff5d97af8a7cf4f86bfe6aef88a09f0a8cc62643e81d71969443a27b98339197",
+    "x86/RimeQ.Tip.dll": "aa458c9f6eb85583c9c8a130025e4869ecc884796d8185b435da7218da41d44c"
+  },
+  "package_sha256": "4801c56cc4deedb9f6c1d87bdb79e65a36c4d23afe35ab4d5c92636c56c52606",
+  "visual_validation": {
+    "source": "actual desktop screenshots, bottom-right taskbar, existing enabled Rime Q profile selected without enabling or sending text",
+    "before": "taskbar-9147-before.png",
+    "after": "taskbar-9148-after.png",
+    "observed": "System input-source Q has solid white strokes on the dark taskbar; 9147 showed dark strokes with a thin white outline.",
+    "scope": "This Windows machine and its current dark taskbar only; no claim of light-theme static profile recolouring or all host applications."
+  }
+}

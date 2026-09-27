@@ -39,9 +39,11 @@ python scripts/build_windows.py --smoke
 python scripts/build_windows.py --reuse-resources --smoke
 ```
 
-开发构建可加 `--no-package`；用 `--build N` 指定递增的 Windows 文件构建号，范围 1–65535。默认构建号见脚本。产物为 `dist/RimeQ-0.4.7-windows-x64.exe` 和对应 SHA256SUMS；`build-windows/stage` 是打包目录，不应直接注册为系统安装。
+开发构建可加 `--no-package`；用 `--build N` 指定递增的 Windows 文件构建号，范围 1–65535。默认构建号见脚本。产物为 `dist/RimeQ-0.4.8-windows-x64.exe` 和对应 SHA256SUMS；`build-windows/stage` 是打包目录，不应直接注册为系统安装。
 
 构建使用固定摘要下载运行库和解包工具，只提取 Weasel 分发包里的 OpenCC 数据，不安装、执行或注册 Weasel 程序。依赖见 [dependencies.lock.json](../dependencies.lock.json)；完整雾凇源码归档、运行库版本记录及许可随包提供。安装包不包含 `.gram` 模型。
+
+源码中的新图标采用透明底单色 Q，设置和安装器字形跟随应用明暗主题；任务栏托盘及自有输入法菜单按系统主题显示纯白或墨黑字形。Windows 自己管理的输入源指示图标使用独立的纯白字形，避免在深色任务栏显示黑字加白边；此静态系统图标不宣称随浅色主题自动换色。目前尚未公开发布，现有 0.4.7 下载包仍保留原图标。素材与重生成方式见 [图标设计说明](plans/2026-09-27-windows-logo-design.md)。
 
 ## 安装与个人数据
 

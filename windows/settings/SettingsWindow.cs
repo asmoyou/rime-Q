@@ -57,7 +57,9 @@ namespace RimeQ {
             page = (StackPanel)Window.FindName("Page"); pageAction = (StackPanel)Window.FindName("PageAction"); navigation = (StackPanel)Window.FindName("Navigation"); footer = (StackPanel)Window.FindName("Footer");
             title = (TextBlock)Window.FindName("PageTitle"); subtitle = (TextBlock)Window.FindName("PageSubtitle"); status = (TextBlock)Window.FindName("Status"); scroll = (ScrollViewer)Window.FindName("PageScroll");
             var decoder = new IconBitmapDecoder(new Uri(Path.Combine(Paths.App,"RimeQ.ico")),BitmapCreateOptions.PreservePixelFormat,BitmapCacheOption.OnLoad);
-            var logo = decoder.Frames.OrderByDescending(frame => frame.PixelWidth).First(); ((Image)Window.FindName("BrandIcon")).Source = logo; Window.Icon = logo;
+            Window.Icon = decoder.Frames.OrderByDescending(frame => frame.PixelWidth).First();
+            using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Brand.xaml"))
+                ((ContentControl)Window.FindName("BrandIcon")).Content = XamlReader.Load(stream);
             navigation.Children.Add(Group("偏好设置")); AddNav("输入与外观",0,"keyboard",navigation); AddNav("皮肤",4,"palette",navigation);
             var dictionaryGroup = Group("词库"); dictionaryGroup.Margin = new Thickness(0,18,0,8); navigation.Children.Add(dictionaryGroup);
             AddNav("个人词库",1,"book",navigation); AddNav("词库与模型",2,"layers",navigation);
