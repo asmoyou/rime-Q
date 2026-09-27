@@ -29,15 +29,15 @@
 | Windows 10 22H2 / Windows 11 x64 | 独立 EXE 安装包，含 x64/x86 TSF；安装与宿主验收状态见 [Windows 说明](docs/WINDOWS.md) |
 | Linux | 客户端规划中 |
 
-Windows：前往 [最新版本](https://github.com/asmoyou/rime-Q/releases/latest)，下载 `RimeQ-0.4.7-windows-x64.exe`。双击安装并完成管理员认证，然后在输入法列表选择 **Rime Q**。安装、升级和备份步骤见 [Windows 使用说明](docs/WINDOWS.md)。Windows 安装包尚未进行 Authenticode 签名。
+Windows：前往 [最新版本](https://github.com/asmoyou/rime-Q/releases/latest)，下载 `RimeQ-0.4.8-windows-x64.exe`。双击安装并完成管理员认证，然后在输入法列表选择 **Rime Q**。安装、升级和备份步骤见 [Windows 使用说明](docs/WINDOWS.md)。Windows 安装包尚未进行 Authenticode 签名。
 
 macOS：
 
-1. 前往 [最新版本](https://github.com/asmoyou/rime-Q/releases/latest)，下载 `RimeQ-0.4.7-macos-universal.pkg`。
+1. 前往 [最新版本](https://github.com/asmoyou/rime-Q/releases/latest)，下载 `RimeQ-0.4.8-macos-universal.pkg`。
 2. 双击安装包，按 macOS 安装器的提示完成安装。应用会安装到系统输入法目录，并在后台完成启用。
 3. 从菜单栏的输入法菜单选择 **Rime Q**，开始输入。
 
-当前发布版 **[0.4.7](https://github.com/asmoyou/rime-Q/releases/tag/v0.4.7)** 减少双平台同步的后台轮询和重复词库处理；Windows 设置窗口按需创建、关闭后释放页面，并优化附近设备页布局，避免短暂连接提示反复出现引起页面抖动。升级保留原同步组与个人记录。性能样本与实际验收范围见 [验证记录](docs/VALIDATION.md)。
+当前发布版 **[0.4.8](https://github.com/asmoyou/rime-Q/releases/tag/v0.4.8)** 将 Windows 标识改为透明底单色 Q，深色任务栏的系统输入源图标使用纯白笔画；设置与安装器采用随主题变化的矢量字形。macOS 保持原有图标与输入行为。升级保留原同步组与个人记录，实际验收范围见 [验证记录](docs/VALIDATION.md)。
 
 macOS 安装包已做本地 ad-hoc 签名，尚未完成 Apple Developer ID 签名与公证。若 macOS 阻止打开，请确认文件来自本项目，再按“系统设置 → 隐私与安全性”的提示处理（[Apple 说明](https://support.apple.com/zh-cn/102445)）。macOS 实际宿主测试主要在 Intel Mac 上完成，通用包构建通过不代表全部 Apple Silicon 宿主均已验证。
 
@@ -121,7 +121,7 @@ Mac 保留原来的单个 Rime Q 输入源和 Q 图标，输入时另用“中 /
 
 Windows 客户端构建：`python scripts/build_windows.py --smoke`，产物为 `dist/RimeQ-0.4.8-windows-x64.exe`。原生 TSF、独立引擎服务、WPF 设置、个人词库、词库资源、可选模型及安装步骤见 [Windows 说明](docs/WINDOWS.md)。macOS 与 Windows 使用相同的设置页能力、词库与模型规则及操作流程，系统输入接入和原生控件分别适配；一致性契约见 [客户端功能一致性](docs/CLIENT_PARITY.md)。
 
-正在准备 0.4.8：Windows 单色 Q 新图标已接入源码，深色任务栏使用纯白字形，尚未公开发布；各图标入口的显示规则与素材生成方式见 [图标说明](docs/plans/2026-09-27-windows-logo-design.md)。
+0.4.8 已发布 Windows 单色 Q 图标，深色任务栏的系统输入源使用纯白字形；各图标入口的显示规则与素材生成方式见 [图标说明](docs/plans/2026-09-27-windows-logo-design.md)。
 
 macOS 客户端构建需要 macOS 13+、Xcode 工具链和 Python 3.10+。首次构建会下载并核验固定版本依赖。
 

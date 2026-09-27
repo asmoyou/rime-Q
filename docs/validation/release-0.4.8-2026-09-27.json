@@ -1,0 +1,184 @@
+{
+  "commit": "4148ec1c06c71ee297175ec259dc8107b9524ef9",
+  "run": 36293683460,
+  "url": "https://github.com/asmoyou/rime-Q/releases/tag/v0.4.8",
+  "macOS_build": "1790482505",
+  "windows_build": 9149,
+  "assets": [
+    {
+      "name": "RimeQ-0.4.8-macos-SHA256SUMS.txt",
+      "size": 98,
+      "sha256": "c43533aad516f7a34a9516411f68471c9959098ba31f11230671a9ef9af47aca",
+      "verification": "public download plus complete GitHub asset SHA-256"
+    },
+    {
+      "name": "RimeQ-0.4.8-macos-universal.pkg",
+      "size": 76127845,
+      "sha256": "0c368281e1b59ef9b81ea7e0a49b46ec4937f479277c08a281c047e689b18ded",
+      "verification": "public download plus complete GitHub asset SHA-256"
+    },
+    {
+      "name": "RimeQ-0.4.8-windows-SHA256SUMS.txt",
+      "size": 95,
+      "sha256": "4c13ee97331de2b41624422493b8c45a990dfa1b70a87d552034d45240f7a7fe",
+      "verification": "public download plus complete GitHub asset SHA-256"
+    },
+    {
+      "name": "RimeQ-0.4.8-windows-x64.exe",
+      "size": 71066112,
+      "sha256": "90887bcd9920d200831637f4da8ac9a29c6fb3d6f0711f5ce3881e01eb2386d6",
+      "verification": "public download plus complete GitHub asset SHA-256"
+    }
+  ],
+  "tag": "v0.4.8",
+  "verified_utc": "2026-09-27T04:41:49.777585+00:00",
+  "ci": {
+    "run": 36293683460,
+    "sha": "4148ec1c06c71ee297175ec259dc8107b9524ef9",
+    "jobs": [
+      {
+        "id": 108548442628,
+        "name": "changes",
+        "conclusion": "success",
+        "html_url": "https://github.com/asmoyou/rime-Q/actions/runs/36293683460/job/108548442628"
+      },
+      {
+        "id": 108548536072,
+        "name": "mac-package",
+        "conclusion": "success",
+        "html_url": "https://github.com/asmoyou/rime-Q/actions/runs/36293683460/job/108548536072"
+      },
+      {
+        "id": 108548536099,
+        "name": "windows-registration",
+        "conclusion": "success",
+        "html_url": "https://github.com/asmoyou/rime-Q/actions/runs/36293683460/job/108548536099"
+      },
+      {
+        "id": 108548536118,
+        "name": "core (macos-14)",
+        "conclusion": "success",
+        "html_url": "https://github.com/asmoyou/rime-Q/actions/runs/36293683460/job/108548536118"
+      },
+      {
+        "id": 108548536122,
+        "name": "core (ubuntu-24.04)",
+        "conclusion": "success",
+        "html_url": "https://github.com/asmoyou/rime-Q/actions/runs/36293683460/job/108548536122"
+      },
+      {
+        "id": 108548536159,
+        "name": "windows-package",
+        "conclusion": "success",
+        "html_url": "https://github.com/asmoyou/rime-Q/actions/runs/36293683460/job/108548536159"
+      },
+      {
+        "id": 108548536168,
+        "name": "sync-core (windows-2022)",
+        "conclusion": "success",
+        "html_url": "https://github.com/asmoyou/rime-Q/actions/runs/36293683460/job/108548536168"
+      },
+      {
+        "id": 108548536170,
+        "name": "core (windows-2022)",
+        "conclusion": "success",
+        "html_url": "https://github.com/asmoyou/rime-Q/actions/runs/36293683460/job/108548536170"
+      },
+      {
+        "id": 108548536176,
+        "name": "sync-sandboxes",
+        "conclusion": "success",
+        "html_url": "https://github.com/asmoyou/rime-Q/actions/runs/36293683460/job/108548536176"
+      },
+      {
+        "id": 108548536188,
+        "name": "sync-core (macos-14)",
+        "conclusion": "success",
+        "html_url": "https://github.com/asmoyou/rime-Q/actions/runs/36293683460/job/108548536188"
+      },
+      {
+        "id": 108548536205,
+        "name": "sync-core (ubuntu-24.04)",
+        "conclusion": "success",
+        "html_url": "https://github.com/asmoyou/rime-Q/actions/runs/36293683460/job/108548536205"
+      },
+      {
+        "id": 108549814283,
+        "name": "windows-install",
+        "conclusion": "success",
+        "html_url": "https://github.com/asmoyou/rime-Q/actions/runs/36293683460/job/108549814283"
+      }
+    ],
+    "artifacts": [
+      {
+        "id": 10923327585,
+        "name": "RimeQ-Windows-x64",
+        "digest": "sha256:6de43c2ab476501630f13b0c51b76cd8293610610e46fff7d349be4e699a4fd3",
+        "size_in_bytes": 71066535
+      },
+      {
+        "id": 10923102646,
+        "name": "RimeQ-macOS",
+        "digest": "sha256:38f4e0154d24510e0498237111b441291a3c6e9133f7d18b02d26218147a139e",
+        "size_in_bytes": 76128021
+      }
+    ]
+  },
+  "packages": {
+    "macOS": {
+      "package": {
+        "overwrite-permissions": "true",
+        "relocatable": "false",
+        "identifier": "com.asmoyou.inputmethod.RimeQ",
+        "postinstall-action": "none",
+        "version": "0.4.8",
+        "format-version": "2",
+        "generator-version": "InstallCmds-834 (23J631)",
+        "install-location": "/Library/Input Methods",
+        "auth": "root"
+      },
+      "bundle": {
+        "path": "./RimeQ.app",
+        "id": "com.asmoyou.inputmethod.RimeQ",
+        "CFBundleShortVersionString": "0.4.8",
+        "CFBundleVersion": "1790482505"
+      },
+      "actual_app_info": {
+        "CFBundleIdentifier": "com.asmoyou.inputmethod.RimeQ",
+        "CFBundleVersion": "1790482505",
+        "CFBundleShortVersionString": "0.4.8"
+      },
+      "payload_entries": 601
+    },
+    "windows": [
+      {
+        "file": "RimeQ.exe",
+        "version": "0.4.8.9149"
+      },
+      {
+        "file": "RimeQ.Broker.exe",
+        "version": "0.4.8.9149"
+      },
+      {
+        "file": "RimeQ.Control.exe",
+        "version": "0.4.8.9149"
+      },
+      {
+        "file": "x64/RimeQ.Tip.dll",
+        "version": "0.4.8.9149"
+      },
+      {
+        "file": "x86/RimeQ.Tip.dll",
+        "version": "0.4.8.9149"
+      }
+    ],
+    "windows_payload_self_check": true
+  },
+  "update_parser": "Production Windows parser: installed 0.4.7 -> available v0.4.8",
+  "scope": {
+    "macOS_activation": "pending with verified login retry; not immediate host input",
+    "local_visual": "installed preview 0.4.7.9148; actual dark taskbar screenshots",
+    "release_installed_locally": false,
+    "download_verification": "Full CI archive hashes and GitHub asset SHA-256; anonymous full checksum files and first 65536 bytes of installers"
+  }
+}
