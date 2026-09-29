@@ -10,7 +10,7 @@ namespace RimeQ {
     internal static class TaskbarIconTests {
         [DllImport("user32.dll")] static extern int GetGuiResources(IntPtr process, int flag);
         static void Require(bool value, string message) { if (!value) throw new Exception(message); }
-        static void Pixels(Icon icon, Color ink) {
+        static void Pixels(Icon icon, Color ink, bool premultiplied=true) {
             using (var bitmap = icon.ToBitmap()) {
                 int solid = 0, clear = 0;
                 for (int y=0;y<bitmap.Height;++y) for (int x=0;x<bitmap.Width;++x) {
@@ -19,7 +19,8 @@ namespace RimeQ {
                     if(pixel.A==255) ++solid;
                     if(pixel.A>0) {
                         // HICON bitmaps expose premultiplied channels at antialiased edges.
-                        Require(Math.Abs(pixel.R-ink.R*pixel.A/255)<=1 && Math.Abs(pixel.G-ink.G*pixel.A/255)<=1 && Math.Abs(pixel.B-ink.B*pixel.A/255)<=1,
+                        int alpha=premultiplied?pixel.A:255;
+                        Require(Math.Abs(pixel.R-ink.R*alpha/255)<=1 && Math.Abs(pixel.G-ink.G*alpha/255)<=1 && Math.Abs(pixel.B-ink.B*alpha/255)<=1,
                             "Solid glyph pixels do not match taskbar text colour: size="+bitmap.Width+" expected="+ink+" actual="+pixel);
                     }
                 }
@@ -29,6 +30,15 @@ namespace RimeQ {
         [STAThread] static int Main(string[] args) {
             try {
                 Directory.CreateDirectory(args[0]);
+                // Start-menu shortcuts extract the EXE icon, a separate path
+                // from the tray and registered TIP. Check the compiled resource.
+                string shellPath=args.Length>1?args[1]:Process.GetCurrentProcess().MainModule.FileName;
+                using(var shellIcon=Icon.ExtractAssociatedIcon(shellPath)) {
+                    Require(shellIcon!=null,"Shell could not extract the application icon");
+                    // PNG application frames retain straight alpha, unlike
+                    // our dynamically rendered premultiplied tray bitmaps.
+                    Pixels(shellIcon,Color.White,false);
+                }
                 // Reproduces this machine: dark shell, light applications. Never write system preferences.
                 var white=TaskbarIcon.SelectInk(key => key=="SystemUsesLightTheme" ? 0 : 1,false,Color.Red);
                 var dark=TaskbarIcon.SelectInk(key => key=="SystemUsesLightTheme" ? 1 : 0,false,Color.Red);

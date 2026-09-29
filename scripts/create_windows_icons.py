@@ -47,14 +47,10 @@ def mark(size, keyline=True, ink=INK):
 
 
 def svg():
-    # Same oval, tail, stroke widths and keyline as the raster master above.
+    # Match the fixed white shell mark, without a second outline.
     return '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
   <title>Rime Q</title>
-  <g stroke="white" stroke-width="15" stroke-linecap="round">
-    <ellipse cx="48" cy="46" rx="26.5" ry="30.5"/>
-    <path d="M57 61 79 83"/>
-  </g>
-  <g stroke="#202124" stroke-width="11" stroke-linecap="round">
+  <g stroke="white" stroke-width="11" stroke-linecap="round">
     <ellipse cx="48" cy="46" rx="26.5" ry="30.5"/>
     <path d="M57 61 79 83"/>
   </g>
@@ -79,7 +75,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check', action='store_true', help='Check committed artwork without writing it')
     args = parser.parse_args()
-    frames = [mark(size) for size in SIZES]
+    # Start uses the EXE's fixed icon, not the theme-aware tray renderer.
+    # Use white strokes on the requested dark shell; no dark fill or keyline.
+    frames = [mark(size, keyline=False, ink=(255, 255, 255)) for size in SIZES]
     import io
     output = io.BytesIO()
     frames[-1].save(output, format='ICO', sizes=[(s, s) for s in SIZES], append_images=frames[:-1])

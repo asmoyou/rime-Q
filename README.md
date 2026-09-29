@@ -29,15 +29,15 @@
 | Windows 10 22H2 / Windows 11 x64 | 独立 EXE 安装包，含 x64/x86 TSF；安装与宿主验收状态见 [Windows 说明](docs/WINDOWS.md) |
 | Linux | 客户端规划中 |
 
-Windows：前往 [最新版本](https://github.com/asmoyou/rime-Q/releases/latest)，下载 `RimeQ-0.4.8-windows-x64.exe`。双击安装并完成管理员认证，然后在输入法列表选择 **Rime Q**。安装、升级和备份步骤见 [Windows 使用说明](docs/WINDOWS.md)。Windows 安装包尚未进行 Authenticode 签名。
+Windows：前往 [最新版本](https://github.com/asmoyou/rime-Q/releases/latest)，下载 `RimeQ-0.4.9-windows-x64.exe`。双击安装并完成管理员认证，然后在输入法列表选择 **Rime Q**。安装、升级和备份步骤见 [Windows 使用说明](docs/WINDOWS.md)。Windows 安装包尚未进行 Authenticode 签名。
 
 macOS：
 
-1. 前往 [最新版本](https://github.com/asmoyou/rime-Q/releases/latest)，下载 `RimeQ-0.4.8-macos-universal.pkg`。
+1. 前往 [最新版本](https://github.com/asmoyou/rime-Q/releases/latest)，下载 `RimeQ-0.4.9-macos-universal.pkg`。
 2. 双击安装包，按 macOS 安装器的提示完成安装。应用会安装到系统输入法目录，并在后台完成启用。
 3. 从菜单栏的输入法菜单选择 **Rime Q**，开始输入。
 
-当前发布版 **[0.4.8](https://github.com/asmoyou/rime-Q/releases/tag/v0.4.8)** 将 Windows 标识改为透明底单色 Q，深色任务栏的系统输入源图标使用纯白笔画；设置与安装器采用随主题变化的矢量字形。macOS 保持原有图标与输入行为。升级保留原同步组与个人记录，实际验收范围见 [验证记录](docs/VALIDATION.md)。
+当前发布版 **[0.4.9](https://github.com/asmoyou/rime-Q/releases/tag/v0.4.9)** 将 Windows 标识改为透明底单色 Q，深色任务栏的系统输入源图标使用纯白笔画；设置与安装器采用随主题变化的矢量字形。macOS 保持原有图标与输入行为。升级保留原同步组与个人记录，实际验收范围见 [验证记录](docs/VALIDATION.md)。
 
 macOS 安装包已做本地 ad-hoc 签名，尚未完成 Apple Developer ID 签名与公证。若 macOS 阻止打开，请确认文件来自本项目，再按“系统设置 → 隐私与安全性”的提示处理（[Apple 说明](https://support.apple.com/zh-cn/102445)）。macOS 实际宿主测试主要在 Intel Mac 上完成，通用包构建通过不代表全部 Apple Silicon 宿主均已验证。
 
@@ -119,9 +119,9 @@ Mac 保留原来的单个 Rime Q 输入源和 Q 图标，输入时另用“中 /
 
 ## 从源码构建
 
-Windows 客户端构建：`python scripts/build_windows.py --smoke`，产物为 `dist/RimeQ-0.4.8-windows-x64.exe`。原生 TSF、独立引擎服务、WPF 设置、个人词库、词库资源、可选模型及安装步骤见 [Windows 说明](docs/WINDOWS.md)。macOS 与 Windows 使用相同的设置页能力、词库与模型规则及操作流程，系统输入接入和原生控件分别适配；一致性契约见 [客户端功能一致性](docs/CLIENT_PARITY.md)。
+Windows 客户端构建：`python scripts/build_windows.py --smoke`，产物为 `dist/RimeQ-0.4.9-windows-x64.exe`。原生 TSF、独立引擎服务、WPF 设置、个人词库、词库资源、可选模型及安装步骤见 [Windows 说明](docs/WINDOWS.md)。macOS 与 Windows 使用相同的设置页能力、词库与模型规则及操作流程，系统输入接入和原生控件分别适配；一致性契约见 [客户端功能一致性](docs/CLIENT_PARITY.md)。
 
-0.4.8 已发布 Windows 单色 Q 图标，深色任务栏的系统输入源使用纯白字形；各图标入口的显示规则与素材生成方式见 [图标说明](docs/plans/2026-09-27-windows-logo-design.md)。
+0.4.9 修复 Windows 开始菜单和 EXE 的 Q 图标，深色任务栏的系统输入源使用纯白字形；各图标入口的显示规则与素材生成方式见 [图标说明](docs/plans/2026-09-27-windows-logo-design.md)。
 
 macOS 客户端构建需要 macOS 13+、Xcode 工具链和 Python 3.10+。首次构建会下载并核验固定版本依赖。
 
@@ -131,7 +131,7 @@ cd rime-Q
 python3 scripts/build_macos.py --universal --smoke
 ```
 
-产物为 `dist/RimeQ-0.4.8-macos-universal.pkg`。已有资源缓存时可加 `--reuse-resources`；默认只保留 PKG，临时应用在打包后清理。
+产物为 `dist/RimeQ-0.4.9-macos-universal.pkg`。已有资源缓存时可加 `--reuse-resources`；默认只保留 PKG，临时应用在打包后清理。
 
 构建检查包括真实引擎与学习、快捷输入、词库管理、原生设置操作、候选皮肤、安装状态、更新版本比较和每日调度。CI 还会在独立运行环境安装实际 PKG，核验启用或明确的待启用处理，并验证卸载保留数据。
 

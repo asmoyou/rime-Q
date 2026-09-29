@@ -1,10 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
   <title>Rime Q</title>
-  <g stroke="white" stroke-width="15" stroke-linecap="round">
-    <ellipse cx="48" cy="46" rx="26.5" ry="30.5"/>
-    <path d="M57 61 79 83"/>
-  </g>
-  <g stroke="#202124" stroke-width="11" stroke-linecap="round">
+  <g stroke="white" stroke-width="11" stroke-linecap="round">
     <ellipse cx="48" cy="46" rx="26.5" ry="30.5"/>
     <path d="M57 61 79 83"/>
   </g>

@@ -966,3 +966,33 @@ Windows 安装器保留原有校验、停服、UAC、写入、回滚、启用和
 | RimeQ-0.4.5-windows-x64.exe | 70284800 | `bf00d0d5f15b531b2e5861fa72fa3d47b4b954dd7d1ee53e3717532eb0d9636c` |
 
 匿名公开验证确认 `releases/latest` 返回v0.4.5，四个附件状态、大小和GitHub端摘要正确；两份SHA文本内容与安装包摘要一致，两个安装包前64KiB下载均返回HTTP 206。用户本机未被本轮自动安装，仍需主动下载Windows 0.4.5并完成系统管理员认证；另一台Mac升级后才可能产生真实组的首次双方成功时间。
+## 2026-09-29 开始菜单图标与本机登录/搜索排查
+
+用户反馈开始菜单仍显示黑色 Q 加白圈。检查发现快捷方式图标明确来自 `RimeQ.exe,0`，而构建脚本此前只修复了任务栏专用 `TaskbarQ.ico`，应用 ICO 仍生成白色外圈。本次将应用/开始菜单 ICO 改为透明底单色 Q，保留任务栏纯白资源；资源、安装器 UI、任务栏像素及 x64/x86 CTest 均通过。构建 `0.4.8.9150` 已完成正常升级，HKLM 活动版本、Rime Q/Broker/Sync 进程和开始菜单快捷方式均指向新版本目录；安装 ICO SHA-256 为 `01371989b3ccc2374b7ce94c26cf238d605488ae6b61c7200006cb0fd9bbcee0`。开始菜单实际视觉仍需用户点击确认。
+
+本机在 2026-09-29 的三次登录记录中，Winlogon 的 `<Profiles>` 处理分别耗时约 412、421、422 秒；Rime Q 进程均在登录完成后才启动，因此当前证据不支持 Rime Q 阻塞密码登录。同期系统日志反复记录 Plastic Change Tracker 45 秒启动超时、MSI Live Update/TriggerModeMonitor/Intel Rapid Storage 服务崩溃或启动失败，以及 ESENT `SRUDB.dat` 坏页链接。磁盘卷和物理磁盘当前报告健康。已重启 SearchApp、StartMenuExperienceHost 和 Explorer；重启后进程响应正常，但搜索栏是否恢复需要用户实际点按确认。上述第三方服务和 SRU 数据库问题尚未在本轮改动，不能写成已修复。
+
+## 2026-09-29 系统启动故障处理
+
+对最近 7 天 System/Application 日志聚合后，重复故障集中在 Plastic Change Tracker（每次启动 45 秒超时）、MSI Live Update、Intel Rapid Storage 数据服务，以及不兼容/未签名的 Intel HAXM 与 Intel XTU `iocbios2` 驱动；未发现 Rime Q 崩溃或 BugCheck 事件。已通过管理员认证将前三个可选用户态服务改为手动启动，并停用当前硬件不兼容的 Intel HAXM 和未签名的 `iocbios2`，没有删除组件。已将损坏的 `C:\Windows\System32\SRU\SRUDB.dat` 保留为 `build-windows/SRUDB.dat.20260929-111045.bak` 后让 DPS 重建；修复后 5 分钟内没有新的 7000/7009/7034/ESENT 目标错误。原服务配置保存在 `build-windows/stability-backup-20260929-111045.json`，可据此恢复。`vstor2-mntapi20-shared`、`AliPaladin` 等未确认用途的驱动未改动。
+Windows `sfc /verifyonly` 以管理员权限完成，进程退出码为 0；未发现扫描失败。
+
+## 2026-09-29 重启复现：撤回已解决登录卡顿的判断
+
+用户再次重启后，本机 14:30:07→14:37:02、14:40:28→14:47:33 登录仍分别在 Winlogon `<Profiles>` 阶段耗时 415/424 秒。三项已改为手动的故障服务均未运行，说明之前服务处置没有解决登录延迟；无新 ESENT 447 也不能证明登录恢复。用户配置文件的 NTUSER.DAT、UsrClass.dat 在每次登录开始后约 1–2 秒完成加载，延迟在后续处理。14:50:40 的 RDP 日志是 Event 25，重连已在 14:47:33 登录成功的会话 2，并非新的配置文件登录，因此不能据此断言 RDP 新登录没有问题。当前证据不足以认定配置文件损坏或排除所有第三方宿主 DLL。
+
+按 Microsoft 用户配置文件诊断文档，启动仅针对 profile providers 的本地 ETL 数据收集器，循环上限 64 MB、45 分钟自动结束，供下一次用户自行保存工作、注销再登录时采集。没有自动注销、重启、重建账号、重置防火墙或删除个人注册表。原始跟踪和操作脚本保存在忽略目录 `artifacts/profile-delay-20260929`；等待复现后停止/解码并移除收集器定义。
+
+图标 9150 仅去白边，用户在深灰开始菜单仍看到黑色 Q，未满足要求。开发构建 9151 将应用 ICO 和 SVG 改为透明底纯白笔画。10 档 ICO 检查、x64/x86 各 3 项 CTest、托盘回归通过；新增直接提取 EXE 默认图标的回归，已验证旧 9150 失败、新 9151 通过。安装包 SHA-256 为 `81e8aed6004de393fb0ab10598d01abfea273544b98b849ceb6d066cd5db3f79`，已打开安装器；本段记录时仍待用户完成升级和实际开始菜单视觉核对，不宣称已发布新版本。界面控制因 `coordinate input geometry is unavailable` 和 `FrameArrived timed out` 未完成点击或截图验收。
+
+## 2026-09-29 冷启动历史与残留启动项修复
+
+Diagnostics-Performance 历史显示，2026-09-23 的启动总时长约 112 秒、用户配置处理约 3.6 秒；2026-09-29 10:32 的启动总时长约 531 秒，其中 `BootUserProfileProcessingTime=422706 ms`，内核和驱动初始化合计约 1.4 秒。14:29 的 Winlogon 日志再次记录 `<Profiles>` 从 14:30:07 持续到 14:37:02；期间 `<GPClient>` 也有约 120 秒的通知处理。用户配置事件在 14:30:07 收到登录、14:30:09 完成两个注册表配置单元加载，但 Profile 通知直到 14:37:02 才结束。RDP Event 25 仍是重连已登录会话，不是冷登录对照。
+
+15:36 的注销再登录中，用户配置 ETL 的所有加载均走“already loaded”路径，`CUserProfile_Load` 约 6 ms；这只能证明暖登录很快，不能证明冷启动延迟已消失。当前仍需一次用户主动重启后的冷启动跟踪，才能定位 `<Profiles>` 内部具体等待者。
+
+本轮确认并修复两个确定的残留问题，均保留可回滚备份：MSI `TriggerModeMonitor.exe` 每次登录因 `CfgDir=C:\MSI\MSI OC Kit\ActiveX_Service` 目录不存在而抛出 `DirectoryNotFoundException`；已创建该目录及空的 `TriggerModeMonitor.ini`，注册表备份为 `artifacts/profile-delay-20260929/msi-activex-registry-20260929-160818.reg`。未据此宣称它是 7 分钟延迟的唯一根因。VMware `vstor2-mntapi20-shared.sys` 在每次启动报告签名验证失败，系统无 VMware 服务或安装目录；已将该残留驱动的 `Start` 改为 4，注册表备份为 `artifacts/profile-delay-20260929/vstor2-service-20260929-161120.reg`，未删除文件。未修改 AliPaladin、VirtualBox、远程控制或安全软件。
+
+Rime Q 0.4.8 构建 9151 的设置快捷方式已核对指向当前安装目录；刷新了当前用户 Windows 图标缓存。新图标已通过资源像素和默认 EXE 图标回归，开始菜单实际视觉仍需用户点开确认。
+
+下一次冷启动跟踪已由 Windows Performance Recorder 预置（GeneralProfile、FileIO、Registry，file mode）；当前尚未重启，需用户手动重启后再停止并解析。跟踪状态保存在 `artifacts/profile-delay-20260929/wpr-boottrace-state.json`，不自动重启。
