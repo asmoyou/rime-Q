@@ -1,0 +1,33 @@
+{
+  "commit": "0e8b595469b00a35a02980e72e0d5d21f3de6311",
+  "run": 36543164533,
+  "url": "https://github.com/asmoyou/rime-Q/releases/tag/v0.4.9",
+  "macOS_build": "1790670713",
+  "windows_build": 9151,
+  "assets": [
+    {
+      "name": "RimeQ-0.4.9-macos-SHA256SUMS.txt",
+      "size": 98,
+      "sha256": "8c1436b213cab307c9e180253a9320a9e5d7c523ad231c67dbd387c0f70976d9",
+      "verification": "public download plus complete GitHub asset SHA-256"
+    },
+    {
+      "name": "RimeQ-0.4.9-macos-universal.pkg",
+      "size": 76127853,
+      "sha256": "2410c4b99f58678c3b6d829dc3e36fde657d02565ecf103eb6a5a7e0f10a5b3d",
+      "verification": "public download plus complete GitHub asset SHA-256"
+    },
+    {
+      "name": "RimeQ-0.4.9-windows-SHA256SUMS.txt",
+      "size": 95,
+      "sha256": "dd784ba77500b230429158babdbeb1f44e7b5b4c819933d551dc718928b5b747",
+      "verification": "public download plus complete GitHub asset SHA-256"
+    },
+    {
+      "name": "RimeQ-0.4.9-windows-x64.exe",
+      "size": 70902272,
+      "sha256": "dae04ba0e19567823787baaa84fb450605a435c167715455ff0a6de31df59b01",
+      "verification": "public download plus complete GitHub asset SHA-256"
+    }
+  ]
+}

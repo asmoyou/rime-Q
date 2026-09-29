@@ -1,5 +1,20 @@
 # 验证记录
 
+## 2026-09-29 0.4.9 完整 CI 与公开发布
+
+已发布 [v0.4.9](https://github.com/asmoyou/rime-Q/releases/tag/v0.4.9)，标签指向 `0e8b595469b00a35a02980e72e0d5d21f3de6311`。[CI 36543164533](https://github.com/asmoyou/rime-Q/actions/runs/36543164533) 的 12 项任务全部通过，包括双端打包、Windows 安装/卸载保留数据及 macOS 安装验证。附件直接取自同一轮 CI，Actions 归档完整 SHA-256 已核对。
+
+Windows 完整载荷校验通过，设置、Broker、Control、x64/x86 TIP 的固定版本均为 **0.4.9.9151**；CI 成品 EXE 默认图标的白色笔画回归通过。macOS 包内 Info.plist 与 PackageInfo 一致，为 **0.4.9 (1790670713)**；固定路径、禁止重定位、雾凇源码归档及不含 `.gram` 检查通过。本轮未安装到用户机器，开始菜单实屏仍待确认。
+
+本机首次协调器测试出现最小检查间隔断言失败，独立重跑及下一轮完整 smoke 中该测试均通过；完整本机 smoke 最后被现用 Broker 的隔离保护拒绝，未替换现用服务。干净 CI 的完整测试全部通过，不声称本机 smoke 全部通过。
+
+| 安装包 | 字节数 | SHA-256 |
+| --- | ---: | --- |
+| RimeQ-0.4.9-windows-x64.exe | 70902272 | `dae04ba0e19567823787baaa84fb450605a435c167715455ff0a6de31df59b01` |
+| RimeQ-0.4.9-macos-universal.pkg | 76127853 | `2410c4b99f58678c3b6d829dc3e36fde657d02565ecf103eb6a5a7e0f10a5b3d` |
+
+匿名核对 latest、标签提交、四个附件大小和完整 GitHub 摘要通过；校验文件全文一致，两份安装包前 64 KiB 下载与 CI 文件一致。正式 Windows 更新解析器确认已装 0.4.8 可发现 v0.4.9。见 [发布核对](validation/release-0.4.9-2026-09-29.json)。本版不包含 Windows 系统登录卡顿修复。
+
 ## 2026-09-27 0.4.8 完整 CI 与公开发布
 
 提交 `4148ec1c06c71ee297175ec259dc8107b9524ef9` 的 [CI 36293683460](https://github.com/asmoyou/rime-Q/actions/runs/36293683460) 全部 12 项通过：三平台核心和同步、隔离网络、Windows 注册/打包/安装生命周期、macOS 成品包。Windows 两架构各 3/3 CTest、默认输入源图标提取及托盘像素/主题/句柄回归通过，生产 TIP 的真实 TSF 上下文与隔离引擎通过。macOS 28 项原生同步场景通过；安装走明确待启用及登录重试分支，不能视为真实宿主立即输入验收。

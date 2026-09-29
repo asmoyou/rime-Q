@@ -37,7 +37,7 @@ macOS：
 2. 双击安装包，按 macOS 安装器的提示完成安装。应用会安装到系统输入法目录，并在后台完成启用。
 3. 从菜单栏的输入法菜单选择 **Rime Q**，开始输入。
 
-当前发布版 **[0.4.9](https://github.com/asmoyou/rime-Q/releases/tag/v0.4.9)** 将 Windows 标识改为透明底单色 Q，深色任务栏的系统输入源图标使用纯白笔画；设置与安装器采用随主题变化的矢量字形。macOS 保持原有图标与输入行为。升级保留原同步组与个人记录，实际验收范围见 [验证记录](docs/VALIDATION.md)。
+当前发布版 **[0.4.9](https://github.com/asmoyou/rime-Q/releases/tag/v0.4.9)** 补齐 Windows 开始菜单和 EXE 的透明底纯白 Q 图标，保留深色任务栏的纯白输入源图标。macOS 保持原有图标与输入行为。升级保留原同步组与个人记录，实际验收范围见 [验证记录](docs/VALIDATION.md)。
 
 macOS 安装包已做本地 ad-hoc 签名，尚未完成 Apple Developer ID 签名与公证。若 macOS 阻止打开，请确认文件来自本项目，再按“系统设置 → 隐私与安全性”的提示处理（[Apple 说明](https://support.apple.com/zh-cn/102445)）。macOS 实际宿主测试主要在 Intel Mac 上完成，通用包构建通过不代表全部 Apple Silicon 宿主均已验证。
 
